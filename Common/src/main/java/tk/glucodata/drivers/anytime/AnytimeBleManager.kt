@@ -2320,6 +2320,9 @@ class AnytimeBleManager(
             "CT2 self-test: iw=${result.iwNa} ib=${result.ibNa} T=${result.temperatureC} " +
                     "power=${result.powerByte} passed=${result.passed}",
         )
+        if (result.powerByte in 0 until AnytimeConstants.BATTERY_LOW_PERCENT_CT2) {
+            Log.w(TAG, "CT2 self-test: low battery (${result.powerByte}%)")
+        }
         UiRefreshBus.requestStatusRefresh()
     }
 
