@@ -508,8 +508,29 @@ class SensorViewModel : ViewModel() {
                         val isSi = Natives.isSibionics(gatt.dataptr)
                         val nativeSensorKind =
                             runCatching { Natives.getLibreVersion(gatt.dataptr) }.getOrDefault(-1)
-                        val sensorVendor = SensorVendor.fromNativeKind(nativeSensorKind)
-                        val sensorType = SensorTypeName.fromNativeKind(nativeSensorKind, isSi2)
+                        // Native decides Libre 2 by elimination -- anything not flagged
+                        // Sibionics, Dexcom, Accu-Chek or five-minute is Libre 2 -- and it
+                        // carries no flag at all for Ottai, Anytime, MQ or iCan. On the
+                        // device holding the sensor the driver registry corrects that; on a
+                        // device that only mirrors it there is no driver to ask, so the
+                        // catch-all would badge every mirrored managed sensor Abbott. Claim
+                        // nothing rather than claim wrongly.
+                        // Never paired to this phone: no address was ever resolved for it and
+                        // no GATT was ever connected. A real Libre 2 in use has both.
+                        val mirrored = gatt.mActiveDeviceAddress == null &&
+                            !gatt.hasLocallyConnectedGatt()
+                        val unknownVendor = mirrored &&
+                            nativeSensorKind == tk.glucodata.SensorSourceResolver.SENSOR_KIND_LIBRE2
+                        val sensorVendor = if (unknownVendor) {
+                            SensorVendor.UNKNOWN
+                        } else {
+                            SensorVendor.fromNativeKind(nativeSensorKind)
+                        }
+                        val sensorType = if (unknownVendor) {
+                            SensorTypeName.UNKNOWN
+                        } else {
+                            SensorTypeName.fromNativeKind(nativeSensorKind, isSi2)
+                        }
                         // Managed and legacy Sibionics 2 both default to 22 days, while preserving
                         // an explicit earlier reset target selected with the sensor-card stepper.
                         if (isSi2 && autoResetDays !in 1..22 && autoResetDays != 300) {
