@@ -122,6 +122,7 @@ object AnytimeRegistry {
         val remaining = persistedRecords(context).filter { !it.matchesId(canonical) }
         writeRecords(context, remaining)
         clearPerSensorState(context, canonical)
+        AnytimeAlgorithm.clearCalibratorState(canonical)
     }
 
     private fun writeRecords(context: Context, records: List<SensorRecord>) {
@@ -216,6 +217,31 @@ object AnytimeRegistry {
         val editor = prefs(c).edit()
         if (glucoseId > 0) editor.putInt(AnytimeConstants.PREF_REF_BG_GLUCOSE_ID_PREFIX + id, glucoseId)
         else editor.remove(AnytimeConstants.PREF_REF_BG_GLUCOSE_ID_PREFIX + id)
+        editor.apply()
+    }
+
+    /** AnytimeCalibrator continuity state (MODEL fallback), so a restart resumes the same series. */
+    @JvmStatic fun loadCalibratorState(c: Context, id: String): AnytimeCalibrator.State? {
+        val p = prefs(c)
+        val lastGlucoseId = p.getInt(AnytimeConstants.PREF_CALIBRATOR_LAST_ID_PREFIX + id, -1)
+        if (lastGlucoseId < 0) return null
+        return AnytimeCalibrator.State(
+            tempSmoothPrev = p.getFloat(AnytimeConstants.PREF_CALIBRATOR_TEMP_SMOOTH_PREV_PREFIX + id, Float.NaN),
+            filteredPrev = p.getFloat(AnytimeConstants.PREF_CALIBRATOR_FILTERED_PREV_PREFIX + id, Float.NaN),
+            lastGlucoseId = lastGlucoseId,
+        )
+    }
+    @JvmStatic fun saveCalibratorState(c: Context, id: String, state: AnytimeCalibrator.State?) {
+        val editor = prefs(c).edit()
+        if (state == null || state.lastGlucoseId < 0) {
+            editor.remove(AnytimeConstants.PREF_CALIBRATOR_TEMP_SMOOTH_PREV_PREFIX + id)
+            editor.remove(AnytimeConstants.PREF_CALIBRATOR_FILTERED_PREV_PREFIX + id)
+            editor.remove(AnytimeConstants.PREF_CALIBRATOR_LAST_ID_PREFIX + id)
+        } else {
+            editor.putFloat(AnytimeConstants.PREF_CALIBRATOR_TEMP_SMOOTH_PREV_PREFIX + id, state.tempSmoothPrev)
+            editor.putFloat(AnytimeConstants.PREF_CALIBRATOR_FILTERED_PREV_PREFIX + id, state.filteredPrev)
+            editor.putInt(AnytimeConstants.PREF_CALIBRATOR_LAST_ID_PREFIX + id, state.lastGlucoseId)
+        }
         editor.apply()
     }
 
@@ -487,6 +513,9 @@ object AnytimeRegistry {
             remove(AnytimeConstants.PREF_REF_BG_HISTORY_PREFIX + sensorId)
             remove(AnytimeConstants.PREF_RAW_HISTORY_PREFIX + sensorId)
             remove(AnytimeConstants.PREF_TEMPERATURE_HISTORY_PREFIX + sensorId)
+            remove(AnytimeConstants.PREF_CALIBRATOR_TEMP_SMOOTH_PREV_PREFIX + sensorId)
+            remove(AnytimeConstants.PREF_CALIBRATOR_FILTERED_PREV_PREFIX + sensorId)
+            remove(AnytimeConstants.PREF_CALIBRATOR_LAST_ID_PREFIX + sensorId)
             remove(AnytimeConstants.PREF_CT5_CIPHER_KEY_PREFIX + sensorId)
             remove(AnytimeConstants.PREF_CT5_RANDOM_B_PREFIX + sensorId)
             remove(AnytimeConstants.PREF_CT5_TEMP_ID_PREFIX + sensorId)
