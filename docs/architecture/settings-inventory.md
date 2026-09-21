@@ -9,6 +9,10 @@ Not derived here, on purpose: per-key defaults and writer/reader sets
 (that is dataflow, not a scan), and the `Natives.get*/set*` surface
 (358 methods whose setting/data/command split needs a human pass).
 
+`Defined in` names one file that declares a constant resolving to that
+prefs file (the first alphabetically, so the doc is reproducible); a name
+may be declared in several places.
+
 ## SharedPreferences files (25)
 
 | File | Defined in | Call sites | Flavours |
@@ -33,7 +37,7 @@ Not derived here, on purpose: per-key defaults and writer/reader sets
 | `tk.glucodata.alerts` | `Common/src/main/java/tk/glucodata/alerts/AlertRepository.kt` | 7 | main |
 | `tk.glucodata.custom_alerts` | `Common/src/main/java/tk/glucodata/alerts/CustomAlertRepository.kt` | 1 | main |
 | `tk.glucodata.snooze` | `Common/src/main/java/tk/glucodata/alerts/SnoozeManager.kt` | 1 | main |
-| `tk.glucodata_preferences` | `Common/src/main/java/tk/glucodata/CloneBackgroundLiveness.kt` | 147 | main, mobile, wear |
+| `tk.glucodata_preferences` | `Common/src/main/java/tk/glucodata/AutoSensorSwitch.kt` | 147 | main, mobile, wear |
 | `wear_journal_cache` | `Common/src/main/java/tk/glucodata/WearJournalSync.kt` | 2 | main |
 | `wear_routing_request` | `Common/src/mobile/java/tk/glucodata/WearRoutingRequest.kt` | 3 | main, mobile |
 | `wear_sensor_claim` | `Common/src/main/java/tk/glucodata/WearSensorClaim.kt` | 3 | main |
