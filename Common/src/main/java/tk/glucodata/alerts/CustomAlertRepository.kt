@@ -1,20 +1,34 @@
 package tk.glucodata.alerts
 
-import android.content.Context
-import android.content.SharedPreferences
 import org.json.JSONArray
 import tk.glucodata.Applic
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
 
+/**
+ * The custom-alert list, over [SettingsStore] (plan task T2.3). One JSON blob
+ * under one key.
+ */
 object CustomAlertRepository {
     private const val PREFS_NAME = "tk.glucodata.custom_alerts"
-    private const val KEY_ALERTS = "custom_alerts_list"
 
-    private val prefs: SharedPreferences by lazy {
-        Applic.app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private object Keys {
+        val ALERTS = SettingKey(PREFS_NAME, "custom_alerts_list", null as String?)
     }
 
+    /** Set by tests to run on an in-memory backend. */
+    @Volatile
+    internal var storeOverride: SettingsStore? = null
+
+    private fun store(): SettingsStore? =
+        storeOverride ?: Applic.app?.let {
+            SettingsStoreImpl(SharedPreferencesKeyValueStore(it.applicationContext))
+        }
+
     fun getAll(): List<CustomAlertConfig> {
-        val jsonString = prefs.getString(KEY_ALERTS, null) ?: return emptyList()
+        val jsonString = store()?.get(Keys.ALERTS) ?: return emptyList()
         val list = mutableListOf<CustomAlertConfig>()
         try {
             val jsonArray = JSONArray(jsonString)
@@ -30,10 +44,10 @@ object CustomAlertRepository {
 
     fun saveAll(alerts: List<CustomAlertConfig>) {
         val jsonArray = JSONArray()
-        alerts.forEach { 
-            jsonArray.put(it.toJson()) 
+        alerts.forEach {
+            jsonArray.put(it.toJson())
         }
-        prefs.edit().putString(KEY_ALERTS, jsonArray.toString()).apply()
+        store()?.set(Keys.ALERTS, jsonArray.toString())
     }
 
     fun add(alert: CustomAlertConfig) {
