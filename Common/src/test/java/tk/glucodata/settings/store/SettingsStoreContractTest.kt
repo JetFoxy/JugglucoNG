@@ -138,6 +138,19 @@ abstract class SettingsStoreContractTest {
     }
 
     @Test
+    fun clearRemovesEveryKeyInTheFile() {
+        val store = newStore()
+        store.set(volume, 11)
+        store.set(name, "glucose")
+
+        store.clear(file)
+
+        assertEquals(emptyMap<String, Any?>(), store.entries(file))
+        assertEquals(7, store.get(volume))
+        assertEquals("unset", store.get(name))
+    }
+
+    @Test
     fun concurrentWritesAreNotLost() {
         val store = newStore()
         val keys = (0 until 100).map { SettingKey(file, "k$it", -1) }

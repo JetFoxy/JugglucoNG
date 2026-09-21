@@ -22,7 +22,8 @@ class InMemoryKeyValueStore : KeyValueStore {
 
     override fun write(file: String, key: String, value: Any?) {
         synchronized(lock) {
-            values.getOrPut(file) { HashMap() }[key] = value
+            val target = values.getOrPut(file) { HashMap() }
+            if (value == null) target.remove(key) else target[key] = value
         }
         flowFor(file).tryEmit(key)
     }
@@ -30,7 +31,9 @@ class InMemoryKeyValueStore : KeyValueStore {
     override fun writeAll(file: String, values: Map<String, Any?>) {
         synchronized(lock) {
             val target = this.values.getOrPut(file) { HashMap() }
-            target.putAll(values)
+            values.forEach { (key, value) ->
+                if (value == null) target.remove(key) else target[key] = value
+            }
         }
         values.keys.forEach { flowFor(file).tryEmit(it) }
     }

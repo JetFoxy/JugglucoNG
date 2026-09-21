@@ -35,6 +35,9 @@ interface SettingsStore {
 
     /** Every stored key in [file], for the few areas that enumerate rather than name keys. */
     fun entries(file: String): Map<String, Any?>
+
+    /** Removes every key in [file]. */
+    fun clear(file: String)
 }
 
 /** Collects the writes of one [SettingsStore.edit], grouped by prefs file. */
@@ -93,4 +96,9 @@ class SettingsStoreImpl(private val backend: KeyValueStore) : SettingsStore {
     }.distinctUntilChanged()
 
     override fun entries(file: String): Map<String, Any?> = backend.entries(file)
+
+    override fun clear(file: String) {
+        val keys = backend.entries(file).keys
+        if (keys.isNotEmpty()) backend.writeAll(file, keys.associateWith { null })
+    }
 }

@@ -36,7 +36,7 @@ may be declared in several places.
 | `sms_watchdog` | `Common/src/main/java/tk/glucodata/sms/SmsWatchdog.kt` | 1 | main |
 | `tk.glucodata.alerts` | `Common/src/main/java/tk/glucodata/alerts/AlertRepository.kt` | 7 | main |
 | `tk.glucodata.custom_alerts` | `Common/src/main/java/tk/glucodata/alerts/CustomAlertRepository.kt` | 1 | main |
-| `tk.glucodata.snooze` | `Common/src/main/java/tk/glucodata/alerts/SnoozeManager.kt` | 1 | main |
+| `tk.glucodata.snooze` | `Common/src/main/java/tk/glucodata/alerts/SnoozeManager.kt` | 2 | main |
 | `tk.glucodata_preferences` | `Common/src/main/java/tk/glucodata/AutoSensorSwitch.kt` | 147 | main, mobile, wear |
 | `wear_journal_cache` | `Common/src/main/java/tk/glucodata/WearJournalSync.kt` | 2 | main |
 | `wear_routing_request` | `Common/src/mobile/java/tk/glucodata/WearRoutingRequest.kt` | 5 | main, mobile |
