@@ -45,6 +45,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import tk.glucodata.Applic
 import tk.glucodata.R
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
 
 /**
  * Special marker values for sound selection:
@@ -55,7 +59,11 @@ import tk.glucodata.R
 const val SYSTEM_DEFAULT_SOUND = "SYSTEM_DEFAULT"
 
 private const val PREFS_NAME = "custom_sounds"
-private const val KEY_CUSTOM_SOUNDS = "user_sounds"
+
+/** The custom-sounds area's keys, on the `custom_sounds` prefs file. */
+object CustomSoundKeys {
+    val CUSTOM_SOUNDS = SettingKey(PREFS_NAME, "user_sounds", emptySet<String>())
+}
 
 data class SoundItem(val uri: String?, val title: String)
 
@@ -72,28 +80,35 @@ fun getSoundDisplayText(uri: String?, alertTypeId: Int = 0): String {
 }
 
 /**
- * Repository for user-added custom sounds
+ * User-added custom sounds, as a set of URIs under one key (plan task T2.3).
+ * The logic takes a [SettingsStore] so it is testable without Android; the
+ * repository below wires it to the app's SharedPreferences.
  */
+class CustomSoundStore(private val store: SettingsStore) {
+
+    fun customSounds(): Set<String> = store.get(CustomSoundKeys.CUSTOM_SOUNDS)
+
+    fun add(uri: String) {
+        store.set(CustomSoundKeys.CUSTOM_SOUNDS, customSounds() + uri)
+    }
+
+    fun remove(uri: String) {
+        store.set(CustomSoundKeys.CUSTOM_SOUNDS, customSounds() - uri)
+    }
+}
+
 object CustomSoundRepository {
-    private val prefs by lazy {
-        Applic.app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val logic by lazy {
+        CustomSoundStore(
+            SettingsStoreImpl(SharedPreferencesKeyValueStore(Applic.app.applicationContext))
+        )
     }
-    
-    fun getCustomSounds(): Set<String> {
-        return prefs.getStringSet(KEY_CUSTOM_SOUNDS, emptySet()) ?: emptySet()
-    }
-    
-    fun addCustomSound(uri: String) {
-        val current = getCustomSounds().toMutableSet()
-        current.add(uri)
-        prefs.edit().putStringSet(KEY_CUSTOM_SOUNDS, current).apply()
-    }
-    
-    fun removeCustomSound(uri: String) {
-        val current = getCustomSounds().toMutableSet()
-        current.remove(uri)
-        prefs.edit().putStringSet(KEY_CUSTOM_SOUNDS, current).apply()
-    }
+
+    fun getCustomSounds(): Set<String> = logic.customSounds()
+
+    fun addCustomSound(uri: String) = logic.add(uri)
+
+    fun removeCustomSound(uri: String) = logic.remove(uri)
 }
 
 @Composable
