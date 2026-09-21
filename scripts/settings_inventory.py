@@ -42,12 +42,17 @@ ENTITIES_RE = re.compile(r"entities\s*=\s*\[([^\]]*)\]")
 
 
 def java_files(root: str):
+    """Every source file, in a stable order. The order matters: `defined_in`
+    picks the first file that declares a name, so an unsorted walk makes the
+    generated doc differ between machines (it did, on CI)."""
+    paths = []
     for source in SOURCES:
         base = os.path.join(root, source)
         for dirpath, _dirnames, filenames in os.walk(base):
             for name in filenames:
                 if name.endswith((".java", ".kt")):
-                    yield os.path.join(dirpath, name)
+                    paths.append(os.path.join(dirpath, name))
+    yield from sorted(paths)
 
 
 def strip_literals_argument(argument: str) -> str:
@@ -140,6 +145,10 @@ def render(root: str) -> str:
     out.append("Not derived here, on purpose: per-key defaults and writer/reader sets")
     out.append("(that is dataflow, not a scan), and the `Natives.get*/set*` surface")
     out.append("(358 methods whose setting/data/command split needs a human pass).")
+    out.append("")
+    out.append("`Defined in` names one file that declares a constant resolving to that")
+    out.append("prefs file (the first alphabetically, so the doc is reproducible); a name")
+    out.append("may be declared in several places.")
     out.append("")
     out.append(f"## SharedPreferences files ({len(files)})")
     out.append("")
