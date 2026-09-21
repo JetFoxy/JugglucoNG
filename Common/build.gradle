@@ -419,4 +419,6 @@ dependencies {
     testImplementation 'org.xerial:sqlite-jdbc:3.41.2.2'
     testImplementation 'org.json:json:20260814'
     testImplementation 'com.github.luben:zstd-jni:1.5.7-12'
+    // Virtual-time testing of Flow-based code (SettingsStore.observe).
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0'
 }

@@ -47,6 +47,7 @@ a manual look before T2.2 routes them through `SettingsStore`.
 | Argument | Call sites |
 |---|---:|
 | `activity.packageName+"_preferences"` | 1 |
+| `file` | 1 |
 | `name` | 3 |
 | `prefsName` | 4 |
 
