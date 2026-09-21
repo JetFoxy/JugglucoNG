@@ -1,8 +1,11 @@
 package tk.glucodata
 
-import android.content.Context
 import java.util.Base64
 import java.util.Locale
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
 
 data class BleErrorEvent(
     val sensorId: String,
@@ -80,20 +83,34 @@ internal fun decodeBleErrorEvents(encoded: String): List<BleErrorEvent> {
 /** Durable, bounded diagnostics for BLE failures. This is independent of trace recording. */
 object BleErrorHistory {
     private const val PREFS_NAME = "ble_error_history"
-    private const val KEY_EVENTS = "events_v1"
+
+    /** The one key, on the `ble_error_history` prefs file (plan task T2.3). */
+    private object Keys {
+        val EVENTS = SettingKey(PREFS_NAME, "events_v1", null as String?)
+    }
+
+    /** Set by tests to run on an in-memory backend. */
+    @Volatile
+    internal var storeOverride: SettingsStore? = null
+
     private val lock = Any()
+
+    private fun store(): SettingsStore? =
+        storeOverride ?: Applic.app?.let {
+            SettingsStoreImpl(SharedPreferencesKeyValueStore(it.applicationContext))
+        }
 
     @JvmStatic
     fun record(sensorId: String?, status: String?, atMs: Long = System.currentTimeMillis()) {
         val validSensorId = sensorId?.trim()?.takeIf { SensorIdentity.isUsableSensorId(it) } ?: return
         val validStatus = status?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        val context = Applic.app ?: return
         synchronized(lock) {
+            val store = store() ?: return
             val retained = retainBleErrorEvents(
-                listOf(BleErrorEvent(validSensorId, validStatus, atMs)) + load(context),
+                listOf(BleErrorEvent(validSensorId, validStatus, atMs)) + load(store),
                 nowMs = System.currentTimeMillis(),
             )
-            save(context, retained)
+            save(store, retained)
         }
     }
 
@@ -105,37 +122,27 @@ object BleErrorHistory {
 
     @JvmStatic
     fun events(): List<BleErrorEvent> {
-        val context = Applic.app ?: return emptyList()
         synchronized(lock) {
-            val loaded = load(context)
+            val store = store() ?: return emptyList()
+            val loaded = load(store)
             val retained = retainBleErrorEvents(loaded, System.currentTimeMillis())
-            if (retained != loaded) save(context, retained)
+            if (retained != loaded) save(store, retained)
             return retained
         }
     }
 
     @JvmStatic
     fun clear() {
-        val context = Applic.app ?: return
         synchronized(lock) {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .remove(KEY_EVENTS)
-                .apply()
+            val store = store() ?: return
+            store.edit { remove(Keys.EVENTS) }
         }
     }
 
-    private fun load(context: Context): List<BleErrorEvent> =
-        decodeBleErrorEvents(
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getString(KEY_EVENTS, null)
-                .orEmpty(),
-        )
+    private fun load(store: SettingsStore): List<BleErrorEvent> =
+        decodeBleErrorEvents(store.get(Keys.EVENTS).orEmpty())
 
-    private fun save(context: Context, events: List<BleErrorEvent>) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_EVENTS, encodeBleErrorEvents(events))
-            .apply()
+    private fun save(store: SettingsStore, events: List<BleErrorEvent>) {
+        store.set(Keys.EVENTS, encodeBleErrorEvents(events))
     }
 }

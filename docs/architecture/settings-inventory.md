@@ -25,7 +25,7 @@ may be declared in several places.
 | `aidex_cn_provisioning` | `Common/src/main/java/tk/glucodata/drivers/aidex/AiDexProvisioningStore.kt` | 1 | main |
 | `anytime_ble_telemetry` | `Common/src/main/java/tk/glucodata/drivers/anytime/AnytimeBleManager.kt` | 4 | main |
 | `app_updates` | `Common/src/mobile/java/tk/glucodata/update/AppUpdateSettings.kt` | 8 | mobile |
-| `ble_error_history` | `Common/src/main/java/tk/glucodata/BleErrorHistory.kt` | 3 | main |
+| `ble_error_history` | `Common/src/main/java/tk/glucodata/BleErrorHistory.kt` | 1 | main |
 | `calibration_prefs` | `Common/src/mobile/java/tk/glucodata/data/calibration/CalibrationManager.kt` | 1 | mobile |
 | `cgm_readiness` | `Common/src/mobile/java/tk/glucodata/ui/CgmReadiness.kt` | 3 | mobile |
 | `clone_ice_network` | `Common/src/main/java/tk/glucodata/CloneIceNetworkConfig.kt` | 2 | main |
