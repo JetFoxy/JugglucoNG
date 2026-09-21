@@ -6,6 +6,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 import java.util.UUID
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
 import tk.glucodata.sms.SmsPolicy
 
 @Keep
@@ -44,6 +48,42 @@ object OutboundApiSettings {
     private const val KEY_LAST_SUCCESS_AT_MS = "last_success_at_ms"
     private const val KEY_LAST_RESPONSE_CODE = "last_response_code"
     private const val KEY_LAST_ERROR = "last_error"
+
+    /** The outbound-api keys, on the `outbound_api` prefs file (plan task T2.3). */
+    private object Keys {
+        val DESTINATIONS = SettingKey(PREFS, KEY_DESTINATIONS_JSON, null as String?)
+        val ENABLED = SettingKey(PREFS, KEY_ENABLED, true)
+        // The legacy path defaulted `enabled` to false, so it needs its own key.
+        val LEGACY_ENABLED = SettingKey(PREFS, KEY_ENABLED, false)
+        val PROVIDER = SettingKey(PREFS, KEY_PROVIDER, null as String?)
+        val URL = SettingKey(PREFS, KEY_URL, null as String?)
+        val TOKEN = SettingKey(PREFS, KEY_TOKEN, null as String?)
+        val CHAT_ID = SettingKey(PREFS, KEY_CHAT_ID, null as String?)
+        val API_VERSION = SettingKey(PREFS, KEY_API_VERSION, null as String?)
+        val HEADERS = SettingKey(PREFS, KEY_HEADERS, null as String?)
+        val MESSAGE_TEMPLATE = SettingKey(PREFS, KEY_MESSAGE_TEMPLATE, null as String?)
+        val MIN_INTERVAL = SettingKey(PREFS, KEY_MIN_INTERVAL_MINUTES, DEFAULT_MIN_INTERVAL_MINUTES)
+        val TRIGGER_MODE = SettingKey(PREFS, KEY_TRIGGER_MODE, null as String?)
+        val TRIGGER_LOW = SettingKey(PREFS, KEY_TRIGGER_LOW_MGDL, DEFAULT_TRIGGER_LOW_MGDL)
+        val TRIGGER_HIGH = SettingKey(PREFS, KEY_TRIGGER_HIGH_MGDL, DEFAULT_TRIGGER_HIGH_MGDL)
+        val LAST_QUEUED_EVENT_ID = SettingKey(PREFS, KEY_LAST_QUEUED_EVENT_ID, null as String?)
+        val LAST_QUEUED_AT = SettingKey(PREFS, KEY_LAST_QUEUED_AT_MS, 0L)
+        val LAST_ATTEMPT_AT = SettingKey(PREFS, KEY_LAST_ATTEMPT_AT_MS, 0L)
+        val LAST_SUCCESS_AT = SettingKey(PREFS, KEY_LAST_SUCCESS_AT_MS, 0L)
+        val LAST_RESPONSE_CODE = SettingKey(PREFS, KEY_LAST_RESPONSE_CODE, 0)
+        val LAST_ERROR = SettingKey(PREFS, KEY_LAST_ERROR, null as String?)
+    }
+
+    /** Set by tests to run the store on an in-memory backend. */
+    @Volatile
+    internal var storeOverride: SettingsStore? = null
+
+    private fun store(context: Context?): SettingsStore =
+        storeOverride ?: SettingsStoreImpl(SharedPreferencesKeyValueStore(context!!.applicationContext))
+
+    internal fun clearCache() {
+        cachedConfig = null
+    }
 
     const val DEFAULT_VK_API_VERSION = "5.199"
     const val DEFAULT_MIN_INTERVAL_MINUTES = 5
@@ -229,7 +269,7 @@ object OutboundApiSettings {
     }
 
     @JvmStatic
-    fun load(context: Context = Applic.app): Config {
+    fun load(context: Context? = Applic.app): Config {
         cachedConfig?.let { return it }
         synchronized(this) {
             cachedConfig?.let { return it }
@@ -237,11 +277,11 @@ object OutboundApiSettings {
         }
     }
 
-    private fun loadUncached(context: Context): Config {
-        val prefs = prefs(context)
-        val stored = prefs.getString(KEY_DESTINATIONS_JSON, null)
+    private fun loadUncached(context: Context?): Config {
+        val store = store(context)
+        val stored = store.get(Keys.DESTINATIONS)
         if (!stored.isNullOrBlank()) {
-            val enabled = prefs.getBoolean(KEY_ENABLED, true)
+            val enabled = store.get(Keys.ENABLED)
             val destinations = runCatching { decodeDestinations(stored) }.getOrDefault(emptyList())
             return Config(
                 enabled = true,
@@ -257,20 +297,20 @@ object OutboundApiSettings {
     }
 
     @JvmStatic
-    fun save(context: Context = Applic.app, config: Config) {
+    fun save(context: Context? = Applic.app, config: Config) {
         val normalized = config.copy(enabled = true)
         cachedConfig = normalized
-        prefs(context).edit()
-            .putBoolean(KEY_ENABLED, true)
-            .putString(KEY_DESTINATIONS_JSON, encodeDestinations(normalized.destinations).toString())
-            .apply()
+        store(context).edit {
+            put(Keys.ENABLED, true)
+            put(Keys.DESTINATIONS, encodeDestinations(normalized.destinations).toString())
+        }
         // Adding, editing or disabling an SMS destination has to take effect without
         // waiting for the next reading — the watchdog is what makes it do anything.
-        runCatching { tk.glucodata.sms.SmsWatchdog.ensureRunning(context) }
+        context?.let { runCatching { tk.glucodata.sms.SmsWatchdog.ensureRunning(it) } }
     }
 
     @JvmStatic
-    fun isEnabled(context: Context = Applic.app): Boolean =
+    fun isEnabled(context: Context? = Applic.app): Boolean =
         load(context).activeDestinations().isNotEmpty()
 
     @JvmStatic
@@ -462,50 +502,43 @@ object OutboundApiSettings {
         }
     }
 
-    private fun migrateLegacy(context: Context): Config {
-        val prefs = prefs(context)
-        if (!prefs.contains(KEY_PROVIDER) &&
-            !prefs.contains(KEY_URL) &&
-            !prefs.contains(KEY_TOKEN) &&
-            !prefs.contains(KEY_CHAT_ID)
+    private fun migrateLegacy(context: Context?): Config {
+        val store = store(context)
+        if (store.get(Keys.PROVIDER) == null &&
+            store.get(Keys.URL) == null &&
+            store.get(Keys.TOKEN) == null &&
+            store.get(Keys.CHAT_ID) == null
         ) {
             return Config(enabled = false, destinations = emptyList())
         }
 
-        val provider = prefs.getString(KEY_PROVIDER, LEGACY_PROVIDER_WEBHOOK_JSON) ?: LEGACY_PROVIDER_WEBHOOK_JSON
+        val provider = store.get(Keys.PROVIDER) ?: LEGACY_PROVIDER_WEBHOOK_JSON
         val preset = if (provider == LEGACY_PROVIDER_VK) PRESET_GLUCO_WATCH_VK else PRESET_CUSTOM_JSON
         return Config(
             enabled = true,
             destinations = listOf(
                 Destination(
                     id = UUID.randomUUID().toString(),
-                    enabled = prefs.getBoolean(KEY_ENABLED, false),
+                    enabled = store.get(Keys.LEGACY_ENABLED),
                     name = defaultName(preset),
                     preset = preset,
-                    url = prefs.getString(KEY_URL, defaultUrl(preset)).orEmpty(),
-                    token = prefs.getString(KEY_TOKEN, "").orEmpty(),
-                    chatId = prefs.getString(KEY_CHAT_ID, "").orEmpty(),
-                    apiVersion = prefs.getString(KEY_API_VERSION, DEFAULT_VK_API_VERSION).orEmpty()
+                    url = (store.get(Keys.URL) ?: defaultUrl(preset)).orEmpty(),
+                    token = store.get(Keys.TOKEN).orEmpty(),
+                    chatId = store.get(Keys.CHAT_ID).orEmpty(),
+                    apiVersion = store.get(Keys.API_VERSION).orEmpty()
                         .ifBlank { DEFAULT_VK_API_VERSION },
-                    headers = prefs.getString(KEY_HEADERS, "").orEmpty(),
-                    messageTemplate = prefs.getString(KEY_MESSAGE_TEMPLATE, defaultTemplate(preset)).orEmpty(),
-                    minIntervalMinutes = prefs.getInt(
-                        KEY_MIN_INTERVAL_MINUTES,
-                        DEFAULT_MIN_INTERVAL_MINUTES
-                    ).coerceAtLeast(0),
-                    triggerMode = normalizeTriggerMode(
-                        prefs.getString(KEY_TRIGGER_MODE, TRIGGER_ALWAYS).orEmpty()
-                    ),
-                    triggerLowMgdl = prefs.getInt(KEY_TRIGGER_LOW_MGDL, DEFAULT_TRIGGER_LOW_MGDL)
-                        .coerceIn(1, 600),
-                    triggerHighMgdl = prefs.getInt(KEY_TRIGGER_HIGH_MGDL, DEFAULT_TRIGGER_HIGH_MGDL)
-                        .coerceIn(1, 600),
-                    lastQueuedEventId = prefs.getString(KEY_LAST_QUEUED_EVENT_ID, "").orEmpty(),
-                    lastQueuedAtMs = prefs.getLong(KEY_LAST_QUEUED_AT_MS, 0L),
-                    lastAttemptAtMs = prefs.getLong(KEY_LAST_ATTEMPT_AT_MS, 0L),
-                    lastSuccessAtMs = prefs.getLong(KEY_LAST_SUCCESS_AT_MS, 0L),
-                    lastResponseCode = prefs.getInt(KEY_LAST_RESPONSE_CODE, 0),
-                    lastError = prefs.getString(KEY_LAST_ERROR, null)
+                    headers = store.get(Keys.HEADERS).orEmpty(),
+                    messageTemplate = (store.get(Keys.MESSAGE_TEMPLATE) ?: defaultTemplate(preset)).orEmpty(),
+                    minIntervalMinutes = store.get(Keys.MIN_INTERVAL).coerceAtLeast(0),
+                    triggerMode = normalizeTriggerMode(store.get(Keys.TRIGGER_MODE) ?: TRIGGER_ALWAYS),
+                    triggerLowMgdl = store.get(Keys.TRIGGER_LOW).coerceIn(1, 600),
+                    triggerHighMgdl = store.get(Keys.TRIGGER_HIGH).coerceIn(1, 600),
+                    lastQueuedEventId = store.get(Keys.LAST_QUEUED_EVENT_ID).orEmpty(),
+                    lastQueuedAtMs = store.get(Keys.LAST_QUEUED_AT),
+                    lastAttemptAtMs = store.get(Keys.LAST_ATTEMPT_AT),
+                    lastSuccessAtMs = store.get(Keys.LAST_SUCCESS_AT),
+                    lastResponseCode = store.get(Keys.LAST_RESPONSE_CODE),
+                    lastError = store.get(Keys.LAST_ERROR)
                 )
             )
         )
@@ -690,7 +723,4 @@ object OutboundApiSettings {
         }
         return out
     }
-
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

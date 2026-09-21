@@ -31,7 +31,7 @@ may be declared in several places.
 | `clone_ice_network` | `Common/src/main/java/tk/glucodata/CloneIceNetworkConfig.kt` | 2 | main |
 | `custom_sounds` | `Common/src/mobile/java/tk/glucodata/ui/alerts/SoundPicker.kt` | 1 | mobile |
 | `managed_sensor_view_modes` | `Common/src/main/java/tk/glucodata/ManagedSensorHandoff.kt` | 1 | main |
-| `outbound_api` | `Common/src/main/java/tk/glucodata/OutboundApiSettings.kt` | 1 | main |
+| `outbound_api` | `Common/src/main/java/tk/glucodata/OutboundApiSettings.kt` | 20 | main |
 | `scheduled_backups` | `Common/src/mobile/java/tk/glucodata/data/ScheduledBackupSettings.kt` | 20 | mobile |
 | `sms_watchdog` | `Common/src/main/java/tk/glucodata/sms/SmsWatchdog.kt` | 1 | main |
 | `tk.glucodata.alerts` | `Common/src/main/java/tk/glucodata/alerts/AlertRepository.kt` | 7 | main |
