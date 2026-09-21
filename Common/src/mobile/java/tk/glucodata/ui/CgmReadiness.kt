@@ -118,11 +118,19 @@ import tk.glucodata.alerts.AlertType
 import tk.glucodata.alerts.CustomAlertRepository
 import tk.glucodata.alerts.FullScreenIntentReadiness
 import tk.glucodata.data.settings.FloatingSettingsRepository
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
 
 private const val CGM_READINESS_PREFS = "cgm_readiness"
-private const val DISMISS_SENSORS = "dismiss_sensors_signature"
-private const val DISMISS_DASHBOARD = "dismiss_dashboard_signature"
-private const val DISMISS_SETUP = "dismiss_setup_signature"
+
+/** The readiness banners' dismissals, on the `cgm_readiness` prefs file. */
+internal object CgmReadinessKeys {
+    val SENSORS = SettingKey(CGM_READINESS_PREFS, "dismiss_sensors_signature", null as String?)
+    val DASHBOARD = SettingKey(CGM_READINESS_PREFS, "dismiss_dashboard_signature", null as String?)
+    val SETUP = SettingKey(CGM_READINESS_PREFS, "dismiss_setup_signature", null as String?)
+}
 
 private enum class CgmReadinessStatus {
     Ready,
@@ -174,12 +182,32 @@ private data class CgmReadinessSnapshot(
     val criticalSignature: String = criticalItems.joinToString("|") { "${it.id}:${it.status.name}" }
 }
 
-private fun android.content.SharedPreferences.Editor.dismissReadinessEverywhere(
-    snapshot: CgmReadinessSnapshot
-): android.content.SharedPreferences.Editor {
-    return putString(DISMISS_SENSORS, snapshot.signature)
-        .putString(DISMISS_DASHBOARD, snapshot.criticalSignature)
-        .putString(DISMISS_SETUP, snapshot.signature)
+/**
+ * The three dismissal signatures (plan task T2.3). A dismiss writes all three
+ * together, so it is all-or-nothing rather than a banner dismissed on one screen
+ * and still nagging on another.
+ */
+internal class CgmReadinessDismissals(private val store: SettingsStore) {
+
+    fun sensorsSignature(): String? = store.get(CgmReadinessKeys.SENSORS)
+
+    fun dashboardSignature(): String? = store.get(CgmReadinessKeys.DASHBOARD)
+
+    fun setupSignature(): String? = store.get(CgmReadinessKeys.SETUP)
+
+    fun dismissAll(signature: String, criticalSignature: String) {
+        store.edit {
+            put(CgmReadinessKeys.SENSORS, signature)
+            put(CgmReadinessKeys.DASHBOARD, criticalSignature)
+            put(CgmReadinessKeys.SETUP, signature)
+        }
+    }
+
+    fun clearSensors() = store.edit { remove(CgmReadinessKeys.SENSORS) }
+
+    fun clearDashboard() = store.edit { remove(CgmReadinessKeys.DASHBOARD) }
+
+    fun clearSetup() = store.edit { remove(CgmReadinessKeys.SETUP) }
 }
 
 @Composable
@@ -246,14 +274,15 @@ fun SensorsCgmReadinessBanner(
     var refreshTick by remember { mutableIntStateOf(0) }
     val snapshot = remember(refreshTick) { buildCgmReadinessSnapshot(context) }
     val items = snapshot.attentionItems
-    val prefs = remember(context) { context.getSharedPreferences(CGM_READINESS_PREFS, Context.MODE_PRIVATE) }
-    var dismissedSignature by remember { mutableStateOf(prefs.getString(DISMISS_SENSORS, null)) }
+    val dismissals = remember(context) {
+        CgmReadinessDismissals(SettingsStoreImpl(SharedPreferencesKeyValueStore(context.applicationContext)))
+    }
+    var dismissedSignature by remember { mutableStateOf(dismissals.sensorsSignature()) }
     val actionHandler = rememberCgmReadinessActionHandler { refreshTick++ }
 
     RefreshReadinessOnResume { refreshTick++ }
     ClearDismissalWhenReady(
-        prefs = prefs,
-        key = DISMISS_SENSORS,
+        clear = { dismissals.clearSensors() },
         shouldClear = items.isEmpty(),
         dismissedSignature = dismissedSignature,
         onCleared = { dismissedSignature = null }
@@ -271,7 +300,7 @@ fun SensorsCgmReadinessBanner(
             items = items,
             maxVisibleItems = 3,
             onDismiss = {
-                prefs.edit().dismissReadinessEverywhere(snapshot).apply()
+                dismissals.dismissAll(snapshot.signature, snapshot.criticalSignature)
                 dismissedSignature = snapshot.signature
             },
             onOpenReadiness = onOpenReadiness,
@@ -289,14 +318,15 @@ fun DashboardCgmReadinessBanner(
     var refreshTick by remember { mutableIntStateOf(0) }
     val snapshot = remember(refreshTick) { buildCgmReadinessSnapshot(context) }
     val items = snapshot.criticalItems
-    val prefs = remember(context) { context.getSharedPreferences(CGM_READINESS_PREFS, Context.MODE_PRIVATE) }
-    var dismissedSignature by remember { mutableStateOf(prefs.getString(DISMISS_DASHBOARD, null)) }
+    val dismissals = remember(context) {
+        CgmReadinessDismissals(SettingsStoreImpl(SharedPreferencesKeyValueStore(context.applicationContext)))
+    }
+    var dismissedSignature by remember { mutableStateOf(dismissals.dashboardSignature()) }
     val actionHandler = rememberCgmReadinessActionHandler { refreshTick++ }
 
     RefreshReadinessOnResume { refreshTick++ }
     ClearDismissalWhenReady(
-        prefs = prefs,
-        key = DISMISS_DASHBOARD,
+        clear = { dismissals.clearDashboard() },
         shouldClear = items.isEmpty(),
         dismissedSignature = dismissedSignature,
         onCleared = { dismissedSignature = null }
@@ -314,7 +344,7 @@ fun DashboardCgmReadinessBanner(
             items = items,
             maxVisibleItems = 3,
             onDismiss = {
-                prefs.edit().dismissReadinessEverywhere(snapshot).apply()
+                dismissals.dismissAll(snapshot.signature, snapshot.criticalSignature)
                 dismissedSignature = snapshot.criticalSignature
             },
             onOpenReadiness = onOpenReadiness,
@@ -336,14 +366,15 @@ fun CgmReadinessSetupBanner(
         buildCgmReadinessSnapshot(context, includeLibreNfc = includeLibreNfc)
     }
     val items = snapshot.attentionItems
-    val prefs = remember(context) { context.getSharedPreferences(CGM_READINESS_PREFS, Context.MODE_PRIVATE) }
-    var dismissedSignature by remember { mutableStateOf(prefs.getString(DISMISS_SETUP, null)) }
+    val dismissals = remember(context) {
+        CgmReadinessDismissals(SettingsStoreImpl(SharedPreferencesKeyValueStore(context.applicationContext)))
+    }
+    var dismissedSignature by remember { mutableStateOf(dismissals.setupSignature()) }
     val actionHandler = rememberCgmReadinessActionHandler { refreshTick++ }
 
     RefreshReadinessOnResume { refreshTick++ }
     ClearDismissalWhenReady(
-        prefs = prefs,
-        key = DISMISS_SETUP,
+        clear = { dismissals.clearSetup() },
         shouldClear = items.isEmpty(),
         dismissedSignature = dismissedSignature,
         onCleared = { dismissedSignature = null }
@@ -362,7 +393,7 @@ fun CgmReadinessSetupBanner(
             items = items,
             maxVisibleItems = 2,
             onDismiss = {
-                prefs.edit().dismissReadinessEverywhere(snapshot).apply()
+                dismissals.dismissAll(snapshot.signature, snapshot.criticalSignature)
                 dismissedSignature = snapshot.signature
             },
             onOpenReadiness = onOpenReadiness,
@@ -764,15 +795,14 @@ private fun RefreshReadinessOnResume(onResume: () -> Unit) {
 
 @Composable
 private fun ClearDismissalWhenReady(
-    prefs: android.content.SharedPreferences,
-    key: String,
+    clear: () -> Unit,
     shouldClear: Boolean,
     dismissedSignature: String?,
     onCleared: () -> Unit
 ) {
     LaunchedEffect(shouldClear, dismissedSignature) {
         if (shouldClear && dismissedSignature != null) {
-            prefs.edit().remove(key).apply()
+            clear()
             onCleared()
         }
     }
