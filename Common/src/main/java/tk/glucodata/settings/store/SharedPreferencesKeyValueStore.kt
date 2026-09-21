@@ -23,6 +23,17 @@ class SharedPreferencesKeyValueStore(private val context: Context) : KeyValueSto
 
     override fun write(file: String, key: String, value: Any?) {
         val editor = prefs(file).edit()
+        put(editor, key, value)
+        editor.apply()
+    }
+
+    override fun writeAll(file: String, values: Map<String, Any?>) {
+        val editor = prefs(file).edit()
+        values.forEach { (key, value) -> put(editor, key, value) }
+        editor.apply()
+    }
+
+    private fun put(editor: SharedPreferences.Editor, key: String, value: Any?) {
         when (value) {
             null -> editor.remove(key)
             is String -> editor.putString(key, value)
@@ -33,7 +44,6 @@ class SharedPreferencesKeyValueStore(private val context: Context) : KeyValueSto
             is Set<*> -> editor.putStringSet(key, value.map { it.toString() }.toSet())
             else -> editor.putString(key, value.toString())
         }
-        editor.apply()
     }
 
     override fun changes(file: String): Flow<String> = callbackFlow {

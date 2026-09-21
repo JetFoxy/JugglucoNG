@@ -15,7 +15,7 @@ may be declared in several places.
 
 ## SharedPreferences files (25)
 
-| File | Defined in | Call sites | Flavours |
+| File | Defined in | References | Flavours |
 |---|---|---:|---|
 | `AiDexDpCatalogPrefs` | `Common/src/main/java/tk/glucodata/drivers/aidex/native/protocol/AiDexDpCatalogProvider.kt` | 1 | main |
 | `AiDexNativePrefs` | `Common/src/main/java/tk/glucodata/ManagedSensorHandoff.kt` | 3 | main |
@@ -24,7 +24,7 @@ may be declared in several places.
 | `AiDexTemperaturePrefs` | `Common/src/main/java/tk/glucodata/drivers/aidex/AiDexTemperatureStore.kt` | 2 | main |
 | `aidex_cn_provisioning` | `Common/src/main/java/tk/glucodata/drivers/aidex/AiDexProvisioningStore.kt` | 1 | main |
 | `anytime_ble_telemetry` | `Common/src/main/java/tk/glucodata/drivers/anytime/AnytimeBleManager.kt` | 4 | main |
-| `app_updates` | `Common/src/mobile/java/tk/glucodata/update/AppUpdateSettings.kt` | 1 | mobile |
+| `app_updates` | `Common/src/mobile/java/tk/glucodata/update/AppUpdateSettings.kt` | 8 | mobile |
 | `ble_error_history` | `Common/src/main/java/tk/glucodata/BleErrorHistory.kt` | 3 | main |
 | `calibration_prefs` | `Common/src/mobile/java/tk/glucodata/data/calibration/CalibrationManager.kt` | 1 | mobile |
 | `cgm_readiness` | `Common/src/mobile/java/tk/glucodata/ui/CgmReadiness.kt` | 3 | mobile |

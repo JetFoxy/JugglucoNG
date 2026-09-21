@@ -1,9 +1,26 @@
 package tk.glucodata.update
 
 import android.content.Context
-import android.content.SharedPreferences
 import org.json.JSONObject
 import tk.glucodata.BuildConfig
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
+
+/** The updater's settings, as typed keys on the `app_updates` prefs file. */
+object AppUpdateKeys {
+    private const val FILE = "app_updates"
+
+    val AUTO_CHECK = SettingKey(FILE, "auto_check", false)
+    val INTRO_ANSWERED = SettingKey(FILE, "intro_answered", false)
+    val SOURCE = SettingKey(FILE, "update_source", null as String?)
+    val LAST_CHECK_AT = SettingKey(FILE, "last_check_at", 0L)
+    val LAST_ERROR = SettingKey(FILE, "last_error", null as String?)
+    val CACHED_UPDATE = SettingKey(FILE, "cached_update", null as String?)
+    val DISMISSED = SettingKey(FILE, "dismissed_update", null as String?)
+    val DISMISSED_AT = SettingKey(FILE, "dismissed_update_at", 0L)
+}
 
 /**
  * Preferences for the in-app updater, plus the cached result of the last check.
@@ -11,134 +28,117 @@ import tk.glucodata.BuildConfig
  * Caching the found release matters for a background check: the worker runs while no UI exists,
  * and the settings card has to be able to say "1.2.0-Alpha is available" without going back to
  * the network the moment the user opens Settings.
+ *
+ * Everything goes through [SettingsStore] (plan task T2.3): the keys live in [AppUpdateKeys] and
+ * the multi-key writes use one `edit` so they stay atomic. [now] is injectable so the dismissal
+ * TTL is testable without a real clock.
  */
-object AppUpdateSettings {
+class AppUpdateStore(
+    private val store: SettingsStore,
+    private val defaultSource: String,
+    private val now: () -> Long = System::currentTimeMillis,
+) {
 
-    private const val PREFS = "app_updates"
-
-    private const val KEY_AUTO_CHECK = "auto_check"
-    private const val KEY_INTRO_ANSWERED = "intro_answered"
-    private const val KEY_SOURCE = "update_source"
-    private const val KEY_LAST_CHECK_AT = "last_check_at"
-    private const val KEY_LAST_ERROR = "last_error"
-    private const val KEY_CACHED_UPDATE = "cached_update"
-    private const val KEY_DISMISSED = "dismissed_update"
-    private const val KEY_DISMISSED_AT = "dismissed_update_at"
-
-    /**
-     * How long an X on the update card silences that release for.
-     *
-     * Permanent dismissal was wrong: one stray tap and a pending update never announces itself
-     * again, which for a release that fixes something is worse than a card the user has already
-     * learned to ignore. A week is long enough not to nag and short enough that the update is
-     * not lost.
-     */
-    private const val DISMISSAL_TTL_MS = 7L * 24 * 60 * 60 * 1000
-
-    fun prefs(context: Context): SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val dismissalTtlMs = 7L * 24 * 60 * 60 * 1000
 
     /**
      * Whether the one-time "JugglucoNG can check for updates" card has been answered.
      * Unanswered means the card is still owed to the user — including to users upgrading from a
      * build that had no updater at all.
      */
-    fun isIntroAnswered(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_INTRO_ANSWERED, false)
+    fun isIntroAnswered(): Boolean = store.get(AppUpdateKeys.INTRO_ANSWERED)
 
-    fun setIntroAnswered(context: Context, answered: Boolean) {
-        prefs(context).edit().putBoolean(KEY_INTRO_ANSWERED, answered).apply()
+    fun setIntroAnswered(answered: Boolean) {
+        store.set(AppUpdateKeys.INTRO_ANSWERED, answered)
     }
 
     /**
      * Off until the user says yes. An update check is an outbound request that reveals the
      * device's IP to the update source, so it is opt-in rather than opt-out.
      */
-    fun isAutoCheckEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_AUTO_CHECK, false)
+    fun isAutoCheckEnabled(): Boolean = store.get(AppUpdateKeys.AUTO_CHECK)
 
-    fun setAutoCheckEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit()
-            .putBoolean(KEY_AUTO_CHECK, enabled)
-            .putBoolean(KEY_INTRO_ANSWERED, true)
-            .apply()
+    fun setAutoCheckEnabled(enabled: Boolean) {
+        store.edit {
+            put(AppUpdateKeys.AUTO_CHECK, enabled)
+            put(AppUpdateKeys.INTRO_ANSWERED, true)
+        }
     }
 
     /** The https URL releases are read from. Defaults to this build's own project. */
-    fun updateSource(context: Context): String {
-        val stored = prefs(context).getString(KEY_SOURCE, null)
-        return stored?.takeIf { UpdateSource.isValid(it) } ?: defaultUpdateSource
+    fun updateSource(): String {
+        val stored = store.get(AppUpdateKeys.SOURCE)
+        return stored?.takeIf { UpdateSource.isValid(it) } ?: defaultSource
     }
 
-    val defaultUpdateSource: String get() = "https://github.com/${BuildConfig.UPDATE_REPO}"
-
-    fun isDefaultUpdateSource(context: Context): Boolean =
-        updateSource(context) == defaultUpdateSource
+    fun isDefaultUpdateSource(): Boolean = updateSource() == defaultSource
 
     /** Pass null to go back to the default. Invalid values are ignored rather than stored. */
-    fun setUpdateSource(context: Context, url: String?) {
-        val editor = prefs(context).edit()
+    fun setUpdateSource(url: String?) {
         val cleaned = url?.let(UpdateSource::sanitize)
-        if (cleaned == null || cleaned == defaultUpdateSource) {
-            editor.remove(KEY_SOURCE)
-        } else if (UpdateSource.isValid(cleaned)) {
-            editor.putString(KEY_SOURCE, cleaned)
-        } else {
-            return
+        when {
+            cleaned == null || cleaned == defaultSource -> store.edit { remove(AppUpdateKeys.SOURCE) }
+            UpdateSource.isValid(cleaned) -> store.set(AppUpdateKeys.SOURCE, cleaned)
+            else -> return
         }
-        editor.apply()
     }
 
-    fun lastCheckAtMillis(context: Context): Long = prefs(context).getLong(KEY_LAST_CHECK_AT, 0L)
+    fun lastCheckAtMillis(): Long = store.get(AppUpdateKeys.LAST_CHECK_AT)
 
-    fun lastError(context: Context): UpdateError? =
-        prefs(context).getString(KEY_LAST_ERROR, null)
+    fun lastError(): UpdateError? =
+        store.get(AppUpdateKeys.LAST_ERROR)
             ?.let { name -> UpdateError.entries.firstOrNull { it.name == name } }
 
     /** Records the outcome of a check; a successful check clears any previous error. */
-    fun recordCheck(context: Context, result: UpdateCheckResult, atMillis: Long) {
-        val editor = prefs(context).edit().putLong(KEY_LAST_CHECK_AT, atMillis)
-        when (result) {
-            is UpdateCheckResult.Available -> editor
-                .remove(KEY_LAST_ERROR)
-                .putString(KEY_CACHED_UPDATE, encode(result.update))
-            UpdateCheckResult.UpToDate -> editor
-                .remove(KEY_LAST_ERROR)
-                .remove(KEY_CACHED_UPDATE)
-            is UpdateCheckResult.Failed -> editor.putString(KEY_LAST_ERROR, result.error.name)
+    fun recordCheck(result: UpdateCheckResult, atMillis: Long) {
+        store.edit {
+            put(AppUpdateKeys.LAST_CHECK_AT, atMillis)
+            when (result) {
+                is UpdateCheckResult.Available -> {
+                    remove(AppUpdateKeys.LAST_ERROR)
+                    put(AppUpdateKeys.CACHED_UPDATE, encode(result.update))
+                }
+                UpdateCheckResult.UpToDate -> {
+                    remove(AppUpdateKeys.LAST_ERROR)
+                    remove(AppUpdateKeys.CACHED_UPDATE)
+                }
+                is UpdateCheckResult.Failed -> put(AppUpdateKeys.LAST_ERROR, result.error.name)
+            }
         }
-        editor.apply()
     }
 
-    fun cachedUpdate(context: Context): AvailableUpdate? =
-        prefs(context).getString(KEY_CACHED_UPDATE, null)?.let(::decode)
+    fun cachedUpdate(): AvailableUpdate? =
+        store.get(AppUpdateKeys.CACHED_UPDATE)?.let(::decode)
 
-    fun clearCachedUpdate(context: Context) {
-        prefs(context).edit().remove(KEY_CACHED_UPDATE).apply()
+    fun clearCachedUpdate() {
+        store.edit { remove(AppUpdateKeys.CACHED_UPDATE) }
     }
 
     /** Banner dismissal is per release and expires, so a still-pending update comes back. */
-    fun dismissedIdentity(context: Context): String? {
-        val prefs = prefs(context)
-        val identity = prefs.getString(KEY_DISMISSED, null) ?: return null
-        val dismissedAt = prefs.getLong(KEY_DISMISSED_AT, 0L)
-        val age = System.currentTimeMillis() - dismissedAt
+    fun dismissedIdentity(): String? {
+        val identity = store.get(AppUpdateKeys.DISMISSED) ?: return null
+        val age = now() - store.get(AppUpdateKeys.DISMISSED_AT)
         // A clock that moved backwards counts as expired rather than as dismissed forever.
-        if (age !in 0 until DISMISSAL_TTL_MS) {
-            prefs.edit().remove(KEY_DISMISSED).remove(KEY_DISMISSED_AT).apply()
+        if (age !in 0 until dismissalTtlMs) {
+            store.edit {
+                remove(AppUpdateKeys.DISMISSED)
+                remove(AppUpdateKeys.DISMISSED_AT)
+            }
             return null
         }
         return identity
     }
 
-    fun setDismissedIdentity(context: Context, identity: String?) {
-        prefs(context).edit().apply {
+    fun setDismissedIdentity(identity: String?) {
+        store.edit {
             if (identity == null) {
-                remove(KEY_DISMISSED).remove(KEY_DISMISSED_AT)
+                remove(AppUpdateKeys.DISMISSED)
+                remove(AppUpdateKeys.DISMISSED_AT)
             } else {
-                putString(KEY_DISMISSED, identity).putLong(KEY_DISMISSED_AT, System.currentTimeMillis())
+                put(AppUpdateKeys.DISMISSED, identity)
+                put(AppUpdateKeys.DISMISSED_AT, now())
             }
-        }.apply()
+        }
     }
 
     private fun encode(update: AvailableUpdate): String = JSONObject().apply {
@@ -174,4 +174,52 @@ object AppUpdateSettings {
             )
         )
     }.getOrNull()
+}
+
+/**
+ * The Context-shaped entry point the rest of the updater calls. Kept so call sites
+ * do not change; all of it delegates to [AppUpdateStore] over the `app_updates`
+ * prefs file.
+ */
+object AppUpdateSettings {
+
+    val defaultUpdateSource: String get() = "https://github.com/${BuildConfig.UPDATE_REPO}"
+
+    private fun logic(context: Context): AppUpdateStore =
+        AppUpdateStore(
+            SettingsStoreImpl(SharedPreferencesKeyValueStore(context.applicationContext)),
+            defaultUpdateSource,
+        )
+
+    fun isIntroAnswered(context: Context): Boolean = logic(context).isIntroAnswered()
+
+    fun setIntroAnswered(context: Context, answered: Boolean) =
+        logic(context).setIntroAnswered(answered)
+
+    fun isAutoCheckEnabled(context: Context): Boolean = logic(context).isAutoCheckEnabled()
+
+    fun setAutoCheckEnabled(context: Context, enabled: Boolean) =
+        logic(context).setAutoCheckEnabled(enabled)
+
+    fun updateSource(context: Context): String = logic(context).updateSource()
+
+    fun isDefaultUpdateSource(context: Context): Boolean = logic(context).isDefaultUpdateSource()
+
+    fun setUpdateSource(context: Context, url: String?) = logic(context).setUpdateSource(url)
+
+    fun lastCheckAtMillis(context: Context): Long = logic(context).lastCheckAtMillis()
+
+    fun lastError(context: Context): UpdateError? = logic(context).lastError()
+
+    fun recordCheck(context: Context, result: UpdateCheckResult, atMillis: Long) =
+        logic(context).recordCheck(result, atMillis)
+
+    fun cachedUpdate(context: Context): AvailableUpdate? = logic(context).cachedUpdate()
+
+    fun clearCachedUpdate(context: Context) = logic(context).clearCachedUpdate()
+
+    fun dismissedIdentity(context: Context): String? = logic(context).dismissedIdentity()
+
+    fun setDismissedIdentity(context: Context, identity: String?) =
+        logic(context).setDismissedIdentity(identity)
 }

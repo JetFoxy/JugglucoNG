@@ -98,6 +98,32 @@ abstract class SettingsStoreContractTest {
     }
 
     @Test
+    fun editWritesSeveralKeysAtOnce() {
+        val store = newStore()
+        val other = SettingKey(file, "other", 0)
+
+        store.edit {
+            put(volume, 11)
+            put(other, 22)
+            remove(muted)
+        }
+
+        assertEquals(11, store.get(volume))
+        assertEquals(22, store.get(other))
+        assertEquals(false, store.get(muted))
+    }
+
+    @Test
+    fun editRemovesAKeyThatWasSet() {
+        val store = newStore()
+        store.set(name, "glucose")
+
+        store.edit { remove(name) }
+
+        assertEquals("unset", store.get(name))
+    }
+
+    @Test
     fun concurrentWritesAreNotLost() {
         val store = newStore()
         val keys = (0 until 100).map { SettingKey(file, "k$it", -1) }

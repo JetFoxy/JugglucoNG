@@ -27,6 +27,14 @@ class InMemoryKeyValueStore : KeyValueStore {
         flowFor(file).tryEmit(key)
     }
 
+    override fun writeAll(file: String, values: Map<String, Any?>) {
+        synchronized(lock) {
+            val target = this.values.getOrPut(file) { HashMap() }
+            target.putAll(values)
+        }
+        values.keys.forEach { flowFor(file).tryEmit(it) }
+    }
+
     override fun changes(file: String): Flow<String> = flowFor(file)
 
     private fun flowFor(file: String): MutableSharedFlow<String> = synchronized(lock) {

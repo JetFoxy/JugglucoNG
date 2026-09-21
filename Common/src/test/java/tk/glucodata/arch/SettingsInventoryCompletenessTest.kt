@@ -106,6 +106,29 @@ class SettingsInventoryCompletenessTest {
     }
 
     @Test
+    fun keepsAFilesThatMovedOntoSettingKeys() {
+        fixture = Files.createTempDirectory("settings-inventory-fixture").toFile()
+        // A migrated area no longer calls getSharedPreferences; the prefs file is
+        // named on the SettingKey. The inventory must still list it.
+        fixtureFile(
+            "Common/src/mobile/java/tk/glucodata/update/Keys.kt",
+            """
+            package tk.glucodata.update
+            object Keys {
+                private const val FILE = "migrated_prefs"
+                val A = SettingKey(FILE, "a", false)
+                val B = SettingKey(FILE, "b", 0L)
+            }
+            """.trimIndent(),
+        )
+
+        val (exit, output) = run("--stdout", "--root", fixture.absolutePath)
+
+        assertEquals(output, 0, exit)
+        assertTrue("a migrated prefs file must stay inventoried:\n$output", output.contains("`migrated_prefs`"))
+    }
+
+    @Test
     fun failsWhenTheCommittedInventoryIsMissingAFile() {
         fixture = Files.createTempDirectory("settings-inventory-fixture").toFile()
         fixtureFile(

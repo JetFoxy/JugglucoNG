@@ -39,6 +39,13 @@ CONST_RE = re.compile(
 LITERAL_RE = re.compile(r'^"([^"]+)"$')
 DATABASE_RE = re.compile(r"@(?:[\w.]+\.)?Database\s*\(")
 ENTITIES_RE = re.compile(r"entities\s*=\s*\[([^\]]*)\]")
+# A migrated area names its prefs file on the SettingKey instead of calling
+# getSharedPreferences. Without this, moving an area onto SettingsStore would
+# quietly drop it from the inventory.
+SETTINGKEY_RE = re.compile(r"SettingKey\(\s*([^,]+?)\s*,")
+# Any `NAME = "value"`; only used to resolve a SettingKey's file argument, where
+# a generic name like FILE is expected (the prefs-named CONST_RE above is too narrow).
+ANY_CONST_RE = re.compile(r'(?:String|val|const\s+val)\s+(\w+)\s*=\s*"([^"]+)"')
 
 
 def java_files(root: str):
@@ -87,24 +94,65 @@ def resolve(argument: str, file_consts: dict[str, str], global_consts: dict[str,
     return ""
 
 
+def collect_any_constants(root: str):
+    """name -> value for every string constant, but only where all definitions
+    agree. Used to resolve a SettingKey's file argument, which is often a generic
+    name like FILE that the prefs-named CONST_RE would not match."""
+    values: dict[str, set[str]] = {}
+    for path in java_files(root):
+        text = open(path, encoding="utf-8", errors="replace").read()
+        for name, value in ANY_CONST_RE.findall(text):
+            values.setdefault(name, set()).add(value)
+    return {name: next(iter(found)) for name, found in values.items() if len(found) == 1}
+
+
+def resolve_any(argument: str, file_consts: dict[str, str], global_consts: dict[str, str]) -> str:
+    literal = LITERAL_RE.match(argument.strip())
+    if literal:
+        return literal.group(1)
+    arg = strip_literals_argument(argument)
+    leaf = arg.rsplit(".", 1)[-1]
+    for candidate in (leaf, arg):
+        if candidate in file_consts:
+            return file_consts[candidate]
+    if leaf in global_consts:
+        return global_consts[leaf]
+    return ""
+
+
 def scan_prefs(root: str):
     global_consts = collect_global_constants(root)
+    any_global_consts = collect_any_constants(root)
     files: dict[str, dict] = {}
     unresolved: dict[str, int] = {}
+
+    def entry_for(name: str) -> dict:
+        return files.setdefault(name, {"calls": 0, "flavors": set(), "defined_in": ""})
+
     for path in java_files(root):
         rel = os.path.relpath(path, root)
         flavor = rel.split(os.sep)[2]
         text = open(path, encoding="utf-8", errors="replace").read()
         file_consts = dict(CONST_RE.findall(text))
+        file_any_consts = dict(ANY_CONST_RE.findall(text))
         for argument in CALL_RE.findall(text):
             name = resolve(argument, file_consts, global_consts)
             if not name:
                 key = strip_literals_argument(argument)
                 unresolved[key] = unresolved.get(key, 0) + 1
                 continue
-            entry = files.setdefault(name, {"calls": 0, "flavors": set(), "defined_in": ""})
+            entry = entry_for(name)
             entry["calls"] += 1
             entry["flavors"].add(flavor)
+        # Files named on a SettingKey: an area already moved onto SettingsStore.
+        for argument in SETTINGKEY_RE.findall(text):
+            name = resolve_any(argument, file_any_consts, any_global_consts)
+            if name:
+                entry = entry_for(name)
+                entry["calls"] += 1
+                entry["flavors"].add(flavor)
+                if not entry["defined_in"]:
+                    entry["defined_in"] = rel
     # Where each name is defined: the file whose constant resolved to it.
     for path in java_files(root):
         rel = os.path.relpath(path, root)
@@ -152,7 +200,7 @@ def render(root: str) -> str:
     out.append("")
     out.append(f"## SharedPreferences files ({len(files)})")
     out.append("")
-    out.append("| File | Defined in | Call sites | Flavours |")
+    out.append("| File | Defined in | References | Flavours |")
     out.append("|---|---|---:|---|")
     for name in sorted(files):
         entry = files[name]
