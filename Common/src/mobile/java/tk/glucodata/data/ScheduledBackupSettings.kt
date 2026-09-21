@@ -2,6 +2,11 @@ package tk.glucodata.data
 
 import android.content.Context
 import android.net.Uri
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsEdit
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
 
 data class ScheduledBackupMetrics(
     val compression: ExportCompression,
@@ -31,94 +36,209 @@ data class ScheduledBackupConfig(
     val pendingMetrics: ScheduledBackupMetrics?
 )
 
-object ScheduledBackupSettings {
-    private const val PREFS = "scheduled_backups"
-    private const val KEY_ENABLED = "enabled"
-    private const val KEY_DESTINATION = "destination"
-    private const val KEY_HOUR = "hour"
-    private const val KEY_MINUTE = "minute"
-    private const val KEY_COMPRESSION = "compression"
-    private const val KEY_DAILY_RETENTION = "daily_retention"
-    private const val KEY_WEEKLY_RETENTION = "weekly_retention"
-    private const val KEY_MONTHLY_RETENTION = "monthly_retention"
-    private const val KEY_LAST_SUCCESS = "last_success"
-    private const val KEY_LAST_FILE = "last_file"
-    private const val KEY_LAST_ATTEMPT = "last_attempt"
-    private const val KEY_LAST_ERROR = "last_error"
-    private const val KEY_INTEGRITY_WARNING = "integrity_warning"
-    private const val BASELINE_PREFIX = "baseline_"
-    private const val PENDING_PREFIX = "pending_"
+internal val scheduledBackupRetentionOptions = listOf(1, 3, 4, 5, 6, 7, 14, 30)
 
-    private const val DEFAULT_DAILY_RETENTION = 5
-    private const val DEFAULT_WEEKLY_RETENTION = 4
-    private const val DEFAULT_MONTHLY_RETENTION = 6
+/**
+ * The scheduled-backups keys, on the `scheduled_backups` prefs file (plan task
+ * T2.3). The metrics under `baseline_`/`pending_` are built from a prefix.
+ */
+object ScheduledBackupKeys {
+    private const val FILE = "scheduled_backups"
 
-    val retentionOptions = listOf(1, 3, 4, 5, 6, 7, 14, 30)
+    const val BASELINE_PREFIX = "baseline_"
+    const val PENDING_PREFIX = "pending_"
 
-    fun load(context: Context): ScheduledBackupConfig {
-        val prefs = prefs(context)
-        fun retention(key: String, fallback: Int): Int {
-            return prefs.getInt(key, fallback).takeIf { it in retentionOptions } ?: fallback
-        }
-        return ScheduledBackupConfig(
-            enabled = prefs.getBoolean(KEY_ENABLED, false),
-            destination = prefs.getString(KEY_DESTINATION, null)?.let(Uri::parse),
-            hour = prefs.getInt(KEY_HOUR, 3).coerceIn(0, 23),
-            minute = prefs.getInt(KEY_MINUTE, 0).coerceIn(0, 59),
-            compression = runCatching {
-                ExportCompression.valueOf(prefs.getString(KEY_COMPRESSION, null) ?: "")
-            }.getOrNull()
-                ?.takeIf { it == ExportCompression.GZIP || it == ExportCompression.ZSTD }
-                ?: ExportCompression.GZIP,
-            dailyRetention = retention(KEY_DAILY_RETENTION, DEFAULT_DAILY_RETENTION),
-            weeklyRetention = retention(KEY_WEEKLY_RETENTION, DEFAULT_WEEKLY_RETENTION),
-            monthlyRetention = retention(KEY_MONTHLY_RETENTION, DEFAULT_MONTHLY_RETENTION),
-            lastSuccessAtMillis = prefs.getLong(KEY_LAST_SUCCESS, 0L),
-            lastFileName = prefs.getString(KEY_LAST_FILE, null),
-            lastAttemptAtMillis = prefs.getLong(KEY_LAST_ATTEMPT, 0L),
-            lastError = prefs.getString(KEY_LAST_ERROR, null),
-            integrityWarning = prefs.getString(KEY_INTEGRITY_WARNING, null),
-            baselineMetrics = readMetrics(prefs, BASELINE_PREFIX),
-            pendingMetrics = readMetrics(prefs, PENDING_PREFIX)
-        )
-    }
+    val ENABLED = SettingKey(FILE, "enabled", false)
+    val DESTINATION = SettingKey(FILE, "destination", null as String?)
+    val HOUR = SettingKey(FILE, "hour", 3)
+    val MINUTE = SettingKey(FILE, "minute", 0)
+    val COMPRESSION = SettingKey(FILE, "compression", null as String?)
+    val DAILY_RETENTION = SettingKey(FILE, "daily_retention", 5)
+    val WEEKLY_RETENTION = SettingKey(FILE, "weekly_retention", 4)
+    val MONTHLY_RETENTION = SettingKey(FILE, "monthly_retention", 6)
+    val LAST_SUCCESS = SettingKey(FILE, "last_success", 0L)
+    val LAST_FILE = SettingKey(FILE, "last_file", null as String?)
+    val LAST_ATTEMPT = SettingKey(FILE, "last_attempt", 0L)
+    val LAST_ERROR = SettingKey(FILE, "last_error", null as String?)
+    val INTEGRITY_WARNING = SettingKey(FILE, "integrity_warning", null as String?)
 
-    fun saveConfiguration(context: Context, config: ScheduledBackupConfig) {
+    fun metricCompression(prefix: String) = SettingKey(FILE, prefix + "compression", null as String?)
+    fun metricBytes(prefix: String) = SettingKey(FILE, prefix + "bytes", 0L)
+    fun metricHistory(prefix: String) = SettingKey(FILE, prefix + "history", 0)
+    fun metricJournal(prefix: String) = SettingKey(FILE, prefix + "journal", 0)
+    fun metricFoods(prefix: String) = SettingKey(FILE, prefix + "foods", 0)
+    fun metricInsulins(prefix: String) = SettingKey(FILE, prefix + "insulins", 0)
+    fun metricCalibrations(prefix: String) = SettingKey(FILE, prefix + "calibrations", 0)
+}
+
+/**
+ * The scheduled-backup settings, over [SettingsStore]. Every write goes through
+ * one `edit`, so the last-attempt/success/error/baseline bundle is applied
+ * together rather than key by key.
+ */
+internal class ScheduledBackupStore(private val store: SettingsStore) {
+
+    private fun retention(key: SettingKey<Int>, fallback: Int): Int =
+        store.get(key).takeIf { it in scheduledBackupRetentionOptions } ?: fallback
+
+    fun load(): ScheduledBackupConfig = ScheduledBackupConfig(
+        enabled = store.get(ScheduledBackupKeys.ENABLED),
+        destination = store.get(ScheduledBackupKeys.DESTINATION)?.let(Uri::parse),
+        hour = store.get(ScheduledBackupKeys.HOUR).coerceIn(0, 23),
+        minute = store.get(ScheduledBackupKeys.MINUTE).coerceIn(0, 59),
+        compression = store.get(ScheduledBackupKeys.COMPRESSION)
+            ?.let { runCatching { ExportCompression.valueOf(it) }.getOrNull() }
+            ?.takeIf { it == ExportCompression.GZIP || it == ExportCompression.ZSTD }
+            ?: ExportCompression.GZIP,
+        dailyRetention = retention(ScheduledBackupKeys.DAILY_RETENTION, 5),
+        weeklyRetention = retention(ScheduledBackupKeys.WEEKLY_RETENTION, 4),
+        monthlyRetention = retention(ScheduledBackupKeys.MONTHLY_RETENTION, 6),
+        lastSuccessAtMillis = store.get(ScheduledBackupKeys.LAST_SUCCESS),
+        lastFileName = store.get(ScheduledBackupKeys.LAST_FILE),
+        lastAttemptAtMillis = store.get(ScheduledBackupKeys.LAST_ATTEMPT),
+        lastError = store.get(ScheduledBackupKeys.LAST_ERROR),
+        integrityWarning = store.get(ScheduledBackupKeys.INTEGRITY_WARNING),
+        baselineMetrics = readMetrics(ScheduledBackupKeys.BASELINE_PREFIX),
+        pendingMetrics = readMetrics(ScheduledBackupKeys.PENDING_PREFIX),
+    )
+
+    fun saveConfiguration(config: ScheduledBackupConfig) {
         require(!config.enabled || config.destination != null) { "A backup folder is required" }
-        require(config.dailyRetention in retentionOptions) { "Unsupported daily retention count" }
-        require(config.weeklyRetention in retentionOptions) { "Unsupported weekly retention count" }
-        require(config.monthlyRetention in retentionOptions) { "Unsupported monthly retention count" }
+        require(config.dailyRetention in scheduledBackupRetentionOptions) { "Unsupported daily retention count" }
+        require(config.weeklyRetention in scheduledBackupRetentionOptions) { "Unsupported weekly retention count" }
+        require(config.monthlyRetention in scheduledBackupRetentionOptions) { "Unsupported monthly retention count" }
         require(config.compression != ExportCompression.NONE) {
             "Scheduled backups must use compression"
         }
-        prefs(context).edit()
-            .putBoolean(KEY_ENABLED, config.enabled)
-            .putString(KEY_DESTINATION, config.destination?.toString())
-            .putInt(KEY_HOUR, config.hour.coerceIn(0, 23))
-            .putInt(KEY_MINUTE, config.minute.coerceIn(0, 59))
-            .putString(KEY_COMPRESSION, config.compression.name)
-            .putInt(KEY_DAILY_RETENTION, config.dailyRetention)
-            .putInt(KEY_WEEKLY_RETENTION, config.weeklyRetention)
-            .putInt(KEY_MONTHLY_RETENTION, config.monthlyRetention)
-            .apply()
+        store.edit {
+            put(ScheduledBackupKeys.ENABLED, config.enabled)
+            put(ScheduledBackupKeys.DESTINATION, config.destination?.toString())
+            put(ScheduledBackupKeys.HOUR, config.hour.coerceIn(0, 23))
+            put(ScheduledBackupKeys.MINUTE, config.minute.coerceIn(0, 59))
+            put(ScheduledBackupKeys.COMPRESSION, config.compression.name)
+            put(ScheduledBackupKeys.DAILY_RETENTION, config.dailyRetention)
+            put(ScheduledBackupKeys.WEEKLY_RETENTION, config.weeklyRetention)
+            put(ScheduledBackupKeys.MONTHLY_RETENTION, config.monthlyRetention)
+        }
     }
+
+    fun recordSuccess(timestamp: Long, fileName: String, metrics: ScheduledBackupMetrics) {
+        store.edit {
+            put(ScheduledBackupKeys.LAST_ATTEMPT, timestamp)
+            put(ScheduledBackupKeys.LAST_SUCCESS, timestamp)
+            put(ScheduledBackupKeys.LAST_FILE, fileName)
+            remove(ScheduledBackupKeys.LAST_ERROR)
+            remove(ScheduledBackupKeys.INTEGRITY_WARNING)
+            removeMetrics(ScheduledBackupKeys.PENDING_PREFIX)
+            putMetrics(ScheduledBackupKeys.BASELINE_PREFIX, metrics)
+        }
+    }
+
+    fun recordSuspiciousSuccess(
+        timestamp: Long,
+        fileName: String,
+        metrics: ScheduledBackupMetrics,
+        warning: String
+    ) {
+        store.edit {
+            put(ScheduledBackupKeys.LAST_ATTEMPT, timestamp)
+            put(ScheduledBackupKeys.LAST_SUCCESS, timestamp)
+            put(ScheduledBackupKeys.LAST_FILE, fileName)
+            remove(ScheduledBackupKeys.LAST_ERROR)
+            put(ScheduledBackupKeys.INTEGRITY_WARNING, warning.take(1_000))
+            putMetrics(ScheduledBackupKeys.PENDING_PREFIX, metrics)
+        }
+    }
+
+    fun recordSuccessWhileWarningIsPending(
+        timestamp: Long,
+        fileName: String,
+        metrics: ScheduledBackupMetrics
+    ) {
+        store.edit {
+            put(ScheduledBackupKeys.LAST_ATTEMPT, timestamp)
+            put(ScheduledBackupKeys.LAST_SUCCESS, timestamp)
+            put(ScheduledBackupKeys.LAST_FILE, fileName)
+            remove(ScheduledBackupKeys.LAST_ERROR)
+            putMetrics(ScheduledBackupKeys.PENDING_PREFIX, metrics)
+        }
+    }
+
+    fun recordFailure(timestamp: Long, error: String) {
+        store.edit {
+            put(ScheduledBackupKeys.LAST_ATTEMPT, timestamp)
+            put(ScheduledBackupKeys.LAST_ERROR, error.take(500))
+        }
+    }
+
+    fun acknowledgeIntegrityWarning() {
+        val pending = load().pendingMetrics
+        store.edit {
+            remove(ScheduledBackupKeys.INTEGRITY_WARNING)
+            removeMetrics(ScheduledBackupKeys.PENDING_PREFIX)
+            pending?.let { putMetrics(ScheduledBackupKeys.BASELINE_PREFIX, it) }
+        }
+    }
+
+    private fun readMetrics(prefix: String): ScheduledBackupMetrics? {
+        val compressionName = store.get(ScheduledBackupKeys.metricCompression(prefix)) ?: return null
+        val compression = runCatching { ExportCompression.valueOf(compressionName) }.getOrNull()
+            ?: return null
+        return ScheduledBackupMetrics(
+            compression = compression,
+            byteSize = store.get(ScheduledBackupKeys.metricBytes(prefix)),
+            historyReadings = store.get(ScheduledBackupKeys.metricHistory(prefix)),
+            journalEntries = store.get(ScheduledBackupKeys.metricJournal(prefix)),
+            journalFoods = store.get(ScheduledBackupKeys.metricFoods(prefix)),
+            insulinPresets = store.get(ScheduledBackupKeys.metricInsulins(prefix)),
+            calibrations = store.get(ScheduledBackupKeys.metricCalibrations(prefix)),
+        )
+    }
+
+    private fun SettingsEdit.putMetrics(prefix: String, metrics: ScheduledBackupMetrics) {
+        put(ScheduledBackupKeys.metricCompression(prefix), metrics.compression.name)
+        put(ScheduledBackupKeys.metricBytes(prefix), metrics.byteSize)
+        put(ScheduledBackupKeys.metricHistory(prefix), metrics.historyReadings)
+        put(ScheduledBackupKeys.metricJournal(prefix), metrics.journalEntries)
+        put(ScheduledBackupKeys.metricFoods(prefix), metrics.journalFoods)
+        put(ScheduledBackupKeys.metricInsulins(prefix), metrics.insulinPresets)
+        put(ScheduledBackupKeys.metricCalibrations(prefix), metrics.calibrations)
+    }
+
+    private fun SettingsEdit.removeMetrics(prefix: String) {
+        remove(ScheduledBackupKeys.metricCompression(prefix))
+        remove(ScheduledBackupKeys.metricBytes(prefix))
+        remove(ScheduledBackupKeys.metricHistory(prefix))
+        remove(ScheduledBackupKeys.metricJournal(prefix))
+        remove(ScheduledBackupKeys.metricFoods(prefix))
+        remove(ScheduledBackupKeys.metricInsulins(prefix))
+        remove(ScheduledBackupKeys.metricCalibrations(prefix))
+    }
+}
+
+/**
+ * The Context-shaped entry point the worker and the UI already call. Kept so call
+ * sites do not change; everything delegates to [ScheduledBackupStore].
+ */
+object ScheduledBackupSettings {
+
+    val retentionOptions = scheduledBackupRetentionOptions
+
+    private fun logic(context: Context) = ScheduledBackupStore(
+        SettingsStoreImpl(SharedPreferencesKeyValueStore(context.applicationContext))
+    )
+
+    fun load(context: Context): ScheduledBackupConfig = logic(context).load()
+
+    fun saveConfiguration(context: Context, config: ScheduledBackupConfig) =
+        logic(context).saveConfiguration(config)
 
     fun recordSuccess(
         context: Context,
         timestamp: Long,
         fileName: String,
         metrics: ScheduledBackupMetrics
-    ) {
-        prefs(context).edit()
-            .putLong(KEY_LAST_ATTEMPT, timestamp)
-            .putLong(KEY_LAST_SUCCESS, timestamp)
-            .putString(KEY_LAST_FILE, fileName)
-            .remove(KEY_LAST_ERROR)
-            .remove(KEY_INTEGRITY_WARNING)
-            .removeMetrics(PENDING_PREFIX)
-            .putMetrics(BASELINE_PREFIX, metrics)
-            .apply()
-    }
+    ) = logic(context).recordSuccess(timestamp, fileName, metrics)
 
     fun recordSuspiciousSuccess(
         context: Context,
@@ -126,47 +246,20 @@ object ScheduledBackupSettings {
         fileName: String,
         metrics: ScheduledBackupMetrics,
         warning: String
-    ) {
-        prefs(context).edit()
-            .putLong(KEY_LAST_ATTEMPT, timestamp)
-            .putLong(KEY_LAST_SUCCESS, timestamp)
-            .putString(KEY_LAST_FILE, fileName)
-            .remove(KEY_LAST_ERROR)
-            .putString(KEY_INTEGRITY_WARNING, warning.take(1_000))
-            .putMetrics(PENDING_PREFIX, metrics)
-            .apply()
-    }
+    ) = logic(context).recordSuspiciousSuccess(timestamp, fileName, metrics, warning)
 
     fun recordSuccessWhileWarningIsPending(
         context: Context,
         timestamp: Long,
         fileName: String,
         metrics: ScheduledBackupMetrics
-    ) {
-        prefs(context).edit()
-            .putLong(KEY_LAST_ATTEMPT, timestamp)
-            .putLong(KEY_LAST_SUCCESS, timestamp)
-            .putString(KEY_LAST_FILE, fileName)
-            .remove(KEY_LAST_ERROR)
-            .putMetrics(PENDING_PREFIX, metrics)
-            .apply()
-    }
+    ) = logic(context).recordSuccessWhileWarningIsPending(timestamp, fileName, metrics)
 
-    fun recordFailure(context: Context, timestamp: Long, error: String) {
-        prefs(context).edit()
-            .putLong(KEY_LAST_ATTEMPT, timestamp)
-            .putString(KEY_LAST_ERROR, error.take(500))
-            .apply()
-    }
+    fun recordFailure(context: Context, timestamp: Long, error: String) =
+        logic(context).recordFailure(timestamp, error)
 
-    fun acknowledgeIntegrityWarning(context: Context) {
-        val current = load(context)
-        prefs(context).edit()
-            .remove(KEY_INTEGRITY_WARNING)
-            .removeMetrics(PENDING_PREFIX)
-            .also { editor -> current.pendingMetrics?.let { editor.putMetrics(BASELINE_PREFIX, it) } }
-            .apply()
-    }
+    fun acknowledgeIntegrityWarning(context: Context) =
+        logic(context).acknowledgeIntegrityWarning()
 
     fun hasPersistedWritePermission(context: Context, destination: Uri?): Boolean {
         if (destination == null) return false
@@ -174,46 +267,4 @@ object ScheduledBackupSettings {
             permission.uri == destination && permission.isWritePermission
         }
     }
-
-    private fun readMetrics(
-        prefs: android.content.SharedPreferences,
-        prefix: String
-    ): ScheduledBackupMetrics? {
-        if (!prefs.contains(prefix + "compression")) return null
-        val compression = runCatching {
-            ExportCompression.valueOf(prefs.getString(prefix + "compression", null) ?: "")
-        }.getOrNull() ?: return null
-        return ScheduledBackupMetrics(
-            compression = compression,
-            byteSize = prefs.getLong(prefix + "bytes", 0L),
-            historyReadings = prefs.getInt(prefix + "history", 0),
-            journalEntries = prefs.getInt(prefix + "journal", 0),
-            journalFoods = prefs.getInt(prefix + "foods", 0),
-            insulinPresets = prefs.getInt(prefix + "insulins", 0),
-            calibrations = prefs.getInt(prefix + "calibrations", 0)
-        )
-    }
-
-    private fun android.content.SharedPreferences.Editor.putMetrics(
-        prefix: String,
-        metrics: ScheduledBackupMetrics
-    ) = putString(prefix + "compression", metrics.compression.name)
-        .putLong(prefix + "bytes", metrics.byteSize)
-        .putInt(prefix + "history", metrics.historyReadings)
-        .putInt(prefix + "journal", metrics.journalEntries)
-        .putInt(prefix + "foods", metrics.journalFoods)
-        .putInt(prefix + "insulins", metrics.insulinPresets)
-        .putInt(prefix + "calibrations", metrics.calibrations)
-
-    private fun android.content.SharedPreferences.Editor.removeMetrics(prefix: String) =
-        remove(prefix + "compression")
-            .remove(prefix + "bytes")
-            .remove(prefix + "history")
-            .remove(prefix + "journal")
-            .remove(prefix + "foods")
-            .remove(prefix + "insulins")
-            .remove(prefix + "calibrations")
-
-    private fun prefs(context: Context) = context.applicationContext
-        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
