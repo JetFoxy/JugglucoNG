@@ -53,4 +53,6 @@ class SharedPreferencesKeyValueStore(private val context: Context) : KeyValueSto
         prefs(file).registerOnSharedPreferenceChangeListener(listener)
         awaitClose { prefs(file).unregisterOnSharedPreferenceChangeListener(listener) }
     }
+
+    override fun entries(file: String): Map<String, Any?> = prefs(file).all
 }

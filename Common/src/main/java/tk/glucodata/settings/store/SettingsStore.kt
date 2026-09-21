@@ -32,6 +32,9 @@ interface SettingsStore {
     fun edit(block: SettingsEdit.() -> Unit)
 
     fun <T> observe(key: SettingKey<T>): Flow<T>
+
+    /** Every stored key in [file], for the few areas that enumerate rather than name keys. */
+    fun entries(file: String): Map<String, Any?>
 }
 
 /** Collects the writes of one [SettingsStore.edit], grouped by prefs file. */
@@ -62,6 +65,9 @@ interface KeyValueStore {
 
     /** Emits the name of every key that changes in [file]. */
     fun changes(file: String): Flow<String>
+
+    /** Every stored key in [file]. */
+    fun entries(file: String): Map<String, Any?>
 }
 
 class SettingsStoreImpl(private val backend: KeyValueStore) : SettingsStore {
@@ -85,4 +91,6 @@ class SettingsStoreImpl(private val backend: KeyValueStore) : SettingsStore {
             .filter { it == key.name }
             .collect { emit(get(key)) }
     }.distinctUntilChanged()
+
+    override fun entries(file: String): Map<String, Any?> = backend.entries(file)
 }

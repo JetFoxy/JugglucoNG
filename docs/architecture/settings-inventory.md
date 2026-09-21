@@ -39,7 +39,7 @@ may be declared in several places.
 | `tk.glucodata.snooze` | `Common/src/main/java/tk/glucodata/alerts/SnoozeManager.kt` | 1 | main |
 | `tk.glucodata_preferences` | `Common/src/main/java/tk/glucodata/AutoSensorSwitch.kt` | 147 | main, mobile, wear |
 | `wear_journal_cache` | `Common/src/main/java/tk/glucodata/WearJournalSync.kt` | 2 | main |
-| `wear_routing_request` | `Common/src/mobile/java/tk/glucodata/WearRoutingRequest.kt` | 3 | main, mobile |
+| `wear_routing_request` | `Common/src/mobile/java/tk/glucodata/WearRoutingRequest.kt` | 5 | main, mobile |
 | `wear_sensor_claim` | `Common/src/main/java/tk/glucodata/WearSensorClaim.kt` | 3 | main |
 | `wear_sensor_selection` | `Common/src/wear/java/tk/glucodata/ui/WearSensorSelection.kt` | 1 | wear |
 

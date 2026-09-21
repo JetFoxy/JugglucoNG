@@ -37,6 +37,10 @@ class InMemoryKeyValueStore : KeyValueStore {
 
     override fun changes(file: String): Flow<String> = flowFor(file)
 
+    override fun entries(file: String): Map<String, Any?> = synchronized(lock) {
+        HashMap(values[file] ?: emptyMap())
+    }
+
     private fun flowFor(file: String): MutableSharedFlow<String> = synchronized(lock) {
         changeFlows.getOrPut(file) { MutableSharedFlow(extraBufferCapacity = 64) }
     }

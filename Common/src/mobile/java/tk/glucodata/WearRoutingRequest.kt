@@ -1,6 +1,9 @@
 package tk.glucodata
 
-import android.content.Context
+import tk.glucodata.settings.store.SettingKey
+import tk.glucodata.settings.store.SettingsStore
+import tk.glucodata.settings.store.SettingsStoreImpl
+import tk.glucodata.settings.store.SharedPreferencesKeyValueStore
 
 /**
  * What the user asked each watch to do, as opposed to what the watch has since
@@ -12,42 +15,55 @@ import android.content.Context
  * to the confirmed native state, so every toggle sprang back to off within a
  * second and the request looked like it had been ignored. Remembering the
  * request lets the switch hold while the status line reports the real phase.
+ *
+ * Now over [SettingsStore] (plan task T2.3); the keys are per node id.
  */
 object WearRoutingRequest {
     private const val PREFS = "wear_routing_request"
-    private const val KEY_DIRECT = "direct."
-    private const val KEY_ENTER = "enter."
-    private const val KEY_SENSOR = "sensor."
 
-    private fun prefs() = Applic.app
-        ?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private object Keys {
+        const val DIRECT_PREFIX = "direct."
+        const val ENTER_PREFIX = "enter."
+        const val SENSOR_PREFIX = "sensor."
+
+        fun direct(nodeId: String) = SettingKey(PREFS, DIRECT_PREFIX + nodeId, false)
+        fun enter(nodeId: String) = SettingKey(PREFS, ENTER_PREFIX + nodeId, false)
+        fun sensor(nodeId: String) = SettingKey(PREFS, SENSOR_PREFIX + nodeId, null as String?)
+    }
+
+    /** Set by tests to run on an in-memory backend. */
+    @Volatile
+    internal var storeOverride: SettingsStore? = null
+
+    private fun store(): SettingsStore? =
+        storeOverride ?: Applic.app?.let {
+            SettingsStoreImpl(SharedPreferencesKeyValueStore(it.applicationContext))
+        }
 
     data class DirectSensorRoute(
         val nodeId: String,
     )
 
     @JvmStatic
-    fun directRequested(nodeId: String): Boolean =
-        prefs()?.getBoolean(KEY_DIRECT + nodeId, false) ?: false
+    fun directRequested(nodeId: String): Boolean = store()?.get(Keys.direct(nodeId)) ?: false
 
     @JvmStatic
-    fun enterRequested(nodeId: String): Boolean =
-        prefs()?.getBoolean(KEY_ENTER + nodeId, false) ?: false
+    fun enterRequested(nodeId: String): Boolean = store()?.get(Keys.enter(nodeId)) ?: false
 
     @JvmStatic
     fun record(nodeId: String, direct: Boolean, enter: Boolean) {
-        val editor = prefs()?.edit()
-            ?.putBoolean(KEY_DIRECT + nodeId, direct)
-            ?.putBoolean(KEY_ENTER + nodeId, enter)
-            ?: return
-        if (direct) {
-            SensorIdentity.canonicalSensorId(SensorIdentity.resolveMainSensor())
-                ?.takeIf { it.isNotBlank() }
-                ?.let { editor.putString(KEY_SENSOR + nodeId, it) }
-        } else {
-            editor.remove(KEY_SENSOR + nodeId)
+        val store = store() ?: return
+        store.edit {
+            put(Keys.direct(nodeId), direct)
+            put(Keys.enter(nodeId), enter)
+            if (direct) {
+                SensorIdentity.canonicalSensorId(SensorIdentity.resolveMainSensor())
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { put(Keys.sensor(nodeId), it) }
+            } else {
+                remove(Keys.sensor(nodeId))
+            }
         }
-        editor.apply()
     }
 
     /**
@@ -65,15 +81,15 @@ object WearRoutingRequest {
     fun revokeAllDirectSensors(): List<DirectSensorRoute> = revokeMatching { true }
 
     private fun revokeMatching(matches: (String) -> Boolean): List<DirectSensorRoute> {
-        val shared = prefs() ?: return emptyList()
-        val snapshot = shared.all
+        val store = store() ?: return emptyList()
+        val snapshot = store.entries(PREFS)
         val routes = snapshot.entries
             .asSequence()
-            .filter { (key, value) -> key.startsWith(KEY_DIRECT) && value == true }
+            .filter { (key, value) -> key.startsWith(Keys.DIRECT_PREFIX) && value == true }
             .mapNotNull { (key, _) ->
-                val nodeId = key.removePrefix(KEY_DIRECT).takeIf { it.isNotBlank() }
+                val nodeId = key.removePrefix(Keys.DIRECT_PREFIX).takeIf { it.isNotBlank() }
                     ?: return@mapNotNull null
-                val assigned = (snapshot[KEY_SENSOR + nodeId] as? String)
+                val assigned = (snapshot[Keys.sensor(nodeId).name] as? String)
                     ?.takeIf { it.isNotBlank() }
                     ?: SensorIdentity.resolveMainSensor()
                     ?: ""
@@ -82,22 +98,22 @@ object WearRoutingRequest {
             }
             .toList()
         if (routes.isEmpty()) return routes
-        val editor = shared.edit()
-        routes.forEach { route ->
-            editor.putBoolean(KEY_DIRECT + route.nodeId, false)
-            editor.remove(KEY_SENSOR + route.nodeId)
+        store.edit {
+            routes.forEach { route ->
+                put(Keys.direct(route.nodeId), false)
+                remove(Keys.sensor(route.nodeId))
+            }
         }
-        editor.apply()
         return routes
     }
 
     /** Dropped when routing is reset to defaults, so nothing stale is shown. */
     @JvmStatic
     fun clear(nodeId: String) {
-        prefs()?.edit()
-            ?.remove(KEY_DIRECT + nodeId)
-            ?.remove(KEY_ENTER + nodeId)
-            ?.remove(KEY_SENSOR + nodeId)
-            ?.apply()
+        store()?.edit {
+            remove(Keys.direct(nodeId))
+            remove(Keys.enter(nodeId))
+            remove(Keys.sensor(nodeId))
+        }
     }
 }

@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -121,6 +122,19 @@ abstract class SettingsStoreContractTest {
         store.edit { remove(name) }
 
         assertEquals("unset", store.get(name))
+    }
+
+    @Test
+    fun entriesListsEveryStoredKey() {
+        val store = newStore()
+        store.set(volume, 11)
+        store.set(name, "glucose")
+
+        val entries = store.entries(file)
+
+        assertEquals(11, entries["volume"])
+        assertEquals("glucose", entries["name"])
+        assertFalse("an unwritten key is absent, not defaulted", entries.containsKey("muted"))
     }
 
     @Test
