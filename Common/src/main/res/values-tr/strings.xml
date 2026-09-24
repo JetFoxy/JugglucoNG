@@ -556,12 +556,13 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="data_smoothing_graph_only_title">Yalnızca grafiği yumuşat</string>
     <string name="data_smoothing_graph_only_desc">Geçerli glikozu, widgetleri, uyarıları ve veri değişimi çıkışlarını yumuşatmadan bırakır — \"Aralıklara daralt\" açıksa hariç: daraltma yumuşatılmış bir okuma gerektirdiğinden veri değişimi çıkışları için yumuşatmayı yeniden etkinleştirir</string>
     <string name="data_smoothing_exchange_only_title">Yalnızca veri çıkışlarını yumuşat</string>
-    <string name="data_smoothing_exchange_only_desc">Yumuşatma ve aralık filtresini yalnızca yayınlara ve giden API yüklerine uygular; grafik, geçerli glikoz, widgetler ve uyarılar değişmeden kalır</string>
+    <string name="data_smoothing_exchange_only_desc">Yumuşatmayı ve gönderim aralığını yalnızca yayınlara ve giden API yüklerine uygular; grafik, geçerli glikoz, widgetler ve uyarılar değişmeden kalır</string>
     <string name="data_smoothing_collapse_title">Aralıklara daralt</string>
-    <string name="data_smoothing_collapse_desc">Her aralık için tek bir yumuşatılmış nokta tutar ve aradaki noktaları filtreler</string>
-    <string name="data_smoothing_collapse_desc_match">Her %1$d dakikada bir yumuşatılmış nokta tutar</string>
-    <string name="data_smoothing_collapse_desc_capped">Yumuşatma hâlâ %1$d dakika kullanırken her 5 dakikada bir yumuşatılmış nokta tutar</string>
+    <string name="data_smoothing_collapse_desc">Her aralık için tek bir yumuşatılmış nokta tutar ve dışa aktarım çıkışlarını her okuma yerine aralık başına bir kez gönderir</string>
+    <string name="data_smoothing_collapse_desc_match">Her %1$d dakikada bir yumuşatılmış nokta tutar ve dışa aktarım çıkışlarını aynı hızda gönderir</string>
+    <string name="data_smoothing_collapse_desc_capped">Her 5 dakikada bir yumuşatılmış nokta tutar ve dışa aktarım çıkışlarını aynı hızda gönderir; yumuşatma yine de %1$d dakika kullanır</string>
     <string name="data_smoothing_collapse_summary_format">Aralıklar her %1$d dk</string>
+    <string name="data_smoothing_collapse_loop_note">xDrip yayını ve xInfuus (kapalı döngü uygulamalarınca kullanılır) seyreltilmez: her okumayı kendi zamanıyla alır</string>
     <string name="preview_window_title">Önizleme penceresi</string>
     <string name="preview_window_desc">Ana grafik davranışını değiştirmeden pano grafiğinin altında 24 saatlik mini gezgini gösterir</string>
     <string name="preview_window_expanded_only">Yalnızca genişletilmiş görünümde (varsayılan)</string>

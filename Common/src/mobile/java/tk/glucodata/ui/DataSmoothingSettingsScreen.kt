@@ -93,6 +93,9 @@ fun DataSmoothingSettingsScreen(
             stringResource(R.string.data_smoothing_collapse_desc_capped, configuredMinutes)
         else ->
             stringResource(R.string.data_smoothing_collapse_desc_match, collapseIntervalMinutes)
+    }.let { described ->
+        // The loop feeds (xDrip broadcast, xInfuus) are exempt from collapse; say so where it is switched on.
+        if (collapseChunks) described + "\n" + stringResource(R.string.data_smoothing_collapse_loop_note) else described
     }
     val exchangeOnlySubtitle = stringResource(R.string.data_smoothing_exchange_only_desc)
 

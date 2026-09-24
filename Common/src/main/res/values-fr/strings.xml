@@ -451,12 +451,13 @@
     <string name="data_smoothing_graph_only_title">Lisser uniquement le graphique</string>
     <string name="data_smoothing_graph_only_desc">Laisse la glycémie actuelle, les widgets, les alertes et les sorties d’échange sans lissage — sauf si « Regrouper en intervalles » est activé : le regroupement a besoin d’une valeur lissée et réactive donc le lissage pour les sorties d’échange</string>
     <string name="data_smoothing_exchange_only_title">Lisser seulement les sorties d’échange</string>
-    <string name="data_smoothing_exchange_only_desc">Applique le lissage et le filtrage en intervalles seulement aux diffusions et aux charges utiles de l’API sortante; le graphique, la glycémie actuelle, les widgets et les alertes restent inchangés</string>
+    <string name="data_smoothing_exchange_only_desc">Applique le lissage et l’intervalle d’envoi seulement aux diffusions et aux charges utiles de l’API sortante; le graphique, la glycémie actuelle, les widgets et les alertes restent inchangés</string>
     <string name="data_smoothing_collapse_title">Regrouper en intervalles</string>
-    <string name="data_smoothing_collapse_desc">Garde un point lissé par intervalle et filtre les points intermédiaires</string>
-    <string name="data_smoothing_collapse_desc_match">Conserve un point lissé toutes les %1$d minutes</string>
-    <string name="data_smoothing_collapse_desc_capped">Conserve un point lissé toutes les 5 minutes alors que le lissage utilise toujours %1$d minutes</string>
+    <string name="data_smoothing_collapse_desc">Garde un point lissé par intervalle et envoie les sorties d’échange une fois par intervalle au lieu de chaque valeur</string>
+    <string name="data_smoothing_collapse_desc_match">Conserve un point lissé toutes les %1$d minutes et envoie les sorties d’échange au même rythme</string>
+    <string name="data_smoothing_collapse_desc_capped">Conserve un point lissé toutes les 5 minutes et envoie les sorties d’échange au même rythme, tandis que le lissage utilise encore %1$d minutes</string>
     <string name="data_smoothing_collapse_summary_format">Intervalles toutes les %1$d min</string>
+    <string name="data_smoothing_collapse_loop_note">Les sorties xDrip et xInfuus (utilisées par les applications en boucle fermée) ne sont pas espacées : elles reçoivent chaque valeur avec son propre horodatage</string>
     <string name="preview_window_title">Fenêtre d’aperçu</string>
     <string name="preview_window_desc">Affiche un mini-navigateur de 24 heures sous le graphique du tableau de bord sans modifier le comportement du graphique principal</string>
     <string name="preview_window_expanded_only">Vue étendue uniquement (par défaut)</string>

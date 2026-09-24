@@ -889,12 +889,13 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="data_smoothing_graph_only_title">Smooth only graph</string>
     <string name="data_smoothing_graph_only_desc">Keep current glucose, widgets, alerts and exchange outputs unsmoothed, unless \"Collapse into chunks\" is on — collapsing still needs a smoothed reading, so it re-enables smoothing for exchange outputs</string>
     <string name="data_smoothing_exchange_only_title">Smooth only exchange outputs</string>
-    <string name="data_smoothing_exchange_only_desc">Apply smoothing and chunk filtering only to broadcasts and outbound API payloads; chart, current glucose, widgets and alerts stay unchanged</string>
+    <string name="data_smoothing_exchange_only_desc">Apply smoothing and the send interval only to broadcasts and outbound API payloads; chart, current glucose, widgets and alerts stay unchanged</string>
     <string name="data_smoothing_collapse_title">Collapse into chunks</string>
-    <string name="data_smoothing_collapse_desc">Keep one smoothed point per interval and filter out points in between</string>
-    <string name="data_smoothing_collapse_desc_match">Keep one smoothed point every %1$d minutes</string>
-    <string name="data_smoothing_collapse_desc_capped">Keep one smoothed point every 5 minutes while smoothing still uses %1$d minutes</string>
+    <string name="data_smoothing_collapse_desc">Keep one smoothed point per interval and send exchange outputs once per interval instead of every reading</string>
+    <string name="data_smoothing_collapse_desc_match">Keep one smoothed point every %1$d minutes and send exchange outputs at the same pace</string>
+    <string name="data_smoothing_collapse_desc_capped">Keep one smoothed point every 5 minutes and send exchange outputs at the same pace, while smoothing still uses %1$d minutes</string>
     <string name="data_smoothing_collapse_summary_format">Chunks every %1$d min</string>
+    <string name="data_smoothing_collapse_loop_note">The xDrip broadcast and xInfuus (used by closed-loop apps) are not thinned: they get every reading at its own time</string>
     <string name="preview_window_title">Preview window</string>
     <string name="preview_window_desc">Show a 24-hour mini navigator under the dashboard chart without changing the main chart behavior</string>
     <string name="preview_window_expanded_only">Expanded view (default)</string>
