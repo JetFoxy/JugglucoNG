@@ -1,5 +1,7 @@
 package tk.glucodata.data.journal
 
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.Keep
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -15,6 +17,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Sends Kotlin Journal entries to Nightscout as treatments. Replaces the legacy C++
@@ -37,6 +40,7 @@ object JournalTreatmentUploader {
     private const val SEND_BACKOFF_FIRST_MILLIS = 60_000L
     private const val SEND_BACKOFF_MAX_MILLIS = 30L * 60_000L
     private const val RECEIVE_ERROR_LOG_INTERVAL_MILLIS = 5L * 60 * 1000
+    private const val RECEIVE_MIN_INTERVAL_MILLIS = 5L * 60 * 1000
 
     /**
      * Refused deletes the tombstone survives before it is dropped. A document Nightscout
@@ -209,6 +213,50 @@ object JournalTreatmentUploader {
     }
 
     private val receiveErrorLog = RepeatedErrorLog(RECEIVE_ERROR_LOG_INTERVAL_MILLIS)
+
+    /**
+     * Lower bound on how often treatments are read back. The read is the newest 240 documents
+     * every time (a few hundred KB on a busy site), and it runs on every treatment pass, so
+     * anything that makes passes frequent multiplies it directly: the receive/wake loop did
+     * about one pass every two seconds, tens of MB in ten minutes. Nightscout gives no way to
+     * ask only for what changed that covers v1-written documents (they carry no srvModified,
+     * so v3 history misses them, and a created_at window misses back-dated entries), so the
+     * rate is what gets bounded. A pass inside the interval is not dropped: one wake is
+     * booked for when the interval ends, so a remote change still arrives without waiting
+     * for the next local edit.
+     *
+     * Keyed by server and API version, so pointing the app at a different site reads it at once.
+     */
+    internal class ReceiveFloor(private val intervalMillis: Long) {
+        private var lastKey: String? = null
+        private var lastReadAt = 0L
+
+        /** 0 when a read may go now, otherwise how long until it may. */
+        fun waitMillis(key: String, nowMillis: Long): Long {
+            if (key != lastKey || lastReadAt == 0L) return 0L
+            val elapsed = nowMillis - lastReadAt
+            if (elapsed < 0 || elapsed >= intervalMillis) return 0L
+            return intervalMillis - elapsed
+        }
+
+        /** Only a read that succeeded starts the interval; a failure is the native backoff's. */
+        fun recordRead(key: String, nowMillis: Long) {
+            lastKey = key
+            lastReadAt = nowMillis
+        }
+    }
+
+    private val receiveFloor = ReceiveFloor(RECEIVE_MIN_INTERVAL_MILLIS)
+    private val deferredReceiveBooked = AtomicBoolean(false)
+
+    private fun bookDeferredReceive(delayMillis: Long) {
+        if (!deferredReceiveBooked.compareAndSet(false, true)) return
+        Handler(Looper.getMainLooper()).postDelayed({
+            deferredReceiveBooked.set(false)
+            runCatching { Natives.waketreatments() }
+                .onFailure { Log.e(LOG_ID, "deferred receive wake failed: ${Log.stackline(it)}") }
+        }, delayMillis)
+    }
 
     /** Path only: the host is already known and repeating it just crowds the line. */
     internal fun endpointPath(endpoint: String): String =
@@ -642,9 +690,16 @@ object JournalTreatmentUploader {
         optString("_id").trim().takeIf { it.isNotBlank() }
             ?: optString("id").trim().takeIf { it.isNotBlank() }
 
-    private fun receiveRemoteTreatments(baseUrl: String, secret: String, useV3: Boolean): Boolean =
-        runCatching {
+    private fun receiveRemoteTreatments(baseUrl: String, secret: String, useV3: Boolean): Boolean {
+        val floorKey = "${if (useV3) "v3" else "v1"} ${NightscoutFollowerRegistry.normalizeUrl(baseUrl)}"
+        val waitMillis = receiveFloor.waitMillis(floorKey, System.currentTimeMillis())
+        if (waitMillis > 0L) {
+            bookDeferredReceive(waitMillis)
+            return true
+        }
+        return runCatching {
             val body = fetchTreatmentsJson(baseUrl, secret, useV3)
+            receiveFloor.recordRead(floorKey, System.currentTimeMillis())
             if (body.isBlank() || body == "[]") return@runCatching true
             val sensorId = NightscoutFollowerRegistry.deriveSensorId(baseUrl)
             val imported = NightscoutJournalFollowerImporter.importTreatments(sensorId, body)
@@ -663,6 +718,7 @@ object JournalTreatmentUploader {
                 Log.e(LOG_ID, if (repeats == 0) message else "$message (repeated ${repeats + 1}x)")
             }
         }.getOrDefault(false)
+    }
 
     private fun fetchTreatmentsJson(baseUrl: String, secret: String, useV3: Boolean): String {
         val normalized = NightscoutFollowerRegistry.normalizeUrl(baseUrl)

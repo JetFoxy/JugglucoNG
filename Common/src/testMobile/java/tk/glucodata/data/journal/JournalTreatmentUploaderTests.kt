@@ -74,6 +74,41 @@ class JournalTreatmentUploaderTests {
         )
     }
 
+    // -- how often treatments are read back ----------------------------------
+
+    @Test
+    fun theFirstReadGoesAtOnce() {
+        val floor = JournalTreatmentUploader.ReceiveFloor(intervalMillis = 5 * 60_000L)
+        assertEquals(0L, floor.waitMillis("v1 https://ns.example.com", 1_000_000L))
+    }
+
+    @Test
+    fun aPassInsideTheIntervalWaitsForItsRemainder() {
+        // The receive/wake loop ran a pass about every two seconds, each one re-reading the
+        // newest 240 documents; this is what bounds that to one read per interval.
+        val floor = JournalTreatmentUploader.ReceiveFloor(intervalMillis = 5 * 60_000L)
+        val key = "v1 https://ns.example.com"
+        floor.recordRead(key, 1_000_000L)
+        assertEquals(5 * 60_000L - 2_000L, floor.waitMillis(key, 1_002_000L))
+        assertEquals(0L, floor.waitMillis(key, 1_000_000L + 5 * 60_000L))
+    }
+
+    @Test
+    fun anotherServerOrApiVersionIsReadAtOnce() {
+        val floor = JournalTreatmentUploader.ReceiveFloor(intervalMillis = 5 * 60_000L)
+        floor.recordRead("v1 https://ns.example.com", 1_000_000L)
+        assertEquals(0L, floor.waitMillis("v3 https://ns.example.com", 1_001_000L))
+        assertEquals(0L, floor.waitMillis("v1 https://other.example.com", 1_001_000L))
+    }
+
+    @Test
+    fun aClockThatWentBackwardsDoesNotHoldReadsOff() {
+        val floor = JournalTreatmentUploader.ReceiveFloor(intervalMillis = 5 * 60_000L)
+        val key = "v1 https://ns.example.com"
+        floor.recordRead(key, 1_000_000L)
+        assertEquals(0L, floor.waitMillis(key, 900_000L))
+    }
+
     // -- what a refusal reports --------------------------------------------
 
     @Test
