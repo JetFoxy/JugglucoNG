@@ -96,7 +96,76 @@ data class ChartSeriesModel(
     fun prepareLookups() {
         valueByTimestamp
     }
+
+    /**
+     * What this series paints in the minute holding [timestamp]: its line's
+     * point and each drawn thin lane's, the one nearest [timestamp] inside the
+     * minute. A cursor dot or tooltip row taken from anywhere else — the
+     * sensor's own point, before calibration, smoothing or a record — sits on
+     * a line nobody drew. The calibration preview is left out: it is a faint
+     * projection, not a line the cursor marks.
+     */
+    fun cursorAt(timestamp: Long): ChartCursor? {
+        val line = nearestInMinute(runs, timestamp)
+        val lanes = ArrayList<ChartLaneValue>(secondaryLanes.size)
+        for (lane in secondaryLanes) {
+            if (lane.kind == ChartLaneKind.CALIBRATION_PREVIEW) continue
+            val point = nearestInMinute(lane.runs, timestamp) ?: continue
+            lanes.add(ChartLaneValue(lane.kind, point.value))
+        }
+        if (line == null && lanes.isEmpty()) return null
+        return ChartCursor(line, lanes)
+    }
+
+    private fun nearestInMinute(runs: List<ChartRun>, timestamp: Long): ChartPointModel? {
+        var best: ChartPointModel? = null
+        for (run in runs) {
+            val candidate = nearestInMinuteOf(run.points, timestamp) { it.timestamp } ?: continue
+            if (best == null || closer(candidate.timestamp, best.timestamp, timestamp)) best = candidate
+        }
+        return best
+    }
 }
+
+/**
+ * The element of [sorted] (ascending by [timestampOf]) nearest [timestamp]
+ * inside the minute holding it; the later one on a tie. The one matching rule
+ * the cursor dots and the tooltip rows share, so they cannot pick different
+ * readings for one minute.
+ */
+fun <T> nearestInMinuteOf(sorted: List<T>, timestamp: Long, timestampOf: (T) -> Long): T? {
+    if (sorted.isEmpty()) return null
+    val minuteStart = MainSensorOwnership.minuteOf(timestamp)
+    val minuteEnd = minuteStart + MainSensorOwnership.MINUTE_MS
+    val insertion = sorted.binarySearchBy(timestamp, selector = timestampOf).let { if (it >= 0) return sorted[it] else -it - 1 }
+    val before = sorted.getOrNull(insertion - 1)?.takeIf { timestampOf(it) >= minuteStart }
+    val after = sorted.getOrNull(insertion)?.takeIf { timestampOf(it) < minuteEnd }
+    return when {
+        before == null -> after
+        after == null -> before
+        closer(timestampOf(after), timestampOf(before), timestamp) -> after
+        else -> before
+    }
+}
+
+/** Whether [a] is nearer [target] than [b], the later one winning a tie. */
+private fun closer(a: Long, b: Long, target: Long): Boolean {
+    val da = kotlin.math.abs(a - target)
+    val db = kotlin.math.abs(b - target)
+    return da < db || (da == db && a > b)
+}
+
+/** A thin lane's value under the cursor. */
+data class ChartLaneValue(val kind: ChartLaneKind, val value: Float)
+
+/**
+ * One series under the cursor. [line] is the point of the series' own line —
+ * main or secondary look, as ownership drew it — if it drew one there.
+ */
+data class ChartCursor(
+    val line: ChartPointModel?,
+    val lanes: List<ChartLaneValue>,
+)
 
 data class HistoryChartModel(
     val series: List<ChartSeriesModel>,

@@ -683,6 +683,14 @@ data class ChartTimelineTapSuggestion(
     val forceMenu: Boolean = false
 )
 
+/** A peer's row in the scrub tooltip: its smoothed point, and what its line drew there when that is not the point's own value. */
+private class TooltipPeerRow(
+    val viewMode: Int,
+    val color: Color,
+    val point: GlucosePoint,
+    val calibratedValue: Float?,
+)
+
 private fun List<GlucosePoint>.sliceByTimestampRange(startMillis: Long, endMillis: Long): List<GlucosePoint> {
     if (isEmpty()) return emptyList()
     val startIndex = binarySearchBy(startMillis) { it.timestamp }
@@ -1019,14 +1027,6 @@ fun InteractiveGlucoseChart(
     val safeData = remember(fullData) {
         if (fullData is java.util.RandomAccess) fullData else ArrayList(fullData)
     }
-    val peerPointsByBucket = multiSensorDisplay.bucketLookup
-    // serial (normalized to logical id) -> draw attributes; O(1) lookups in the
-    // cursor/tooltip hot paths instead of SensorIdentity.matches per frame.
-    val peerDrawAttrs = remember(multiSensorDisplay) {
-        multiSensorDisplay.series.associate { series ->
-            series.sensorId to (Color(series.colorArgb) to series.viewMode)
-        }
-    }
     val primarySerial = fullData.lastOrNull()?.sensorSerial
     val primaryIdentityColor = remember(primarySerial) {
         val logical = SensorIdentity.resolveAppSensorId(primarySerial) ?: primarySerial
@@ -1077,6 +1077,14 @@ fun InteractiveGlucoseChart(
     val renderData = resolution.renderData
     val peerChartSeries = resolution.peerChartSeries
     val chartModel = resolution.chartModel
+    // Whether a calibration applies to each peer's own lane: the tooltip leads
+    // with the calibrated number exactly as it does for the primary.
+    val peerHasCalibration = remember(calibrationRevision, peerChartSeries) {
+        peerChartSeries.associate { peer ->
+            val peerIsRaw = peer.viewMode == 1 || peer.viewMode == 3
+            peer.sensorId to tk.glucodata.data.calibration.CalibrationManager.hasActiveCalibration(peerIsRaw, peer.sensorId)
+        }
+    }
     val interactionData = remember(safeData, renderData, graphSmoothingMinutes) {
         if (graphSmoothingMinutes > 0) renderData else safeData
     }
@@ -3363,65 +3371,34 @@ fun InteractiveGlucoseChart(
 
                     selectedPoint?.let { p ->
                         val dotRadius = 5.dp.toPx()
-                        val isRawModeDot = viewMode == 1 || viewMode == 3
-                        val resolvedDot = chartModel.primary?.valueAt(p.timestamp)
-                        val hasCalibrationDot = hasCalibration ||
-                            (resolvedDot != null && resolvedDot != (if (isRawModeDot) p.rawValue else p.value))
-                        val hideSourceDot = hasCalibrationDot &&
-                            tk.glucodata.data.calibration.CalibrationManager.shouldHideInitialWhenCalibrated()
-                        val hideRawDot = hideSourceDot && isRawModeDot
-                        val hideAutoDot = hideSourceDot && !isRawModeDot
-
-                        // Draw dots for active lines (demoted when calibration active)
-                         if (!hideRawDot && (viewMode == 1 || viewMode == 2 || viewMode == 3) && p.rawValue > 0.1f) {
-                              val color = if (hasCalibrationDot) secondaryColor else if (viewMode == 1 || viewMode == 3) primaryColor else secondaryColor
-                              val py = valToY(p.rawValue)
-                              if (py.isFinite()) drawCircle(color, dotRadius, Offset(cursorX, py))
-                          }
-                         if (!hideAutoDot && (viewMode == 0 || viewMode == 2 || viewMode == 3)) {
-                             val color = if (hasCalibrationDot) secondaryColor else if (viewMode == 0 || viewMode == 2) primaryColor else secondaryColor
-                             val py = valToY(p.value)
-                             if (py.isFinite()) drawCircle(color, dotRadius, Offset(cursorX, py))
-                         }
-
-                         // Draw calibrated dot on top (primary when active)
-                         if (hasCalibrationDot) {
-                             val calibratedV = chartModel.primary?.valueAt(p.timestamp) ?: Float.NaN
-                             if (calibratedV.isFinite() && calibratedV > 0.1f) {
-                                 val py = valToY(calibratedV)
-                                 if (py.isFinite()) drawCircle(primaryColor, dotRadius, Offset(cursorX, py))
-                             }
-                         }
-
-                         peerPointsByBucket[MultiSensorDisplay.bucketKeyForTimestamp(p.timestamp)]
-                             .orEmpty()
-                             .forEach { peer ->
-                                 val attrs = peerDrawAttrs[peer.sensorSerial]
-                                 val peerMode = attrs?.second ?: viewMode
-                                 val peerColor = attrs?.first ?: SensorColors.getColor(peer.sensorSerial.orEmpty())
-                                 val drawPeerRaw = peerMode == 1 || peerMode == 2 || peerMode == 3
-                                 val drawPeerAuto = peerMode == 0 || peerMode == 2 || peerMode == 3
-                                 if (drawPeerRaw && peer.rawValue.isFinite() && peer.rawValue > 0.1f) {
-                                     val py = valToY(peer.rawValue)
-                                     if (py.isFinite()) {
-                                         drawCircle(
-                                             color = peerColor.copy(alpha = if (drawPeerAuto) 0.32f else 0.46f),
-                                             radius = dotRadius * 0.7f,
-                                             center = Offset(cursorX, py)
-                                         )
-                                     }
-                                 }
-                                 if (drawPeerAuto && peer.value.isFinite() && peer.value > 0.1f) {
-                                     val py = valToY(peer.value)
-                                     if (py.isFinite()) {
-                                         drawCircle(
-                                             color = peerColor.copy(alpha = 0.46f),
-                                             radius = dotRadius * 0.75f,
-                                             center = Offset(cursorX, py)
-                                         )
-                                     }
-                                 }
-                             }
+                        // Every dot is read from the resolved model — the same points the
+                        // lines were stroked from — so a dot cannot sit on a line that was
+                        // not drawn: an uncalibrated source, an unsmoothed peer, a lane the
+                        // "hide source values" setting removed.
+                        fun dot(value: Float, color: Color, radius: Float) {
+                            if (!value.isFinite() || value <= 0.1f) return
+                            val py = valToY(value)
+                            if (py.isFinite()) drawCircle(color, radius, Offset(cursorX, py))
+                        }
+                        chartModel.primary?.cursorAt(p.timestamp)?.let { cursor ->
+                            cursor.lanes.forEach { lane -> dot(lane.value, secondaryColor, dotRadius) }
+                            cursor.line?.let { line ->
+                                val color = if (line.look == tk.glucodata.chart.ChartLook.MAIN) primaryColor else secondaryColor
+                                dot(line.value, color, dotRadius)
+                            }
+                        }
+                        for (series in chartModel.peers) {
+                            val cursor = series.cursorAt(p.timestamp) ?: continue
+                            val peerColor = Color(series.colorArgb)
+                            cursor.lanes.forEach { lane -> dot(lane.value, peerColor.copy(alpha = 0.32f), dotRadius * 0.7f) }
+                            cursor.line?.let { line ->
+                                if (line.look == tk.glucodata.chart.ChartLook.MAIN) {
+                                    dot(line.value, primaryColor, dotRadius)
+                                } else {
+                                    dot(line.value, peerColor.copy(alpha = 0.46f), dotRadius * 0.75f)
+                                }
+                            }
+                        }
                     }
                 }
                 } finally { android.os.Trace.endSection() }
@@ -3930,8 +3907,23 @@ fun InteractiveGlucoseChart(
                     ?.takeIf { it.isFinite() && it > 0.1f }
                     ?.takeIf { hasCalibration || it != (if (isRawModeTT) point.rawValue else point.value) }
                 val dvs = getDisplayValues(point, viewMode, unit, calibratedValueTT)
-                val tooltipPeerPoints = peerPointsByBucket[MultiSensorDisplay.bucketKeyForTimestamp(point.timestamp)]
-                    .orEmpty()
+                // Peer rows read what the peer's line drew — calibrated, smoothed,
+                // recorded — not the sensor's own point from before any of that.
+                val tooltipPeerRows = chartModel.peers.mapNotNull { series ->
+                    val cursor = series.cursorAt(point.timestamp) ?: return@mapNotNull null
+                    val source = peerChartSeries.firstOrNull { it.sensorId == series.sensorId }
+                        ?.points
+                        ?.let { tk.glucodata.chart.nearestInMinuteOf(it, point.timestamp) { p -> p.timestamp } }
+                        ?: return@mapNotNull null
+                    val peerIsRaw = series.viewMode == 1 || series.viewMode == 3
+                    val calibrated = cursor.line?.value
+                        ?.takeIf { it.isFinite() && it > 0.1f }
+                        ?.takeIf {
+                            peerHasCalibration[series.sensorId] == true ||
+                                it != (if (peerIsRaw) source.rawValue else source.value)
+                        }
+                    TooltipPeerRow(series.viewMode, Color(series.colorArgb), source, calibrated)
+                }
 
                 // --- 1. INFO CARD (Top) ---
                 // "Current Status Card styling" -> primaryContainer
@@ -4018,7 +4010,7 @@ fun InteractiveGlucoseChart(
                         // Colored Text Logic (Keep matching graph lines for values)
                         // Multi-sensor: tint the primary value subtly with its
                         // sensor identity color so it pairs with peer rows below.
-                        val primaryTooltipColor = if (tooltipPeerPoints.isNotEmpty()) {
+                        val primaryTooltipColor = if (tooltipPeerRows.isNotEmpty()) {
                             androidx.compose.ui.graphics.lerp(
                                 statusContentColor,
                                 primaryIdentityColor,
@@ -4097,16 +4089,13 @@ fun InteractiveGlucoseChart(
                                 )
                             }
                         }
-                        tooltipPeerPoints.forEach { peer ->
-                            val attrs = peerDrawAttrs[peer.sensorSerial]
-                            val peerColor = attrs?.first ?: SensorColors.getColor(peer.sensorSerial.orEmpty())
-                            val peerMode = attrs?.second ?: viewMode
+                        tooltipPeerRows.forEach { peer ->
                             val peerTextColor = androidx.compose.ui.graphics.lerp(
                                 statusContentColor,
-                                peerColor,
+                                peer.color,
                                 tk.glucodata.SensorVisuals.PEER_TEXT_BLEND
                             )
-                            val peerDvs = getDisplayValues(peer, peerMode, unit, calibratedValue = null)
+                            val peerDvs = getDisplayValues(peer.point, peer.viewMode, unit, peer.calibratedValue)
                             Text(
                                 modifier = Modifier.padding(top = 3.dp),
                                 text = buildGlucoseString(
