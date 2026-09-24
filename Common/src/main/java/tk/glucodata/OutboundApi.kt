@@ -668,11 +668,7 @@ object OutboundApi {
     }
 
     private fun loadJournalSnapshot(timeMillis: Long): JournalSnapshot {
-        val raw = runCatching {
-            val type = Class.forName("tk.glucodata.OutboundApiJournalSnapshot")
-            val method = type.getMethod("snapshotJson", java.lang.Long.TYPE)
-            method.invoke(null, timeMillis) as? String
-        }.getOrNull() ?: return JournalSnapshot()
+        val raw = JournalSnapshotAccess.snapshotJson(timeMillis)
         if (raw.isBlank()) return JournalSnapshot()
         return runCatching {
             val json = JSONObject(raw)

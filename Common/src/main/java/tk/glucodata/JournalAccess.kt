@@ -11,8 +11,14 @@ package tk.glucodata
  * This used to resolve `tk.glucodata.data.journal.WearJournalBridge` by name.
  * R8 renames those members in release builds, so the watch journal silently did
  * nothing there; explicit registration leaves ordinary interface calls behind.
+ *
+ * Every method keeps the old reflective failure contract: a failure inside the
+ * mobile implementation degrades to the default instead of reaching the shared
+ * caller.
  */
 object JournalAccess {
+    private const val TAG = "JournalAccess"
+
     @Volatile
     private var bridge: JournalBridge? = null
 
@@ -24,11 +30,20 @@ object JournalAccess {
 
     /** Encoded journal payload, or null when there is no journal to serve. */
     @JvmStatic
-    fun serveEntries(fromMs: Long): ByteArray? = bridge?.serveEntries(fromMs)
+    fun serveEntries(fromMs: Long): ByteArray? =
+        runCatching { bridge?.serveEntries(fromMs) }
+            .onFailure { Log.stack(TAG, "serveEntries failed", it) }
+            .getOrNull()
 
     @JvmStatic
-    fun applyCommand(data: ByteArray): Boolean = bridge?.applyCommand(data) ?: false
+    fun applyCommand(data: ByteArray): Boolean =
+        runCatching { bridge?.applyCommand(data) }
+            .onFailure { Log.stack(TAG, "applyCommand failed", it) }
+            .getOrNull() ?: false
 
     @JvmStatic
-    fun isJournalEnabled(): Boolean = bridge?.isJournalEnabled() ?: false
+    fun isJournalEnabled(): Boolean =
+        runCatching { bridge?.isJournalEnabled() }
+            .onFailure { Log.stack(TAG, "isJournalEnabled failed", it) }
+            .getOrNull() ?: false
 }
