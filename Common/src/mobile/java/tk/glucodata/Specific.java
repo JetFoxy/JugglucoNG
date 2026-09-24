@@ -39,6 +39,8 @@ public class Specific {
 		JournalAccess.register(tk.glucodata.data.journal.WearJournalBridge.INSTANCE);
 		JournalTreatmentUploadAccess.register(tk.glucodata.data.journal.JournalTreatmentUploader.INSTANCE);
 		NightscoutTreatmentImportAccess.register(tk.glucodata.data.journal.NightscoutJournalFollowerImporter.INSTANCE);
+		NotificationPredictionAccess.register(tk.glucodata.NotificationPredictionOverlay.INSTANCE);
+		GlucoseUncertaintyAccess.register(tk.glucodata.data.GlucoseUncertaintyStore.INSTANCE);
 	}
 
 	static void start(Application context) {

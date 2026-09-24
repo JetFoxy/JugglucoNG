@@ -1093,7 +1093,6 @@ public class NotificationChartDrawer {
                         calibrationSensorId, targetLow, targetHigh));
     }
 
-    @SuppressWarnings("unchecked")
     private static List<NotificationPredictionSeries> resolvePredictionOverlay(
             Context context,
             List<GlucosePoint> data,
@@ -1103,34 +1102,15 @@ public class NotificationChartDrawer {
             String calibrationSensorId,
             float targetLow,
             float targetHigh) {
-        try {
-            Class<?> helper = Class.forName("tk.glucodata.NotificationPredictionOverlay");
-            Method method = helper.getMethod(
-                    "buildPredictionSeries",
-                    Context.class,
-                    List.class,
-                    boolean.class,
-                    int.class,
-                    boolean.class,
-                    String.class,
-                    float.class,
-                    float.class);
-            Object result = method.invoke(
-                    null,
-                    context,
-                    data,
-                    isMmol,
-                    viewMode,
-                    hasCalibration,
-                    calibrationSensorId,
-                    targetLow,
-                    targetHigh);
-            if (result instanceof List<?>) {
-                return (List<NotificationPredictionSeries>) result;
-            }
-        } catch (Throwable ignored) {
-        }
-        return Collections.emptyList();
+        return NotificationPredictionAccess.buildPredictionSeries(
+                context,
+                data,
+                isMmol,
+                viewMode,
+                hasCalibration,
+                calibrationSensorId,
+                targetLow,
+                targetHigh);
     }
 
     public static int getGlucoseColor(Context context, float value, boolean isMmol) {
