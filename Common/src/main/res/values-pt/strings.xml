@@ -410,7 +410,7 @@
     <string name="data_smoothing_collapse_desc_match">Mantém um ponto suavizado a cada %1$d minutos e envia as saídas de troca ao mesmo ritmo</string>
     <string name="data_smoothing_collapse_desc_capped">Mantém um ponto suavizado a cada 5 minutos e envia as saídas de troca ao mesmo ritmo, enquanto a suavização ainda usa %1$d minutos</string>
     <string name="data_smoothing_collapse_summary_format">Intervalos a cada %1$d min</string>
-    <string name="data_smoothing_collapse_loop_note">A transmissão xDrip e o xInfuus (usados por aplicações de ciclo fechado) não são espaçados: recebem cada leitura com a sua própria hora</string>
+    <string name="data_smoothing_collapse_loop_note">A transmissão xDrip e o xInfuus (usados por aplicações de ciclo fechado) não são espaçados: recebem cada leitura com a sua própria hora, sem suavização quando «Suavizar só o gráfico» está ativo</string>
     <string name="preview_window_title">Janela de pré-visualização</string>
     <string name="preview_window_desc">Mostra um mini navegador de 24 horas sob o gráfico do painel sem alterar o comportamento do gráfico principal</string>
     <string name="preview_window_expanded_only">Apenas na vista expandida (padrão)</string>

@@ -562,7 +562,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="data_smoothing_collapse_desc_match">Her %1$d dakikada bir yumuşatılmış nokta tutar ve dışa aktarım çıkışlarını aynı hızda gönderir</string>
     <string name="data_smoothing_collapse_desc_capped">Her 5 dakikada bir yumuşatılmış nokta tutar ve dışa aktarım çıkışlarını aynı hızda gönderir; yumuşatma yine de %1$d dakika kullanır</string>
     <string name="data_smoothing_collapse_summary_format">Aralıklar her %1$d dk</string>
-    <string name="data_smoothing_collapse_loop_note">xDrip yayını ve xInfuus (kapalı döngü uygulamalarınca kullanılır) seyreltilmez: her okumayı kendi zamanıyla alır</string>
+    <string name="data_smoothing_collapse_loop_note">xDrip yayını ve xInfuus (kapalı döngü uygulamalarınca kullanılır) seyreltilmez: her okumayı kendi zamanıyla alır; “Yalnızca grafiği yumuşat” açıkken yumuşatılmadan gelir</string>
     <string name="preview_window_title">Önizleme penceresi</string>
     <string name="preview_window_desc">Ana grafik davranışını değiştirmeden pano grafiğinin altında 24 saatlik mini gezgini gösterir</string>
     <string name="preview_window_expanded_only">Yalnızca genişletilmiş görünümde (varsayılan)</string>

@@ -606,7 +606,7 @@
     <string name="data_smoothing_collapse_desc_match">Оставляет одну сглаженную точку каждые %1$d минут и отправляет выходы обмена в том же темпе</string>
     <string name="data_smoothing_collapse_desc_capped">Оставляет одну сглаженную точку каждые 5 минут и отправляет выходы обмена в том же темпе, пока сглаживание всё ещё использует %1$d минут</string>
     <string name="data_smoothing_collapse_summary_format">Интервалы каждые %1$d мин</string>
-    <string name="data_smoothing_collapse_loop_note">Трансляции xDrip и xInfuus (их используют замкнутые системы) не прореживаются: они получают каждый отсчёт со своим временем</string>
+    <string name="data_smoothing_collapse_loop_note">Трансляции xDrip и xInfuus (их используют замкнутые системы) не прореживаются: они получают каждый отсчёт со своим временем, без сглаживания при включённом «Сглаживать только график»</string>
     <string name="preview_window_title">Окно предпросмотра</string>
     <string name="preview_window_desc">Показывает 24-часовой мини-навигатор под графиком на главном экране без изменения поведения основного графика</string>
     <string name="preview_window_expanded_only">Только в расширенном виде (по умолчанию)</string>

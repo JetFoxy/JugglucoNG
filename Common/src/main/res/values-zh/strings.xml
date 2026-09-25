@@ -517,7 +517,7 @@
     <string name="data_smoothing_collapse_desc_match">每 %1$d 分钟保留一个平滑点，并以相同节奏发送对外输出</string>
     <string name="data_smoothing_collapse_desc_capped">每 5 分钟保留一个平滑点，并以相同节奏发送对外输出，而平滑仍使用 %1$d 分钟</string>
     <string name="data_smoothing_collapse_summary_format">每 %1$d 分钟分块</string>
-    <string name="data_smoothing_collapse_loop_note">xDrip 广播和 xInfuus（供闭环应用使用）不会被抽稀：它们会收到每一次读数，并带有其自身的时间</string>
+    <string name="data_smoothing_collapse_loop_note">xDrip 广播和 xInfuus（供闭环应用使用）不会被抽稀：它们会收到每一次读数，并带有其自身的时间；开启“仅平滑图表”时不做平滑</string>
     <string name="preview_window_title">预览窗口</string>
     <string name="preview_window_desc">在不改变主图表行为的情况下，在仪表板图表下方显示 24 小时迷你导航器</string>
     <string name="preview_window_expanded_only">仅在展开视图中（默认）</string>

@@ -895,7 +895,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="data_smoothing_collapse_desc_match">Keep one smoothed point every %1$d minutes and send exchange outputs at the same pace</string>
     <string name="data_smoothing_collapse_desc_capped">Keep one smoothed point every 5 minutes and send exchange outputs at the same pace, while smoothing still uses %1$d minutes</string>
     <string name="data_smoothing_collapse_summary_format">Chunks every %1$d min</string>
-    <string name="data_smoothing_collapse_loop_note">The xDrip broadcast and xInfuus (used by closed-loop apps) are not thinned: they get every reading at its own time</string>
+    <string name="data_smoothing_collapse_loop_note">The xDrip broadcast and xInfuus (used by closed-loop apps) are not thinned: they get every reading at its own time, unsmoothed when “Smooth only graph” is on</string>
     <string name="preview_window_title">Preview window</string>
     <string name="preview_window_desc">Show a 24-hour mini navigator under the dashboard chart without changing the main chart behavior</string>
     <string name="preview_window_expanded_only">Expanded view (default)</string>

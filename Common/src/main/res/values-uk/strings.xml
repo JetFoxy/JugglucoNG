@@ -522,7 +522,7 @@
     <string name="data_smoothing_collapse_desc_match">Залишає одну згладжену точку кожні %1$d хвилин і надсилає виходи обміну в тому самому темпі</string>
     <string name="data_smoothing_collapse_desc_capped">Залишає одну згладжену точку кожні 5 хвилин і надсилає виходи обміну в тому самому темпі, доки згладжування все ще використовує %1$d хвилин</string>
     <string name="data_smoothing_collapse_summary_format">Інтервали кожні %1$d хв</string>
-    <string name="data_smoothing_collapse_loop_note">Трансляції xDrip і xInfuus (їх використовують замкнені системи) не проріджуються: вони отримують кожне вимірювання з його власним часом</string>
+    <string name="data_smoothing_collapse_loop_note">Трансляції xDrip і xInfuus (їх використовують замкнені системи) не проріджуються: вони отримують кожне вимірювання з його власним часом, без згладжування, коли ввімкнено «Згладжувати лише графік»</string>
     <string name="preview_window_title">Вікно попереднього перегляду</string>
     <string name="preview_window_desc">Показує 24-годинний мінінавігатор під графіком на головному екрані без зміни поведінки основного графіка</string>
     <string name="preview_window_expanded_only">Лише в розширеному вигляді (типово)</string>

@@ -798,10 +798,11 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="data_smoothing_graph_only_title">Зөвхөн графикийг жигдлэх</string>
     <string name="data_smoothing_graph_only_desc">Одоогийн глюкоз, виджетүүд, анхааруулга болон дамжуулалтыг жигдлэхгүй үлдээх — харин «Хэсгүүдэд хуваах» асаалттай бол хуваахад жигдэлсэн утга шаардлагатай тул дамжуулалтын жигдлэлтийг дахин асаана</string>
     <string name="data_smoothing_collapse_title">Хэсгүүдэд хуваах</string>
-    <string name="data_smoothing_collapse_desc">Интервал бүрт нэг жигдэрсэн цэгийг үлдээж, хоорондох цэгүүдийг шүүх</string>
-    <string name="data_smoothing_collapse_desc_match">Keep one smoothed point every %1$d minutes</string>
-    <string name="data_smoothing_collapse_desc_capped">Keep one smoothed point every 5 minutes while smoothing still uses %1$d minutes</string>
-    <string name="data_smoothing_collapse_summary_format">Chunks every %1$d min</string>
+    <string name="data_smoothing_collapse_desc">Интервал бүрт нэг жигдэрсэн цэгийг үлдээж, солилцооны гаралтыг хэмжилт бүрт бус интервал бүрт нэг удаа илгээнэ</string>
+    <string name="data_smoothing_collapse_desc_match">%1$d минут тутамд нэг жигдэрсэн цэгийг үлдээж, солилцооны гаралтыг мөн ижил хурдаар илгээнэ</string>
+    <string name="data_smoothing_collapse_desc_capped">5 минут тутамд нэг жигдэрсэн цэгийг үлдээж, солилцооны гаралтыг мөн ижил хурдаар илгээнэ, харин жигдрүүлэлт одоо ч %1$d минут ашиглана</string>
+    <string name="data_smoothing_collapse_summary_format">Хэсэг бүр %1$d мин тутамд</string>
+    <string name="data_smoothing_collapse_loop_note">xDrip-ийн дамжуулалт болон xInfuus (хаалттай гогцооны аппууд ашигладаг) сийрэгждэггүй: тэд хэмжилт бүрийг өөрийнх нь цагтай хүлээн авна; «Зөвхөн графикийг жигдлэх» асаалттай үед жигдлэлтгүй</string>
     <string name="preview_window_title">Урьдчилан харах цонх</string>
     <string name="preview_window_desc">Үндсэн графикийн үйл ажиллагааг өөрчлөхгүйгээр хянах самбарын графикийн доор 24 цагийн мини навигаторыг харуулах</string>
     <string name="preview_window_expanded_only">Дэлгэсэн харагдац (үндсэн)</string>
@@ -2228,7 +2229,7 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <!-- Preserved current-main entries added after the translation branch split. -->
     <string name="gs3">Sibionics GS3</string>
     <string name="data_smoothing_exchange_only_title">Зөвхөн солилцооны гаралтыг жигдрүүлэх</string>
-    <string name="data_smoothing_exchange_only_desc">Жигдрүүлэлт болон багцын шүүлтүүрийг зөвхөн дамжуулалт ба гадагш API өгөгдөлд хэрэглэнэ; график, одоогийн глюкоз, виджет болон дохио өөрчлөгдөхгүй</string>
+    <string name="data_smoothing_exchange_only_desc">Жигдрүүлэлт болон илгээх интервалыг зөвхөн дамжуулалт ба гадагш API өгөгдөлд хэрэглэнэ; график, одоогийн глюкоз, виджет болон дохио өөрчлөгдөхгүй</string>
     <string name="status_invalid_glucose_from_sensor">Сенсороос ирсэн глюкозын утга буруу</string>
     <string name="sibionics_sensor_picker_desc">QR скан</string>
     <string name="libre_sensor_picker_desc">NFC скан</string>
