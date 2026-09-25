@@ -749,17 +749,7 @@ class ApiGlucoseSourceManager(
     private fun importJournalPayload(raw: String): Int {
         if (raw.isBlank()) return 0
         return runCatching {
-            val type = Class.forName("tk.glucodata.OutboundApiJournalSnapshot")
-            val sourcePrefix = "api:$SerialNumber"
-            val method = runCatching {
-                type.getMethod("importFromJsonForSource", String::class.java, String::class.java)
-            }.getOrNull()
-            if (method != null) {
-                (method.invoke(null, raw, sourcePrefix) as? Int) ?: 0
-            } else {
-                val legacyMethod = type.getMethod("importFromJson", String::class.java)
-                (legacyMethod.invoke(null, raw) as? Int) ?: 0
-            }
+            tk.glucodata.JournalSnapshotAccess.importFromJsonForSource(raw, "api:$SerialNumber")
         }.onSuccess { imported ->
             if (imported > 0) {
                 Log.i(TAG, "Imported $imported API journal entries")

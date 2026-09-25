@@ -11,7 +11,6 @@ object HistorySyncAccess {
     private const val TAG = "HistorySyncAccess"
     private const val SYNC_CLASS_NAME = "tk.glucodata.data.HistorySync"
     private const val REPOSITORY_CLASS_NAME = "tk.glucodata.data.HistoryRepository"
-    private const val JOURNAL_SNAPSHOT_CLASS_NAME = "tk.glucodata.OutboundApiJournalSnapshot"
     private const val CLONE_RECOVERY_ACCESS_CLASS_NAME =
         "tk.glucodata.data.CloneHistoryRecoveryAccess"
     private const val CLONE_OUTGOING_RECOVERY_ACCESS_CLASS_NAME =
@@ -149,39 +148,6 @@ object HistorySyncAccess {
             repositoryHolder?.getField("GLUCODATA_SOURCE_AIDEX")?.getInt(null)
         }.getOrNull() ?: DEFAULT_AIDEX_SOURCE
     }
-    private val journalSnapshotHolder by lazy {
-        runCatching { Class.forName(JOURNAL_SNAPSHOT_CLASS_NAME) }.getOrNull()
-    }
-    private val exportCloneIobMethod by lazy {
-        runCatching {
-            journalSnapshotHolder?.getMethod(
-                "cloneIobSnapshotJson",
-                Long::class.javaPrimitiveType,
-            )
-        }.getOrNull()
-    }
-    private val importCloneIobMethod by lazy {
-        runCatching {
-            journalSnapshotHolder?.getMethod("importCloneIobSnapshot", String::class.java)
-        }.getOrNull()
-    }
-    private val exportCloneJournalMethod by lazy {
-        runCatching {
-            journalSnapshotHolder?.getMethod(
-                "cloneJournalSnapshotJson",
-                Long::class.javaPrimitiveType,
-            )
-        }.getOrNull()
-    }
-    private val importCloneJournalMethod by lazy {
-        runCatching {
-            journalSnapshotHolder?.getMethod(
-                "importCloneJournalSnapshot",
-                String::class.java,
-                Int::class.javaPrimitiveType,
-            )
-        }.getOrNull()
-    }
     private val cloneRecoveryHolder by lazy {
         runCatching { Class.forName(CLONE_RECOVERY_ACCESS_CLASS_NAME) }.getOrNull()
     }
@@ -297,48 +263,26 @@ object HistorySyncAccess {
     }
 
     @JvmStatic
-    fun exportCloneIobSnapshot(): String {
-        val method = exportCloneIobMethod ?: return ""
-        return runCatching {
-            method.invoke(null, System.currentTimeMillis()) as? String ?: ""
-        }.onFailure {
-            Log.w(TAG, "exportCloneIobSnapshot failed", it)
-        }.getOrDefault("")
-    }
+    fun exportCloneIobSnapshot(): String =
+        JournalSnapshotAccess.cloneIobSnapshotJson(System.currentTimeMillis())
 
     @JvmStatic
     fun importCloneIobSnapshot(raw: String?): Boolean {
         if (raw.isNullOrBlank()) return false
-        val method = importCloneIobMethod ?: return false
         return CloneSensorRegistry.whileReceptionEnabled {
-            runCatching {
-                method.invoke(null, raw) as? Boolean ?: false
-            }.onFailure {
-                Log.w(TAG, "importCloneIobSnapshot failed", it)
-            }.getOrDefault(false)
+            JournalSnapshotAccess.importCloneIobSnapshot(raw)
         } ?: false
     }
 
     @JvmStatic
-    fun exportCloneJournalSnapshot(): String {
-        val method = exportCloneJournalMethod ?: return ""
-        return runCatching {
-            method.invoke(null, System.currentTimeMillis()) as? String ?: ""
-        }.onFailure {
-            Log.w(TAG, "exportCloneJournalSnapshot failed", it)
-        }.getOrDefault("")
-    }
+    fun exportCloneJournalSnapshot(): String =
+        JournalSnapshotAccess.cloneJournalSnapshotJson(System.currentTimeMillis())
 
     @JvmStatic
     fun importCloneJournalSnapshot(raw: String?, transportCode: Int): Boolean {
         if (raw.isNullOrBlank()) return false
-        val method = importCloneJournalMethod ?: return false
         return CloneSensorRegistry.whileReceptionEnabled {
-            runCatching {
-                method.invoke(null, raw, transportCode) as? Boolean ?: false
-            }.onFailure {
-                Log.w(TAG, "importCloneJournalSnapshot failed", it)
-            }.getOrDefault(false)
+            JournalSnapshotAccess.importCloneJournalSnapshot(raw, transportCode)
         } ?: false
     }
 

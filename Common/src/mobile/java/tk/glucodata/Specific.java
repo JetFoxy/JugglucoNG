@@ -40,6 +40,9 @@ public class Specific {
 		JournalTreatmentUploadAccess.register(tk.glucodata.data.journal.JournalTreatmentUploader.INSTANCE);
 		NightscoutTreatmentImportAccess.register(tk.glucodata.data.journal.NightscoutJournalFollowerImporter.INSTANCE);
 		tk.glucodata.ui.ComposeHostAccess.register(tk.glucodata.ui.MobileComposeHost.INSTANCE);
+		JournalSnapshotAccess.register(tk.glucodata.OutboundApiJournalSnapshot.INSTANCE);
+		NotificationPredictionAccess.register(tk.glucodata.NotificationPredictionOverlay.INSTANCE);
+		GlucoseUncertaintyAccess.register(tk.glucodata.data.GlucoseUncertaintyStore.INSTANCE);
 	}
 
 	static void start(Application context) {

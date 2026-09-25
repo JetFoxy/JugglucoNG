@@ -73,22 +73,6 @@
     public final void markSensorReset(java.lang.String);
 }
 
-# Keep GlucoseUncertaintyStore names and reflected members stable.
-# GlucoseUncertaintyAccess in src/main resolves this mobile-only class by name, and the same
-# failure mode as HistoryRepository above applies: without these rules the lookup throws only
-# in minified builds, the bridge silently stores nothing, and every chart renders without its
-# uncertainty ribbon with no error anywhere. The members also carry @Keep at their declaration;
-# keep both in sync when adding one.
--keepnames class tk.glucodata.data.GlucoseUncertaintyStore
--keepclassmembers class tk.glucodata.data.GlucoseUncertaintyStore {
-    public static final tk.glucodata.data.GlucoseUncertaintyStore INSTANCE;
-    public static void storeBatch(java.lang.String,long[],float[],float[],float,float[],float[]);
-    public static void storeReading(java.lang.String,long,float,float,float,float,float);
-    public static void clearForSensor(java.lang.String);
-    public static void deleteForSensorAfter(java.lang.String,long);
-    public static void pruneOlderThan(long);
-}
-
 # Keep the hidden-framework connection-parameter callback.
 # BluetoothGattCallback#onConnectionUpdated exists since Android O but is absent from the SDK
 # stubs, so SuperGattCallback declares it without @Override and nothing in the compiled code
@@ -160,13 +144,6 @@
     public static void discard();
 }
 
-# Keep notification/AOD predictive chart bridge stable. NotificationChartDrawer
-# resolves the mobile-only helper by name so main/wear source sets do not take a
-# direct dependency on mobile prediction/journal classes.
--keep class tk.glucodata.NotificationPredictionOverlay { *; }
--keep class tk.glucodata.NotificationPredictionPoint { *; }
--keep class tk.glucodata.NotificationPredictionSeries { *; }
-
 # Keep TrendEngine names and reflected members stable.
 # TrendAccess in src/main resolves these mobile-only methods by name for
 # notification/dashboard/AOD trend arrows in minified builds.
@@ -179,26 +156,6 @@
 -keepnames class tk.glucodata.logic.TrendEngine$TrendResult
 -keepclassmembers class tk.glucodata.logic.TrendEngine$TrendResult {
     public final float getVelocity();
-}
-
-# Keep OutboundApiJournalSnapshot name and reflected members stable.
-# OutboundApi, ApiGlucoseSourceManager and JugglucoSend (src/main) resolve this
-# mobile-only object by name: snapshotJson() backs the {iob}/{cob}/{journal}/
-# {journal_events} message-template tokens, importFromJson*() ingests API
-# journal payloads, and broadcastIobSnapshot() feeds the glucodata.Minute
-# IOB/eIOB/COB extras. Without this, R8 renames/strips the class and the
-# reflection silently yields an empty snapshot (tokens render as
-# "0 - 0 - 0 - 0 -  -") / a broadcast without IOB.
--keepnames class tk.glucodata.OutboundApiJournalSnapshot
--keepclassmembers class tk.glucodata.OutboundApiJournalSnapshot {
-    public static java.lang.String snapshotJson(long);
-    public static int importFromJson(java.lang.String);
-    public static int importFromJsonForSource(java.lang.String,java.lang.String);
-    public static float[] broadcastIobSnapshot(long);
-    public static java.lang.String cloneIobSnapshotJson(long);
-    public static boolean importCloneIobSnapshot(java.lang.String);
-    public static java.lang.String cloneJournalSnapshotJson(long);
-    public static boolean importCloneJournalSnapshot(java.lang.String,int);
 }
 
 #-keep class tk.glucodata.watchface.WatchFaceService
