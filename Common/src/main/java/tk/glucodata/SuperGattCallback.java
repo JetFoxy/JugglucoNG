@@ -375,7 +375,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     public static notGlucose previousglucose = null;
     static float previousglucosevalue = 0.0f;
     public static String previousglucosesensorid = null;
-    private static final ExchangeUpdateGate exchangeUpdateGate = new ExchangeUpdateGate();
+    private static final ExchangeOutputPolicy exchangeOutputPolicy = new ExchangeOutputPolicy();
 
     static public void initAlarmTalk() {
         if (glucosealarms == null)
@@ -791,9 +791,15 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         // "Collapse into chunks" only thins how often these are fed; the payload is always the newest
         // reading under its own timestamp.
         final int exchangeIntervalMinutes = DataSmoothing.exchangeThrottleIntervalMinutes(app, false);
-        final boolean shouldEmitExchangeUpdate =
-                exchangePayload != null
-                && exchangeUpdateGate.shouldEmit(exchangePayload.getSensorId(), exchangePayload.getTimeMillis(), exchangeIntervalMinutes);
+        final ExchangeOutputPolicy.Decision exchangeOutputDecision = exchangeOutputPolicy.decide(
+                exchangePayload != null ? exchangePayload.getSensorId() : null,
+                exchangePayload != null ? exchangePayload.getTimeMillis() : 0L,
+                exchangeIntervalMinutes,
+                shouldBroadcastMinuteUpdate,
+                Natives.getJugglucobroadcast(),
+                outboundApiEnabled,
+                !isWearable && doWearInt,
+                !isWearable && doGadgetbridge);
         // xDrip broadcast and xInfuus are what closed loops (AAPS) dose from: every reading, never
         // thinned. Only its smoothing can differ from the chunked outputs ("graph only" + collapse).
         final boolean loopFeedWanted = shouldBroadcastMinuteUpdate
@@ -804,9 +810,9 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                         ? exchangePayload
                         : ExchangeGlucosePayload.resolve(SerialNumber, gl, rate, timmsec, sensorgen, primaryText, true);
 
-        if (Natives.getJugglucobroadcast() && shouldEmitExchangeUpdate)
+        if (exchangeOutputDecision.getSendJuggluco())
             JugglucoSend.broadcastglucose(SerialNumber, exchangePayload, alarm);
-        if (outboundApiEnabled && shouldEmitExchangeUpdate)
+        if (exchangeOutputDecision.getSendOutboundApi())
             OutboundApi.enqueueGlucose(
                     exchangePayload.getSensorId(),
                     exchangePayload.getPrimaryText(),
@@ -851,10 +857,10 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 SendLikexDrip.broadcastglucose(loopFeedPayload, sensorstartmsec);
             }
             if (!isWearable) {
-                if (doWearInt && shouldEmitExchangeUpdate)
+                if (exchangeOutputDecision.getSendWearInt())
                     tk.glucodata.WearInt.sendglucose(exchangePayload, alarm);
 
-                if (doGadgetbridge && shouldEmitExchangeUpdate)
+                if (exchangeOutputDecision.getSendGadgetbridge())
                     Gadgetbridge.sendglucose(exchangePayload);
             }
         }

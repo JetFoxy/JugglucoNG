@@ -319,4 +319,104 @@ class ExchangeCollapseLatencyTests {
         assertTrue("collapse off: everything sends", gate.shouldEmit("a", base + minute, 0))
         assertTrue("collapse back on, a later interval", gate.shouldEmit("a", base + 6 * minute, 3))
     }
+
+    // --- production exchange destination policy ------------------------------------------------
+
+    @Test
+    fun destinationGatesDoNotShareABucketAcrossMinuteGateJitter() {
+        val policy = ExchangeOutputPolicy()
+        val boundary = base
+        val early = policy.decide(
+            sensorId = sensorId,
+            payloadTimeMs = boundary - 20_000L,
+            intervalMinutes = 5,
+            shouldBroadcastMinuteUpdate = false,
+            jugglucoEnabled = false,
+            outboundApiEnabled = true,
+            wearIntEnabled = true,
+            gadgetbridgeEnabled = true
+        )
+        assertTrue("outbound API is eligible on every reading", early.sendOutboundApi)
+        assertFalse("minute-gated WearInt waits", early.sendWearInt)
+        assertFalse("minute-gated Gadgetbridge waits", early.sendGadgetbridge)
+
+        val fastDestinationUsesCurrentBucket = policy.decide(
+            sensorId = sensorId,
+            payloadTimeMs = boundary + 30_000L,
+            intervalMinutes = 5,
+            shouldBroadcastMinuteUpdate = false,
+            jugglucoEnabled = false,
+            outboundApiEnabled = true,
+            wearIntEnabled = true,
+            gadgetbridgeEnabled = true
+        )
+        assertTrue("the fast destination uses the new bucket", fastDestinationUsesCurrentBucket.sendOutboundApi)
+        assertFalse("the slow destinations are still behind the minute gate", fastDestinationUsesCurrentBucket.sendWearInt)
+        assertFalse("the slow destinations are still behind the minute gate", fastDestinationUsesCurrentBucket.sendGadgetbridge)
+
+        val sameBucketAfterJitter = policy.decide(
+            sensorId = sensorId,
+            payloadTimeMs = boundary + 90_000L,
+            intervalMinutes = 5,
+            shouldBroadcastMinuteUpdate = true,
+            jugglucoEnabled = false,
+            outboundApiEnabled = true,
+            wearIntEnabled = true,
+            gadgetbridgeEnabled = true
+        )
+        assertFalse("API already used its own bucket", sameBucketAfterJitter.sendOutboundApi)
+        assertTrue("WearInt gets the first eligible callback in its bucket", sameBucketAfterJitter.sendWearInt)
+        assertTrue("Gadgetbridge gets the first eligible callback in its bucket", sameBucketAfterJitter.sendGadgetbridge)
+    }
+
+    @Test
+    fun disabledDestinationDoesNotReserveItsBucketBeforeItIsEnabled() {
+        val policy = ExchangeOutputPolicy()
+
+        val disabled = policy.decide(
+            sensorId = sensorId,
+            payloadTimeMs = base + 30_000L,
+            intervalMinutes = 5,
+            shouldBroadcastMinuteUpdate = true,
+            jugglucoEnabled = false,
+            outboundApiEnabled = true,
+            wearIntEnabled = false,
+            gadgetbridgeEnabled = false
+        )
+        assertTrue("the enabled API may consume its own bucket", disabled.sendOutboundApi)
+        assertFalse(disabled.sendGadgetbridge)
+
+        val enabled = policy.decide(
+            sensorId = sensorId,
+            payloadTimeMs = base + 90_000L,
+            intervalMinutes = 5,
+            shouldBroadcastMinuteUpdate = true,
+            jugglucoEnabled = false,
+            outboundApiEnabled = true,
+            wearIntEnabled = false,
+            gadgetbridgeEnabled = true
+        )
+        assertTrue("the first enabled reading starts Gadgetbridge's bucket", enabled.sendGadgetbridge)
+    }
+
+    @Test
+    fun destinationPolicyKeepsIntervalChangeAndOutOfOrderRules() {
+        val policy = ExchangeOutputPolicy()
+
+        assertTrue(
+            policy.decide(sensorId, base, 3, true, false, true, false, false).sendOutboundApi
+        )
+        assertFalse(
+            "an older reading cannot reopen a sent interval",
+            policy.decide(sensorId, base - minute, 3, true, false, true, false, false).sendOutboundApi
+        )
+        assertFalse(
+            "the same interval remains closed",
+            policy.decide(sensorId, base + minute, 3, true, false, true, false, false).sendOutboundApi
+        )
+        assertTrue(
+            "changing the interval starts its count afresh",
+            policy.decide(sensorId, base + minute, 5, true, false, true, false, false).sendOutboundApi
+        )
+    }
 }
