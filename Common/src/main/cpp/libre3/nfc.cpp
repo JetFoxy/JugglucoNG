@@ -48,12 +48,13 @@ struct firstnfc {
 
 struct nfc1 {
     uint8_t nfcbuf[50+sizeof(firstnfc)];
-	firstnfc *nfcptr;
+	firstnfc *nfcptr = nullptr;
 	bool error = true;
 	const std::string_view getSerialNumber() const {
  		return std::string_view(nfcptr->serialnumber,9);
 		}
 	nfc1(JNIEnv *env,  jbyteArray jnfcout) {
+        if (!jnfcout) return;
         jsize lens=env->GetArrayLength(jnfcout);
 		if(lens<(sizeof(firstnfc)+3) || lens > sizeof(nfcbuf)) {
 			LOGGER("NFC: sizeof bytearray=%d sizeof(firstnfc)=%ld\n",lens,sizeof(firstnfc));
@@ -67,6 +68,7 @@ struct nfc1 {
 		LOGGERN(hex.str(),hex.size());
 		}
 #endif
+       if (env->ExceptionCheck()) return;
        const size_t offset = libre3nfc::nfcPayloadOffset(nfcbuf, lens, sizeof(firstnfc));
        if (offset == static_cast<size_t>(lens))
            return;
