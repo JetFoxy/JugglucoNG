@@ -1826,6 +1826,10 @@ public class SensorBluetooth {
                 }
                 ;
                 cb.resetdataptr();
+                cb.sensorstartmsec = Natives.getSensorStartmsec(cb.dataptr);
+                cb.setPause(false);
+                // NFC created a separate stream wrapper for the same native record.
+                Natives.freedataptr(streamptr);
                 return checkandconnect(cb, 0);
             }
         }

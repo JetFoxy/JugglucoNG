@@ -21,6 +21,7 @@
 #ifndef SENSOREN_H
 #define SENSOREN_H
 #include "SensorGlucoseData.hpp"
+#include "libre3/nfcmetadata.hpp"
 #include "inout.hpp"
 #include "settings/settings.hpp"
 #include <algorithm>
@@ -535,7 +536,12 @@ public:
   int makelibre3sensorindex(std::string_view shortname, uint32_t starttime,
                             const uint32_t pin, const char *deviceaddress,
                             uint32_t now, uint16_t warmup,
-                            uint16_t wearduration) {
+                            uint16_t wearduration, bool fromNfc = false) {
+    const libre3nfc::NfcMetadata nfc{starttime, pin, deviceaddress, warmup, wearduration};
+    if (fromNfc && (shortname.size() != 9 || !nfc.valid(now))) {
+      LOGAR("Libre 3 NFC metadata invalid");
+      return -1;
+    }
     const auto name = namelibre3(shortname);
 
 #ifndef NOLOG
@@ -551,15 +557,25 @@ public:
       LOGGER("known sensor %s\n", sensgegs->showsensorname());
       const int sensindex = sensgegs - sensorlist();
       SensorGlucoseData *sens = getSensorData(sensindex);
-      if (pin) {
-        sens->getinfo()->pin = pin;
+      if (!sens)
+        return -1;
+      if (fromNfc) {
+        if (libre3nfc::refreshNfcMetadata(*sens->getinfo(), nfc) !=
+            libre3nfc::NfcRefresh::updated) {
+          LOGAR("Libre 3 NFC activation conflicts with retained history or storage; unchanged");
+          return -1;
+        }
+        sensgegs->starttime = sens->getstarttime();
+        sensgegs->halfdays = 2 * sens->getweardurationMIN() / (24 * 60);
+        sensgegs->endtime = 0;
+        LOGAR("Libre 3 NFC connection metadata refreshed");
+      } else {
+        if (pin)
+          sens->getinfo()->pin = pin;
+        if (deviceaddress && !*sens->deviceaddress())
+          strcpy(sens->deviceaddress(), deviceaddress);
+        sens->getinfo()->haskAuth = false;
       }
-      if (deviceaddress) {
-        char *address = sens->deviceaddress();
-        if (!*address)
-          strcpy(address, deviceaddress);
-      }
-      sens->getinfo()->haskAuth = false;
       sendKAuth(sens);
       sensgegs->finished = 0;
 
@@ -575,6 +591,18 @@ public:
                                    warmup, wearduration);
     const int ind = addsensor(std::string_view(name.data(), name.size()));
     sensor *sen = getsensor(ind);
+    if (fromNfc) {
+      // A sensor directory can survive after its roster entry was removed.
+      // mkdatabase3 deliberately retains it, so validate that path as well.
+      auto *sens = getSensorData(ind);
+      if (!sens || libre3nfc::refreshNfcMetadata(*sens->getinfo(), nfc) !=
+                       libre3nfc::NfcRefresh::updated) {
+        sen->markRemovedByUser();
+        LOGAR("Libre 3 NFC retained directory conflicts with activation");
+        return -1;
+      }
+      sen->starttime = sens->getstarttime();
+    }
     sen->halfdays = 2 * wearduration / (24 * 60);
     sen->initialized = true;
     return ind;

@@ -101,7 +101,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     public long dataptr = 0L;
     public BluetoothDevice mActiveBluetoothDevice;
     long foundtime = 0L;
-    protected BluetoothGatt mBluetoothGatt;
+    protected volatile BluetoothGatt mBluetoothGatt;
     private volatile BluetoothGatt locallyConnectedGatt;
     private volatile boolean connectPending = false;
     private volatile ScheduledFuture<?> pendingConnectFuture = null;
@@ -109,6 +109,45 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
      * stack delivers for it. Zero means "already reported", so a live connection pays one
      * volatile read per callback and nothing else. */
     private volatile long connectGattAtMs = 0L;
+    private final GattConnectDeadline<BluetoothGatt> connectDeadline = new GattConnectDeadline<>(
+            this, (task, delay) -> {
+                final ScheduledFuture<?> future = Applic.scheduler.schedule(task, delay, TimeUnit.MILLISECONDS);
+                return () -> future.cancel(false);
+            }, this::connectionAttemptExpired);
+
+    /** Opt in only for drivers whose silent connect failure is covered by this deadline. */
+    protected long connectionAttemptTimeoutMillis() { return 0L; }
+
+    protected final void watchConnectionAttempt(BluetoothGatt attempt) {
+        synchronized (this) {
+            if (mBluetoothGatt != attempt || stop) return;
+            final long timeout = connectionAttemptTimeoutMillis();
+            if (timeout > 0L) connectDeadline.arm(attempt, timeout);
+        }
+    }
+
+    private void connectionAttemptExpired(BluetoothGatt attempt) {
+        // The deadline holds this callback's monitor, also used for GATT replacement.
+        if (mBluetoothGatt != attempt || stop || dataptr == 0L
+                || CloneSensorRegistry.isCloneSensor(SerialNumber)
+                || SensorOwnershipRuntime.blocksLocalConnection(SerialNumber)) return;
+        Log.i(LOG_ID, SerialNumber + " no connection result before deadline; retrying");
+        closeGattTransport();
+        connectDevice(0);
+    }
+
+    protected final synchronized boolean acceptConnectionAttemptCallback(BluetoothGatt gatt, int state) {
+        if (gatt != mBluetoothGatt) {
+            Log.i(LOG_ID, SerialNumber + " ignore retired connection callback");
+            return false;
+        }
+        if (state == android.bluetooth.BluetoothProfile.STATE_CONNECTED
+                || state == android.bluetooth.BluetoothProfile.STATE_DISCONNECTED) {
+            connectDeadline.completed(gatt);
+        }
+        return !stop;
+    }
+
     boolean superseded = false;
     public final int sensorgen;
     public int readrssi = 9999;
@@ -179,7 +218,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         }
     }
 
-    public void disconnect() {
+    public synchronized void disconnect() {
+        connectDeadline.cancel();
         clearPendingConnect();
         final var thegatt = mBluetoothGatt;
         if (thegatt != null) {
@@ -202,9 +242,10 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         }
     }
 
-    public void setPause(boolean pause) {
+    public synchronized void setPause(boolean pause) {
         this.stop = pause;
         if (pause) {
+            connectDeadline.cancel();
             clearPendingConnect();
         }
         if (doLog)
@@ -1126,7 +1167,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
      * share a dataptr, and {@link #free()} would hand the running callback's
      * SensorGlucoseData back to the allocator — taking that sensor's history with it.
      */
-    void discard() {
+    synchronized void discard() {
         stop = true;
         if (doLog) {
             Log.i(LOG_ID, "discard " + SerialNumber);
@@ -1135,7 +1176,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         dataptr = 0L;
     }
 
-    void free() {
+    synchronized void free() {
         stop = true;
         {
             if (doLog) {
@@ -1164,7 +1205,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
     /** Close only the current Android GATT transport, without invoking a
      * managed driver's terminal close override. */
-    public final void closeGattTransport() {
+    public final synchronized void closeGattTransport() {
+        connectDeadline.cancel();
         clearPendingConnect();
         {
             if (doLog) {
@@ -1174,14 +1216,15 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         }
         ;
         var tmpgatt = mBluetoothGatt;
+        mBluetoothGatt = null;
         if (tmpgatt != null) {
             if (locallyConnectedGatt == tmpgatt) {
                 locallyConnectedGatt = null;
                 WearSensorClaim.onLocalGattDisconnected(SerialNumber);
             }
             try {
-                tmpgatt.disconnect();
-                tmpgatt.close();
+                try { tmpgatt.disconnect(); }
+                finally { tmpgatt.close(); }
             } catch (Throwable se) {
                 var mess = se.getMessage();
                 mess = mess == null ? "" : mess;
@@ -1190,8 +1233,6 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                         : mess);
                 Applic.Toaster(uit);
                 Log.stack(LOG_ID, SerialNumber + " " + "BluetoothGatt.close()", se);
-            } finally {
-                mBluetoothGatt = null;
             }
         } else {
             {
@@ -1285,6 +1326,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             return null;
         }
         return () -> {
+            synchronized (cb) {
             markConnectRunnableStarted();
             try {
             {
@@ -1358,6 +1400,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                     }
                 }
 
+                watchConnectionAttempt(cb.mBluetoothGatt);
                 setpriority(cb.mBluetoothGatt);
                 {
                     if (doLog) {
@@ -1383,6 +1426,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             }
             } finally {
                 clearPendingConnect();
+            }
             }
         };
     }
