@@ -43,6 +43,10 @@ public class Specific {
 		JournalSnapshotAccess.register(tk.glucodata.OutboundApiJournalSnapshot.INSTANCE);
 		NotificationPredictionAccess.register(tk.glucodata.NotificationPredictionOverlay.INSTANCE);
 		GlucoseUncertaintyAccess.register(tk.glucodata.data.GlucoseUncertaintyStore.INSTANCE);
+		HistoryRepositoryAccess.register(tk.glucodata.data.MobileHistoryRepositoryBridge.INSTANCE);
+		HistorySyncBridgeAccess.register(tk.glucodata.data.MobileHistorySyncBridge.INSTANCE);
+		CloneRecoveryAccessBridge.register(tk.glucodata.data.MobileCloneRecoveryBridge.INSTANCE);
+		CloneOutgoingRecoveryAccessBridge.register(tk.glucodata.data.MobileCloneOutgoingRecoveryBridge.INSTANCE);
 	}
 
 	static void start(Application context) {
