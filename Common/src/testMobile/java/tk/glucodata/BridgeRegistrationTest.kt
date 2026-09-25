@@ -26,5 +26,11 @@ class BridgeRegistrationTest {
         assertTrue("JournalSnapshotAccess", JournalSnapshotAccess.isRegistered())
         assertTrue("NotificationPredictionAccess", NotificationPredictionAccess.isRegistered())
         assertTrue("GlucoseUncertaintyAccess", GlucoseUncertaintyAccess.isRegistered())
+        assertTrue("CalibrationProfileAccess", CalibrationProfileAccess.isRegistered())
+        assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
+        assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())
+        assertTrue("HistorySyncBridgeAccess", HistorySyncBridgeAccess.isRegistered())
+        assertTrue("CloneRecoveryAccessBridge", CloneRecoveryAccessBridge.isRegistered())
+        assertTrue("CloneOutgoingRecoveryAccessBridge", CloneOutgoingRecoveryAccessBridge.isRegistered())
     }
 }

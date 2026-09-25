@@ -97,7 +97,7 @@ class CloneReceptionSafetyTests {
 
         val reconcile = registry.substring(registry.indexOf("fun reconcilePrimaryCloneSensor"))
         assertTrue(reconcile.contains("whileReceptionEnabled"))
-        assertTrue(access.contains("return CloneSensorRegistry.whileReceptionEnabled"))
+        assertTrue(access.contains("CloneSensorRegistry.whileReceptionEnabled"))
 
         val importStart = snapshots.indexOf("fun importCloneIobSnapshot")
         val importEnd = snapshots.indexOf("fun importFromJson", importStart)
