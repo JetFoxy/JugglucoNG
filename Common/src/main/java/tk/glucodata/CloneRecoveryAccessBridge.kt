@@ -39,7 +39,7 @@ object CloneRecoveryAccessBridge {
 
     @JvmStatic
     fun readPullFile(jobId: String, packageChunk: Boolean, offset: Long, maximumBytes: Int): ByteArray? =
-        runCatching { bridge?.preparePullFile(jobId, packageChunk, offset, maximumBytes) }
+        runCatching { bridge?.readPullFile(jobId, packageChunk, offset, maximumBytes) }
             .onFailure { Log.stack(TAG, "readPullFile failed", it) }
             .getOrNull()
 

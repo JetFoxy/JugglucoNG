@@ -282,7 +282,7 @@ object HistorySyncAccess {
         rate: Float,
         sensorSerial: String?,
     ) {
-        if (sensorSerial.isNullOrBlank()) return
+        if (timestamp <= 0L || sensorSerial.isNullOrBlank()) return
         HistoryRepositoryAccess.storeCurrentReadingAsync(timestamp, valueMgdl, rawValueMgdl, rate, sensorSerial)
     }
 
@@ -295,7 +295,7 @@ object HistorySyncAccess {
         sensorSerial: String?,
         source: String,
     ) {
-        if (sensorSerial.isNullOrBlank()) return
+        if (timestamp <= 0L || sensorSerial.isNullOrBlank()) return
         HistoryRepositoryAccess.storeCurrentReadingWithSourceAsync(
             timestamp,
             valueMgdl,

@@ -68,7 +68,7 @@ object HistoryRepositoryAccess {
                 rate,
                 sensorSerial,
                 source,
-            ) ?: bridge?.storeCurrentReadingAsync(timestamp, valueMgdl, rawValueMgdl, rate, sensorSerial)
+            )
         }.onFailure { Log.stack(TAG, "storeCurrentReadingWithSourceAsync failed", it) }
     }
 
@@ -102,6 +102,8 @@ object HistoryRepositoryAccess {
         rawValuesMgdl: FloatArray,
         source: String,
     ): Boolean =
+        // No retry without the source on failure: that would store a follower's
+        // readings under the sensor default, which the old bridge never did.
         runCatching {
             bridge?.storeHistoryBatchWithSourceBlocking(
                 sensorSerial,
@@ -111,11 +113,7 @@ object HistoryRepositoryAccess {
                 source,
             )
         }.onFailure { Log.stack(TAG, "storeHistoryBatchWithSourceBlocking failed", it) }
-            .getOrNull()
-            ?: runCatching {
-                bridge?.storeHistoryBatchBlocking(sensorSerial, timestamps, valuesMgdl, rawValuesMgdl)
-            }.getOrNull()
-            ?: false
+            .getOrNull() ?: false
 
     @JvmStatic
     fun getLatestTimestampForSensorBlocking(sensorSerial: String): Long =

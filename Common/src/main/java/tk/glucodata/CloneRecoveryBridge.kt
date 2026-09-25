@@ -13,7 +13,7 @@ interface CloneRecoveryBridge {
 
     fun preparePullExport(requestJson: String): Boolean
 
-    fun preparePullFile(jobId: String, packageChunk: Boolean, offset: Long, maximumBytes: Int): ByteArray?
+    fun readPullFile(jobId: String, packageChunk: Boolean, offset: Long, maximumBytes: Int): ByteArray?
 
     fun prepareIncomingPush(manifestJson: String): String
 

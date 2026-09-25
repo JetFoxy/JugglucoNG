@@ -12,7 +12,7 @@ object MobileCloneRecoveryBridge : CloneRecoveryBridge {
     override fun preparePullExport(requestJson: String): Boolean =
         CloneHistoryRecoveryAccess.preparePullExport(requestJson)
 
-    override fun preparePullFile(
+    override fun readPullFile(
         jobId: String,
         packageChunk: Boolean,
         offset: Long,
