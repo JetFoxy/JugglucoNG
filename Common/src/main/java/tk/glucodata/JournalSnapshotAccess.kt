@@ -26,6 +26,10 @@ object JournalSnapshotAccess {
         this.bridge = bridge
     }
 
+    /** Registration-completeness check (plan §6 Q1). */
+    @JvmStatic
+    fun isRegistered(): Boolean = bridge != null
+
     /** Empty when there is no journal to serve, or the snapshot failed. */
     @JvmStatic
     fun snapshotJson(timeMillis: Long): String =

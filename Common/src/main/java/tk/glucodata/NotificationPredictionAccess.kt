@@ -24,6 +24,10 @@ object NotificationPredictionAccess {
         this.bridge = bridge
     }
 
+    /** Registration-completeness check (plan §6 Q1). */
+    @JvmStatic
+    fun isRegistered(): Boolean = bridge != null
+
     /** Empty without an overlay (the watch) or when the prediction failed. */
     @JvmStatic
     fun buildPredictionSeries(
