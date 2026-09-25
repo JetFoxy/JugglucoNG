@@ -29,7 +29,7 @@ import tk.glucodata.data.journal.JournalTreatmentTransfer
 import tk.glucodata.data.journal.isCloneJournalExportSource
 import tk.glucodata.data.prediction.PredictionModelProfileStore
 
-object OutboundApiJournalSnapshot {
+object OutboundApiJournalSnapshot : JournalSnapshotBridge {
     private const val PREFS_NAME = "tk.glucodata_preferences"
     private const val SNAPSHOT_EVENT_WINDOW_MS = 12L * 60L * 60L * 1000L
     private const val DEFAULT_ACTIVE_WINDOW_MS = 24L * 60L * 60L * 1000L
@@ -41,8 +41,7 @@ object OutboundApiJournalSnapshot {
     private const val CLONE_JOURNAL_MAX_TOMBSTONES = 256
     private val cloneJournalImportMutex = Mutex()
 
-    @JvmStatic
-    fun snapshotJson(timeMillis: Long): String = runBlocking {
+    override fun snapshotJson(timeMillis: Long): String = runBlocking {
         withContext(Dispatchers.IO) {
             buildSnapshot(timeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()).toString()
         }
@@ -126,8 +125,7 @@ object OutboundApiJournalSnapshot {
      * Results are cached briefly; on the main thread the cache (possibly
      * stale) is returned instead of blocking on Room.
      */
-    @JvmStatic
-    fun broadcastIobSnapshot(timeMillis: Long): FloatArray? {
+    override fun broadcastIobSnapshot(timeMillis: Long): FloatArray? {
         val atMillis = timeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
         val cached = broadcastIobCache
         if (cached != null && atMillis - cached.atMillis < BROADCAST_IOB_CACHE_MS) return cached.values
@@ -208,8 +206,7 @@ object OutboundApiJournalSnapshot {
     }
 
     @Keep
-    @JvmStatic
-    fun cloneIobSnapshotJson(timeMillis: Long): String = runBlocking {
+    override fun cloneIobSnapshotJson(timeMillis: Long): String = runBlocking {
         val atMillis = timeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
         val values = withContext(Dispatchers.IO) {
             // Never forward a snapshot received from another Clone. That would
@@ -225,8 +222,7 @@ object OutboundApiJournalSnapshot {
     }
 
     /** Local journal state only; remote snapshots must never be timestamp-refreshed into Nightscout. */
-    @JvmStatic
-    fun nightscoutUploadIobSnapshot(timeMillis: Long): FloatArray? = runBlocking {
+    override fun nightscoutUploadIobSnapshot(timeMillis: Long): FloatArray? = runBlocking {
         val atMillis = timeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
         withContext(Dispatchers.IO) {
             runCatching {
@@ -259,8 +255,7 @@ object OutboundApiJournalSnapshot {
     }
 
     @Keep
-    @JvmStatic
-    fun importCloneIobSnapshot(raw: String): Boolean {
+    override fun importCloneIobSnapshot(raw: String): Boolean {
         val remote = CloneIobSnapshot.parse(raw) ?: return false
         if (!CloneIobSnapshot.update(remote)) return false
         broadcastIobCache = null
@@ -273,8 +268,7 @@ object OutboundApiJournalSnapshot {
     }
 
     @Keep
-    @JvmStatic
-    fun cloneJournalSnapshotJson(timeMillis: Long): String = runBlocking {
+    override fun cloneJournalSnapshotJson(timeMillis: Long): String = runBlocking {
         val atMillis = timeMillis.takeIf { it > 0L } ?: System.currentTimeMillis()
         withContext(Dispatchers.IO) {
             runCatching { buildCloneJournalSnapshot(atMillis).toString() }
@@ -283,8 +277,7 @@ object OutboundApiJournalSnapshot {
     }
 
     @Keep
-    @JvmStatic
-    fun importCloneJournalSnapshot(raw: String, transportCode: Int): Boolean {
+    override fun importCloneJournalSnapshot(raw: String, transportCode: Int): Boolean {
         val envelope = runCatching { parseCloneJournalEnvelope(raw) }
             .onFailure { Log.e("CloneJournal", "Snapshot rejected: ${Log.stackline(it)}") }
             .getOrNull()
@@ -306,8 +299,7 @@ object OutboundApiJournalSnapshot {
         }
     }
 
-    @JvmStatic
-    fun importFromJsonForSource(raw: String, sourcePrefix: String): Int = runBlocking {
+    override fun importFromJsonForSource(raw: String, sourcePrefix: String): Int = runBlocking {
         withContext(Dispatchers.IO) {
             importJournal(raw, sourcePrefix.trim().ifBlank { API_SOURCE_PREFIX })
         }

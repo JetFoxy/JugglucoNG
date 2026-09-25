@@ -181,26 +181,6 @@
     public final float getVelocity();
 }
 
-# Keep OutboundApiJournalSnapshot name and reflected members stable.
-# OutboundApi, ApiGlucoseSourceManager and JugglucoSend (src/main) resolve this
-# mobile-only object by name: snapshotJson() backs the {iob}/{cob}/{journal}/
-# {journal_events} message-template tokens, importFromJson*() ingests API
-# journal payloads, and broadcastIobSnapshot() feeds the glucodata.Minute
-# IOB/eIOB/COB extras. Without this, R8 renames/strips the class and the
-# reflection silently yields an empty snapshot (tokens render as
-# "0 - 0 - 0 - 0 -  -") / a broadcast without IOB.
--keepnames class tk.glucodata.OutboundApiJournalSnapshot
--keepclassmembers class tk.glucodata.OutboundApiJournalSnapshot {
-    public static java.lang.String snapshotJson(long);
-    public static int importFromJson(java.lang.String);
-    public static int importFromJsonForSource(java.lang.String,java.lang.String);
-    public static float[] broadcastIobSnapshot(long);
-    public static java.lang.String cloneIobSnapshotJson(long);
-    public static boolean importCloneIobSnapshot(java.lang.String);
-    public static java.lang.String cloneJournalSnapshotJson(long);
-    public static boolean importCloneJournalSnapshot(java.lang.String,int);
-}
-
 #-keep class tk.glucodata.watchface.WatchFaceService
 #-keep class tk.glucodata.watchface.WatchFaceService.editor.WatchFaceConfigActivity
 
