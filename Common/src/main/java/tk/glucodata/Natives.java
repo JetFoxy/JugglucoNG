@@ -1220,6 +1220,7 @@ public class Natives {
         public static native void setpostTreatments(boolean val);
 
         public static native long getSensorStartmsec(long dataptr);
+        public static native int getSensorWarmupMinutes(long dataptr);
 
         public static native long getSensorStartmsecFromSensorptr(long sensorptr);
 

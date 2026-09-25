@@ -528,6 +528,11 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(getSensorStartmsec)(JNIEnv *env,
   const streamdata *sdata = reinterpret_cast<const streamdata *>(dataptr);
   return sdata->hist->getstarttime() * 1000LL;
 }
+extern "C" JNIEXPORT jint JNICALL
+fromjava(getSensorWarmupMinutes)(JNIEnv *env, jclass cl, jlong dataptr) {
+  const auto *stream = reinterpret_cast<const streamdata *>(dataptr);
+  return stream && stream->hist ? stream->hist->getWarmupMIN() : 0;
+}
 extern "C" JNIEXPORT jlong JNICALL
 fromjava(getSensorStartmsecFromSensorptr)(JNIEnv *env, jclass cl,
                                           jlong sensorptr) {

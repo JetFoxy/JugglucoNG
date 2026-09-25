@@ -1702,6 +1702,7 @@ fun SensorCard(
     }
 
     val isLocallyStreaming = sensor.streaming
+    val isLocallyEnabled = isSensorLocallyEnabled(sensor.streaming, sensor.paused)
     val isHandedOff = sensor.handoffUiState != SensorHandoffUiState.NONE
     val refreshRevision by UiRefreshBus.revision.collectAsState(initial = 0L)
     val latestPersistedReading by remember(sensor.serial) {
@@ -1904,7 +1905,7 @@ fun SensorCard(
                             // the accent container so the way back to streaming is the loud thing.
                             IconButton(
                                 onClick = {
-                                    if (isLocallyStreaming) {
+                                    if (isLocallyEnabled) {
                                         android.util.Log.d("SensorCard", "Pause button clicked for: ${sensor.serial}")
                                         viewModel.disconnectSensor(sensor.serial)
                                     } else {
@@ -1915,7 +1916,7 @@ fun SensorCard(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .background(
-                                        if (isLocallyStreaming) {
+                                        if (isLocallyEnabled) {
                                             MaterialTheme.colorScheme.surfaceDim.copy(alpha = 0.5f)
                                         } else {
                                             MaterialTheme.colorScheme.primaryContainer
@@ -1924,13 +1925,13 @@ fun SensorCard(
                                     )
                             ) {
                                 Icon(
-                                    imageVector = if (isLocallyStreaming) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    imageVector = if (isLocallyEnabled) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = stringResource(
-                                        if (isLocallyStreaming) R.string.sensor_pause_streaming
+                                        if (isLocallyEnabled) R.string.sensor_pause_streaming
                                         else R.string.sensor_resume_streaming
                                     ),
                                     modifier = Modifier.size(26.dp),
-                                    tint = if (isLocallyStreaming) {
+                                    tint = if (isLocallyEnabled) {
                                         MaterialTheme.colorScheme.onSurface
                                     } else {
                                         MaterialTheme.colorScheme.onPrimaryContainer
@@ -1945,7 +1946,7 @@ fun SensorCard(
                     // repeating what the play button already says.
                     val sensorStatusText = when {
                         sensor.isCloneSource && !cloneHasRecentData -> stringResource(R.string.nodata)
-                        !isStreaming -> pausedText
+                        !sensor.isCloneSource && !isHandedOff && !isLocallyEnabled -> pausedText
                         // statusTextRes only knows connected from reconnecting, and
                         // it reads the ICE generation, which is unknown often enough
                         // that a Clone showing a reading from thirty seconds ago still
