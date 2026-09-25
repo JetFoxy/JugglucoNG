@@ -59,12 +59,14 @@ class ProguardKeepRulesTests {
     }
 
     @Test
-    fun theHistoryRepositoryLookupNamesAreKept() {
-        // The 713631f9 case: this one method was the omission, and its absence cost a full history
-        // re-pull per reconnect.
+    fun theHistoryRepositoryLookupNamesAreNoLongerNeeded() {
+        // The 713631f9 omitting lookup is gone: HistoryRepositoryAccess now reaches
+        // the repository through the registered HistoryRepositoryBridge, so the
+        // hand-kept name list was deleted. This guards against it being re-added as
+        // a duplicate of the interface call.
         val text = activeRules()
-        assertTrue(text.contains("-keepnames class tk.glucodata.data.HistoryRepository"))
-        assertTrue(text.contains("getHistoryTimestampsForSensorBlocking"))
+        assertFalse(text.contains("-keepnames class tk.glucodata.data.HistoryRepository"))
+        assertFalse(text.contains("-keepnames class tk.glucodata.data.HistorySync"))
     }
 
     @Test

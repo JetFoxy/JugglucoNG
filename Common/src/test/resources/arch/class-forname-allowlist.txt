@@ -9,6 +9,4 @@
 # This list may only shrink: a new file added to it, or a stale line for one already fixed, fails
 # the build (ArchitectureGateTests.classForNameFromMainDoesNotGrow).
 src/main/java/tk/glucodata/CalibrationAccess.kt
-src/main/java/tk/glucodata/HistoryRepositoryAccess.kt
-src/main/java/tk/glucodata/HistorySyncAccess.kt
 src/main/java/tk/glucodata/Notify.java
