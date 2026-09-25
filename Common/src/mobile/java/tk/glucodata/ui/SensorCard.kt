@@ -1028,7 +1028,7 @@ fun SensorCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // --- Hardware Reset action ---
-                Surface(
+                if (sensor.supportsHardwareReset) Surface(
                     onClick = {
                         viewModel.resetAiDexSensor(sensor.serial, enableBiasCompensation = aiDexBiasChecked)
                         showAiDexClearDialog = false
@@ -2578,7 +2578,9 @@ fun SensorCard(
                 ) {
                     // Edit 78: Reset button — opens bottom sheet. Shows tertiary tint when
                     // bias correction is active so the user knows something is going on.
-                    FilledTonalButton(
+                    // Firmware 1.8.3+ refuses the reset; the button stays only while a bias
+                    // correction is running, so it can still be switched off.
+                    if (sensor.supportsHardwareReset || sensor.resetCompensationActive) FilledTonalButton(
                         onClick = { showAiDexClearDialog = true },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(

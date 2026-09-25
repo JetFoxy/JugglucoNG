@@ -13,6 +13,11 @@ internal object AiDexRuntimePolicy {
         RETRY_CLEAN_GATT,
         /** The saved key is dead and this phone holds the sensor's bond: replace it over F001. */
         REPLACE_SAVED_KEY,
+        /**
+         * The fresh pair that followed a confirmed reset kept failing: the reset evidently did
+         * not rotate the sensor's credential, so go back to the key that was kept for this.
+         */
+        RESTORE_SAVED_KEY,
         BROADCAST_ONLY,
     }
 
@@ -51,8 +56,13 @@ internal object AiDexRuntimePolicy {
         savedKeyExhausted: Boolean = false,
         explicitPairRequested: Boolean = false,
         bonded: Boolean = false,
+        pairKeyResetPending: Boolean = false,
     ): PairKeyStartAction = when {
         !hasSavedPairKey -> PairKeyStartAction.FRESH_PAIR
+        // The sensor acknowledged CLEAR_STORAGE, which wipes its bond and PAIR credential:
+        // the saved key is dead, so skip the retries that would only prove it. It stays
+        // stored until a fresh key decrypts live data, and comes back if the fresh pair fails.
+        pairKeyResetPending -> PairKeyStartAction.FRESH_PAIR
         savedKeyExhausted && (explicitPairRequested || bonded) -> PairKeyStartAction.FRESH_PAIR
         else -> PairKeyStartAction.USE_SAVED_KEY
     }
@@ -67,8 +77,10 @@ internal object AiDexRuntimePolicy {
         maxFailures: Int,
         usedSavedKey: Boolean = false,
         bonded: Boolean = false,
+        freshPairAfterReset: Boolean = false,
     ): KeyExchangeFailureAction = when {
         consecutiveFailures < maxFailures -> KeyExchangeFailureAction.RETRY_CLEAN_GATT
+        freshPairAfterReset -> KeyExchangeFailureAction.RESTORE_SAVED_KEY
         usedSavedKey && bonded -> KeyExchangeFailureAction.REPLACE_SAVED_KEY
         else -> KeyExchangeFailureAction.BROADCAST_ONLY
     }
@@ -95,8 +107,52 @@ internal object AiDexRuntimePolicy {
 
     const val BOND_VECTOR_LENGTH = 17
 
+    /**
+     * Status byte of an accepted F002 command. AiDex ACKs `[opcode, status, crc16]` with
+     * `0x01` for success: calibration (0x25) has always read it that way, every DELETE_BOND
+     * (0xF2) in the field logs answered `0x01`, and CLEAR_STORAGE (0xF3) answered `0x01` on
+     * 1.6.0 / 1.7.1 / 1.8.0 sensors that then came back with history `newest=1` and a zeroed
+     * session start. The one `0x00` on record is a 1.8.3 CLEAR_STORAGE that left the old
+     * history in place — a refusal.
+     */
+    const val COMMAND_ACCEPTED = 0x01
+
+    /** Longest reply that is still a bare `[opcode, status, crc16]` ACK. */
+    private const val MAX_ACK_LENGTH = 4
+
     fun shouldClearPersistedPairKey(deleteBondPending: Boolean, responseStatus: Int): Boolean =
-        deleteBondPending && responseStatus == 0x00
+        deleteBondPending && responseStatus == COMMAND_ACCEPTED
+
+    /**
+     * Whether a CLEAR_STORAGE reply proves the sensor accepted the reset. Anything longer
+     * than an ACK is not one — newer firmware is reported to answer a reset with key
+     * material — and must not be read as a status byte.
+     */
+    fun isClearStorageConfirmed(responseLength: Int, responseStatus: Int): Boolean =
+        responseLength in 2..MAX_ACK_LENGTH && responseStatus == COMMAND_ACCEPTED
+
+    /** First firmware that refuses the lifecycle reset (CLEAR_STORAGE). */
+    private val RESET_REFUSING_FIRMWARE = listOf(1, 8, 3)
+
+    /**
+     * Whether this firmware still accepts the lifecycle reset. From 1.8.3 the sensor refuses
+     * it (the 1.8.3 trace answered `0x00` and kept its history), so the action is withheld
+     * there. An unknown or unparseable version is not a reason to hide it: the driver only
+     * sends the command over an established session, by which point the version is read.
+     */
+    fun supportsLifecycleReset(firmwareVersion: String?): Boolean {
+        val parts = firmwareVersion
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.split('.')
+            ?.map { it.trim().toIntOrNull() ?: return true }
+            ?: return true
+        for (i in RESET_REFUSING_FIRMWARE.indices) {
+            val part = parts.getOrElse(i) { 0 }
+            if (part != RESET_REFUSING_FIRMWARE[i]) return part < RESET_REFUSING_FIRMWARE[i]
+        }
+        return false
+    }
 
     fun connectedWarmupStatus(
         connectionPart: String,

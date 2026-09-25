@@ -111,10 +111,85 @@ class AiDexRuntimePolicyTests {
 
     @Test
     fun persistedPairKeyClearsOnlyAfterSuccessfulDeleteBondAck() {
-        assertFalse(AiDexRuntimePolicy.shouldClearPersistedPairKey(false, 0x00))
-        assertFalse(AiDexRuntimePolicy.shouldClearPersistedPairKey(true, 0x01))
+        // AiDex ACKs success with 0x01; every DELETE_BOND in the field logs answered 0x01.
+        assertFalse(AiDexRuntimePolicy.shouldClearPersistedPairKey(false, 0x01))
+        assertFalse(AiDexRuntimePolicy.shouldClearPersistedPairKey(true, 0x00))
         assertFalse(AiDexRuntimePolicy.shouldClearPersistedPairKey(true, 0xFF))
-        assertTrue(AiDexRuntimePolicy.shouldClearPersistedPairKey(true, 0x00))
+        assertTrue(AiDexRuntimePolicy.shouldClearPersistedPairKey(true, 0x01))
+    }
+
+    @Test
+    fun clearStorageIsConfirmedOnlyByAnAcceptedAck() {
+        // 1.6.0 / 1.7.1 / 1.8.0: `F3 01 crc crc`, then history newest=1 and a zeroed session.
+        assertTrue(AiDexRuntimePolicy.isClearStorageConfirmed(responseLength = 4, responseStatus = 0x01))
+        assertTrue(AiDexRuntimePolicy.isClearStorageConfirmed(responseLength = 2, responseStatus = 0x01))
+        // 1.8.3: `0x00`, and the old history was still there afterwards.
+        assertFalse(AiDexRuntimePolicy.isClearStorageConfirmed(responseLength = 4, responseStatus = 0x00))
+        assertFalse(AiDexRuntimePolicy.isClearStorageConfirmed(responseLength = 1, responseStatus = 0xFF))
+        // A payload is not an ACK, whatever its second byte happens to be.
+        assertFalse(AiDexRuntimePolicy.isClearStorageConfirmed(responseLength = 18, responseStatus = 0x01))
+    }
+
+    @Test
+    fun pairKeyStartAction_aConfirmedResetPairsFreshOverTheKeptKey() {
+        // The reporter's case: reset acknowledged, key still stored, sensor wiped its own.
+        assertEquals(
+            AiDexRuntimePolicy.PairKeyStartAction.FRESH_PAIR,
+            AiDexRuntimePolicy.decidePairKeyStartAction(hasSavedPairKey = true, pairKeyResetPending = true)
+        )
+        assertEquals(
+            AiDexRuntimePolicy.PairKeyStartAction.FRESH_PAIR,
+            AiDexRuntimePolicy.decidePairKeyStartAction(
+                hasSavedPairKey = true,
+                bonded = true,
+                pairKeyResetPending = true,
+            )
+        )
+        assertEquals(
+            AiDexRuntimePolicy.PairKeyStartAction.FRESH_PAIR,
+            AiDexRuntimePolicy.decidePairKeyStartAction(hasSavedPairKey = false, pairKeyResetPending = true)
+        )
+    }
+
+    @Test
+    fun keyExchangeFailures_aFailingPostResetFreshPairFallsBackToTheKeptKey() {
+        assertEquals(
+            AiDexRuntimePolicy.KeyExchangeFailureAction.RETRY_CLEAN_GATT,
+            AiDexRuntimePolicy.decideKeyExchangeFailureAction(2, 3, freshPairAfterReset = true)
+        )
+        // A reset that did not rotate the credential must not strand the sensor.
+        assertEquals(
+            AiDexRuntimePolicy.KeyExchangeFailureAction.RESTORE_SAVED_KEY,
+            AiDexRuntimePolicy.decideKeyExchangeFailureAction(3, 3, freshPairAfterReset = true)
+        )
+        assertEquals(
+            AiDexRuntimePolicy.KeyExchangeFailureAction.RESTORE_SAVED_KEY,
+            AiDexRuntimePolicy.decideKeyExchangeFailureAction(3, 3, bonded = true, freshPairAfterReset = true)
+        )
+        // Without a reset behind it, a failing fresh pair still parks.
+        assertEquals(
+            AiDexRuntimePolicy.KeyExchangeFailureAction.BROADCAST_ONLY,
+            AiDexRuntimePolicy.decideKeyExchangeFailureAction(3, 3, bonded = true)
+        )
+    }
+
+    @Test
+    fun lifecycleResetIsWithheldFromFirmware183AndLater() {
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset("1.6.0"))
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset("1.7.1.3"))
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset("1.8"))
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset("1.8.1"))
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset("1.8.2"))
+        assertFalse(AiDexRuntimePolicy.supportsLifecycleReset("1.8.3"))
+        assertFalse(AiDexRuntimePolicy.supportsLifecycleReset(" 1.8.3 "))
+        assertFalse(AiDexRuntimePolicy.supportsLifecycleReset("1.8.3.1"))
+        assertFalse(AiDexRuntimePolicy.supportsLifecycleReset("1.9.3"))
+        assertFalse(AiDexRuntimePolicy.supportsLifecycleReset("1.10.0"))
+        assertFalse(AiDexRuntimePolicy.supportsLifecycleReset("2.0"))
+        // Not read yet, or not a version: no grounds to hide the action.
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset(""))
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset(null))
+        assertTrue(AiDexRuntimePolicy.supportsLifecycleReset("V1.8.3"))
     }
 
     @Test
