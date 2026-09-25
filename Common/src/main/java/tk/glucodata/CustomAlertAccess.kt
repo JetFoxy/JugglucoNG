@@ -5,14 +5,14 @@ import android.content.Context
 /**
  * Bridge from the shared code to the app's custom-alert engine.
  *
- * This used to find the engine by name at runtime, via
- * `Class.forName("tk.glucodata.logic.CustomAlertManager")` plus `getField`/`getMethod`. The class
- * lookup itself survived, because R8 folds `Class.forName` of a literal into a direct class
- * reference. The members did not: in a release build that class becomes `a71`, whose entire member
- * list is `<clinit> a b c d e`, so `getField("INSTANCE")` and `getMethod("checkAndTrigger", ...)`
- * threw. `runCatching` swallowed that, [checkAndTrigger] returned having done nothing, and custom
- * alerts silently never fired in a release build. Notify's dismissal path carried its own copy of
- * the same lookup, so they could not be dismissed either.
+ * This used to find the engine by name at runtime, via a literal class lookup plus
+ * `getField`/`getMethod`. The class lookup itself survived, because R8 folds a
+ * literal lookup into a direct class reference. The members did not: in a release
+ * build that class becomes `a71`, whose entire member list is `<clinit> a b c d e`,
+ * so the field and method lookups threw. `runCatching` swallowed that,
+ * [checkAndTrigger] returned having done nothing, and custom alerts silently never
+ * fired in a release build. Notify's dismissal path carried its own copy of the same
+ * lookup, so they could not be dismissed either.
  *
  * No keep rule protects any of this, and adding one would only pin the names the detour depends on.
  * The sibling bridge to the TrendEngine happens to still work, purely because R8's allocator handed
