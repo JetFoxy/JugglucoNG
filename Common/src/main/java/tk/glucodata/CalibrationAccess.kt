@@ -11,6 +11,11 @@ object CalibrationAccess {
         this.provider = provider
     }
 
+    /** Tests only: drop a provider installed with [register]. */
+    internal fun unregisterForTests() {
+        provider = null
+    }
+
     /** Registration-completeness check (plan §6 Q1). */
     @JvmStatic
     fun isRegistered(): Boolean = provider != null

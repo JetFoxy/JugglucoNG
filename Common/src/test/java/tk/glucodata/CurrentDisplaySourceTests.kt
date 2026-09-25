@@ -373,4 +373,54 @@ class CurrentDisplaySourceTests {
         assertEquals(3.5f, snapshot.rawValue, 0.001f)
         requireNotNull(snapshot.secondaryStr)
     }
+
+    /**
+     * #431: the alert engine resolves the live reading through here, and this
+     * applies the calibration itself. SuperGattCallback publishes the reading
+     * already calibrated, so it has to hand the alerts the value from before
+     * that step — the published one comes out calibrated twice.
+     */
+    @Test
+    fun resolveFromLive_calibratesTheLiveReadingItself() {
+        val offsetMgdl = 42f
+        CalibrationAccess.register(object : CalibrationProvider {
+            override fun hasActiveCalibration(isRawMode: Boolean, sensorId: String?) = true
+            override fun getCalibratedValue(
+                value: Float,
+                timestamp: Long,
+                isRawMode: Boolean,
+                emitDiagnostics: Boolean,
+                sensorId: String?,
+            ) = value + offsetMgdl
+        })
+        try {
+            val timestamp = 1_790_331_424_000L
+            fun resolveLive(value: Float) = CurrentDisplaySource.resolveFromLive(
+                liveValueText = null,
+                liveNumericValue = value,
+                rate = 0f,
+                targetTimeMillis = timestamp,
+                sensorId = "30211DF2J38",
+                sensorGen = 0,
+                index = 0,
+                source = "incoming",
+                // What mergeLivePoint yields before the reading reaches history.
+                recentPoints = listOf(GlucosePoint(timestamp, value, 0f)),
+                viewMode = 0,
+                isMmol = false
+            )
+
+            val uncalibrated = 92f
+            val published = uncalibrated + offsetMgdl
+
+            assertEquals(published, requireNotNull(resolveLive(uncalibrated)).primaryValue, 0.001f)
+            assertEquals(
+                published + offsetMgdl,
+                requireNotNull(resolveLive(published)).primaryValue,
+                0.001f
+            )
+        } finally {
+            CalibrationAccess.unregisterForTests()
+        }
+    }
 }
