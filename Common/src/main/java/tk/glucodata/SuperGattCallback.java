@@ -415,6 +415,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
     public static tk.glucodata.GlucoseAlarms glucosealarms = null;
     public static notGlucose previousglucose = null;
     static float previousglucosevalue = 0.0f;
+    /** What {@link #previousglucosevalue} was made of; see {@link LiveReadingLanes}. */
+    static volatile LiveReadingLanes previousglucosereading = null;
     public static String previousglucosesensorid = null;
     private static final ExchangeUpdateGate exchangeUpdateGate = new ExchangeUpdateGate();
 
@@ -522,8 +524,9 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 ? sensorSerial
                 : Natives.lastsensorname();
         final int mgdlValue = Math.round(glucoseValue * (Applic.unit == 1 ? mgdLmult : 1.0f));
+        // Both callers hand over a value CurrentDisplaySource already resolved.
         dowithglucose(resolvedSensorSerial, mgdlValue, glucoseValue, rate, 0, timmsec,
-                0L, Notify.glucosetimeout, sensorgen);
+                0L, Notify.glucosetimeout, sensorgen, LiveReadingLanes.resolved(glucoseValue));
     }
 
     private static long[] loadRecentSensorHistory(String sensorSerial, long startTimeSec) {
@@ -647,19 +650,18 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
     static void dowithglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec,
             long sensorstartmsec, long showtime, int sensorgen) {
-        dowithglucose(SerialNumber, mgdl, gl, rate, alarm, timmsec, sensorstartmsec, showtime, sensorgen, gl);
+        dowithglucose(SerialNumber, mgdl, gl, rate, alarm, timmsec, sensorstartmsec, showtime, sensorgen,
+                LiveReadingLanes.stock(gl, Float.NaN));
     }
 
     /**
-     * @param alertBaseValue the reading before this app's calibration was applied to it.
-     *                       The alert engine resolves the reading through
-     *                       CurrentDisplaySource, which calibrates it itself; handing it
-     *                       {@code gl} after the live path already calibrated it applied
-     *                       the calibration twice (#431: a +42 mg/dL offset raised HIGH
-     *                       alarms at 176 while the screen read 134).
+     * @param reading what {@code gl} was made of. {@code gl} itself is what the user
+     *                is shown; the alert engines resolve {@code reading} instead,
+     *                because CurrentDisplaySource calibrates what it is given and
+     *                {@code gl} may already be calibrated (#431).
      */
     static void dowithglucose(String SerialNumber, int mgdl, float gl, float rate, int alarm, long timmsec,
-            long sensorstartmsec, long showtime, int sensorgen, float alertBaseValue) {
+            long sensorstartmsec, long showtime, int sensorgen, LiveReadingLanes reading) {
 
         if (gl == 0.0)
             return;
@@ -708,7 +710,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
         glucosealarms.setagealarm(timmsec, showtime);
         final var alertEvaluation = tk.glucodata.alerts.AlertRuntimeManager.INSTANCE.onNewReading(SerialNumber,
-                alertBaseValue, rate, timmsec, sensorgen);
+                reading, rate, timmsec, sensorgen);
         final boolean runtimeHandledStandardGlucoseAlert = alertEvaluation.getStandardGlucoseAlertHandled();
         final boolean glucoseAlertStarted = alertEvaluation.getStandardGlucoseAlertStarted();
         final long tim = timmsec / 1000L;
@@ -716,6 +718,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         var sglucose = new notGlucose(timmsec, String.format(Applic.usedlocale, Notify.pureglucoseformat, gl), rate,
                 sensorgen);
         previousglucose = sglucose;
+        previousglucosereading = reading;
         previousglucosevalue = gl;
         previousglucosesensorid = SerialNumber;
         Applic.app.sendBroadcast(new Intent("tk.glucodata.action.AOD_IMMEDIATE_REFRESH"));
@@ -756,7 +759,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         } catch (Throwable e) {
             Log.stack(LOG_ID, SerialNumber, e);
         }
-        CustomAlertAccess.checkAndTrigger(Applic.app, gl, rate, timmsec, SerialNumber, sensorgen);
+        CustomAlertAccess.checkAndTrigger(Applic.app, reading, rate, timmsec, SerialNumber, sensorgen);
         {
             if (doLog) {
                 Log.v(LOG_ID, SerialNumber + " " + tim + " glucose=" + gl + " " + rate);
@@ -989,7 +992,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 } else {
                     syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
                 }
-                final float uncalibratedGlucose = glucoseToUse;
+                final LiveReadingLanes reading = LiveReadingLanes.stock(Float.NaN, glucoseToUse);
                 if (shouldApplyGenericLiveCalibration) {
                     glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, true, false, SerialNumber);
                     mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
@@ -1001,7 +1004,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
                 markLocalReadingAccepted(timmsec);
                 dowithglucose(SerialNumber, mgdlToUse, glucoseToUse, rate, alarm, timmsec, sensorstartmsec, showtime,
-                        sensorgen, uncalibratedGlucose);
+                        sensorgen, reading);
                 charcha[0] = timmsec;
 
                 if (!isWearable && Natives.gethealthConnect() && Build.VERSION.SDK_INT >= 28) {
@@ -1073,7 +1076,9 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 syncLegacyRoomHistoryAfterLive(SerialNumber, timmsec);
             }
 
-            final float uncalibratedGlucose = glucoseToUse;
+            final LiveReadingLanes reading = LiveReadingLanes.stock(gl, Float.isFinite(rawMgdl) && rawMgdl > 0f
+                    ? (Applic.unit == 1 ? rawMgdl / (float) mgdLmult : rawMgdl)
+                    : Float.NaN);
             if (shouldApplyGenericLiveCalibration) {
                 glucoseToUse = CalibrationAccess.getCalibratedValue(glucoseToUse, timmsec, isRawMode, false, SerialNumber);
                 mgdlToUse = (int) Math.round(glucoseToUse * (Applic.unit == 1 ? mgdLmult : 1.0f));
@@ -1081,7 +1086,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
             markLocalReadingAccepted(timmsec);
             dowithglucose(SerialNumber, mgdlToUse, glucoseToUse, rate, alarm, timmsec, sensorstartmsec, showtime,
-                    sensorgen, uncalibratedGlucose);
+                    sensorgen, reading);
 
             charcha[0] = timmsec;
 

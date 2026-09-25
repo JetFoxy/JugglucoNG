@@ -375,14 +375,88 @@ class CurrentDisplaySourceTests {
     }
 
     /**
-     * #431: the alert engine resolves the live reading through here, and this
-     * applies the calibration itself. SuperGattCallback publishes the reading
-     * already calibrated, so it has to hand the alerts the value from before
-     * that step — the published one comes out calibrated twice.
+     * #431: a Libre 2 Plus with a +42 mg/dL offset. The BLE path shows 134 (stock
+     * 92 calibrated once); the alert engine resolved the published 134 again and
+     * rang HIGH at 176, then the monitor tick resolved the same minute from
+     * history at 134 and cleared it. Every path has to land on 134, whether or not
+     * the reading has reached history yet.
      */
     @Test
-    fun resolveFromLive_calibratesTheLiveReadingItself() {
-        val offsetMgdl = 42f
+    fun liveReading_isCalibratedOnceOnEveryPath_431() = withOffsetCalibration(42f) {
+        val timestamp = 1_790_331_424_000L
+        val stock = LiveReadingLanes.stock(92f, Float.NaN)
+        val published = 134f
+        val history = listOf(GlucosePoint(timestamp, 92f, 0f))
+        val callback = requireNotNull(
+            CurrentGlucoseSource.callbackSnapshot(
+                latest = notGlucose(timestamp, "134", 0f, 0),
+                publishedValue = published,
+                reading = stock,
+                sensorId = SENSOR,
+                now = timestamp,
+                maxAgeMillis = 60_000L
+            )
+        )
+
+        for (recentPoints in listOf(emptyList(), history)) {
+            // AlertRuntimeManager.onNewReading, before and after the Room write.
+            assertEquals(published, resolve(incoming(stock, timestamp), recentPoints).primaryValue, 0.001f)
+            // The monitor tick's resolveCurrent, fed by the callback.
+            assertEquals(published, resolve(callback, recentPoints).primaryValue, 0.001f)
+        }
+    }
+
+    /** processExternalCurrentReading hands over a value that was already resolved. */
+    @Test
+    fun resolvedLiveReading_isNotCalibratedAgain() = withOffsetCalibration(42f) {
+        val timestamp = 1_790_331_424_000L
+        val resolved = incoming(LiveReadingLanes.resolved(134f), timestamp)
+
+        assertEquals(134f, resolve(resolved, emptyList()).primaryValue, 0.001f)
+        assertEquals(134f, resolve(resolved, listOf(GlucosePoint(timestamp, 92f, 0f))).primaryValue, 0.001f)
+    }
+
+    /** Raw-primary view: the raw lane has to arrive as raw, or it is shown uncalibrated. */
+    @Test
+    fun rawPrimaryLiveReading_calibratesTheRawLane() = withOffsetCalibration(42f) {
+        val timestamp = 1_790_331_424_000L
+        val live = incoming(LiveReadingLanes.stock(100f, 92f), timestamp)
+
+        assertEquals(134f, resolve(live, emptyList(), viewMode = 1).primaryValue, 0.001f)
+    }
+
+    private fun incoming(reading: LiveReadingLanes, timestamp: Long) = CurrentGlucoseSource.Snapshot.of(
+        reading = reading,
+        timeMillis = timestamp,
+        valueText = "",
+        rate = 0f,
+        sensorId = SENSOR,
+        sensorGen = 0,
+        index = 0,
+        source = "incoming"
+    )
+
+    private fun resolve(
+        current: CurrentGlucoseSource.Snapshot,
+        recentPoints: List<GlucosePoint>,
+        viewMode: Int = 0
+    ): CurrentDisplaySource.Snapshot = requireNotNull(
+        CurrentDisplaySource.resolveSnapshot(
+            current = current,
+            recentPoints = recentPoints,
+            historyStart = current.timeMillis - 60_000L,
+            viewMode = viewMode,
+            isMmol = false,
+            smoothingMode = CurrentDisplaySource.SmoothingMode(
+                smoothAllData = false,
+                smoothingMinutes = 0,
+                collapseChunks = false
+            ),
+            sensorId = SENSOR
+        )
+    )
+
+    private fun withOffsetCalibration(offsetMgdl: Float, block: () -> Unit) {
         CalibrationAccess.register(object : CalibrationProvider {
             override fun hasActiveCalibration(isRawMode: Boolean, sensorId: String?) = true
             override fun getCalibratedValue(
@@ -394,33 +468,13 @@ class CurrentDisplaySourceTests {
             ) = value + offsetMgdl
         })
         try {
-            val timestamp = 1_790_331_424_000L
-            fun resolveLive(value: Float) = CurrentDisplaySource.resolveFromLive(
-                liveValueText = null,
-                liveNumericValue = value,
-                rate = 0f,
-                targetTimeMillis = timestamp,
-                sensorId = "30211DF2J38",
-                sensorGen = 0,
-                index = 0,
-                source = "incoming",
-                // What mergeLivePoint yields before the reading reaches history.
-                recentPoints = listOf(GlucosePoint(timestamp, value, 0f)),
-                viewMode = 0,
-                isMmol = false
-            )
-
-            val uncalibrated = 92f
-            val published = uncalibrated + offsetMgdl
-
-            assertEquals(published, requireNotNull(resolveLive(uncalibrated)).primaryValue, 0.001f)
-            assertEquals(
-                published + offsetMgdl,
-                requireNotNull(resolveLive(published)).primaryValue,
-                0.001f
-            )
+            block()
         } finally {
             CalibrationAccess.unregisterForTests()
         }
+    }
+
+    private companion object {
+        const val SENSOR = "30211DF2J38"
     }
 }
