@@ -592,12 +592,13 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="data_smoothing_graph_only_title">Alleen grafiek afvlakken</string>
     <string name="data_smoothing_graph_only_desc">Houd huidige glucose, widgets, waarschuwingen en gegevensuitvoer onafgevlakt – tenzij „Samenvoegen in intervallen” aanstaat: samenvoegen heeft een afgevlakte waarde nodig en schakelt afvlakking voor gegevensuitvoer dus weer in</string>
     <string name="data_smoothing_exchange_only_title">Alleen gegevensuitvoer afvlakken</string>
-    <string name="data_smoothing_exchange_only_desc">Past afvlakking en intervalfiltering alleen toe op broadcasts en uitgaande API-payloads; grafiek, huidige glucose, widgets en waarschuwingen blijven ongewijzigd</string>
+    <string name="data_smoothing_exchange_only_desc">Past afvlakking en verzendinterval alleen toe op broadcasts en uitgaande API-payloads; grafiek, huidige glucose, widgets en waarschuwingen blijven ongewijzigd</string>
     <string name="data_smoothing_collapse_title">Samenvoegen in intervallen</string>
-    <string name="data_smoothing_collapse_desc">Bewaar één afgevlakt punt per interval en filter de punten ertussen weg</string>
-    <string name="data_smoothing_collapse_desc_match">Behoudt elke %1$d minuten één afgevlakt punt</string>
-    <string name="data_smoothing_collapse_desc_capped">Behoudt elke 5 minuten één afgevlakt punt terwijl de afvlakking nog steeds %1$d minuten gebruikt</string>
+    <string name="data_smoothing_collapse_desc">Bewaart één afgevlakt punt per interval en verstuurt uitvoer eenmaal per interval in plaats van bij elke meting</string>
+    <string name="data_smoothing_collapse_desc_match">Bewaart elke %1$d minuten één afgevlakt punt en verstuurt uitvoer in hetzelfde tempo</string>
+    <string name="data_smoothing_collapse_desc_capped">Bewaart elke 5 minuten één afgevlakt punt en verstuurt uitvoer in hetzelfde tempo, terwijl de afvlakking nog %1$d minuten gebruikt</string>
     <string name="data_smoothing_collapse_summary_format">Intervallen elke %1$d min</string>
+    <string name="data_smoothing_collapse_loop_note">De xDrip-broadcast en xInfuus (gebruikt door closed-loop-apps) worden niet uitgedund: ze krijgen elke meting met de eigen tijd</string>
     <string name="preview_window_title">Voorbeeldvenster</string>
     <string name="preview_window_desc">Toont een mini-navigator van 24 uur onder de dashboardgrafiek zonder het gedrag van de hoofdgrafiek te wijzigen</string>
     <string name="preview_window_expanded_only">Alleen in uitgebreide weergave (standaard)</string>

@@ -516,12 +516,13 @@
     <string name="data_smoothing_graph_only_title">Згладжувати лише графік</string>
     <string name="data_smoothing_graph_only_desc">Залишає поточну глюкозу, віджети, сповіщення та виходи обміну даними без згладжування — якщо тільки не ввімкнено «Стискати в інтервали»: стисканню потрібне згладжене значення, тому воно знову вмикає згладжування для виходів обміну даними</string>
     <string name="data_smoothing_exchange_only_title">Згладжувати лише виходи обміну</string>
-    <string name="data_smoothing_exchange_only_desc">Застосовує згладжування й фільтр інтервалів лише до трансляцій та вихідних API-даних; графік, поточна глюкоза, віджети й сповіщення залишаються без змін</string>
+    <string name="data_smoothing_exchange_only_desc">Застосовує згладжування й інтервал надсилання лише до трансляцій та вихідних API-даних; графік, поточна глюкоза, віджети й сповіщення залишаються без змін</string>
     <string name="data_smoothing_collapse_title">Стискати в інтервали</string>
-    <string name="data_smoothing_collapse_desc">Залишає одну згладжену точку на інтервал і відфільтровує точки між ними</string>
-    <string name="data_smoothing_collapse_desc_match">Залишає одну згладжену точку кожні %1$d хвилин</string>
-    <string name="data_smoothing_collapse_desc_capped">Залишає одну згладжену точку кожні 5 хвилин, поки згладжування все ще використовує %1$d хвилин</string>
+    <string name="data_smoothing_collapse_desc">Залишає одну згладжену точку на інтервал і надсилає виходи обміну раз на інтервал, а не на кожне вимірювання</string>
+    <string name="data_smoothing_collapse_desc_match">Залишає одну згладжену точку кожні %1$d хвилин і надсилає виходи обміну в тому самому темпі</string>
+    <string name="data_smoothing_collapse_desc_capped">Залишає одну згладжену точку кожні 5 хвилин і надсилає виходи обміну в тому самому темпі, доки згладжування все ще використовує %1$d хвилин</string>
     <string name="data_smoothing_collapse_summary_format">Інтервали кожні %1$d хв</string>
+    <string name="data_smoothing_collapse_loop_note">Трансляції xDrip і xInfuus (їх використовують замкнені системи) не проріджуються: вони отримують кожне вимірювання з його власним часом</string>
     <string name="preview_window_title">Вікно попереднього перегляду</string>
     <string name="preview_window_desc">Показує 24-годинний мінінавігатор під графіком на головному екрані без зміни поведінки основного графіка</string>
     <string name="preview_window_expanded_only">Лише в розширеному вигляді (типово)</string>

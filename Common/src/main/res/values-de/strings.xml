@@ -604,12 +604,13 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="data_smoothing_graph_only_title">Nur Diagramm glätten</string>
     <string name="data_smoothing_graph_only_desc">Aktuellen Glukosewert, Widgets, Warnungen und Datenausgaben ungeglättet lassen – außer wenn „In Blöcke verdichten“ aktiv ist: das Verdichten braucht einen geglätteten Wert und schaltet die Glättung für Datenausgaben daher wieder ein</string>
     <string name="data_smoothing_exchange_only_title">Nur Datenausgaben glätten</string>
-    <string name="data_smoothing_exchange_only_desc">Wendet Glättung und Blockfilter nur auf Broadcasts und Outbound-API-Payloads an; Diagramm, aktueller Glukosewert, Widgets und Warnungen bleiben unverändert</string>
+    <string name="data_smoothing_exchange_only_desc">Wendet Glättung und Sendeintervall nur auf Broadcasts und Outbound-API-Payloads an; Diagramm, aktueller Glukosewert, Widgets und Warnungen bleiben unverändert</string>
     <string name="data_smoothing_collapse_title">In Blöcke verdichten</string>
-    <string name="data_smoothing_collapse_desc">Pro Intervall nur einen geglätteten Punkt behalten und Punkte dazwischen ausblenden</string>
-    <string name="data_smoothing_collapse_desc_match">Behält einen geglätteten Punkt alle %1$d Minuten</string>
-    <string name="data_smoothing_collapse_desc_capped">Behält alle 5 Minuten einen geglätteten Punkt, während die Glättung weiterhin %1$d Minuten verwendet</string>
+    <string name="data_smoothing_collapse_desc">Behält pro Intervall einen geglätteten Punkt und sendet Datenausgaben einmal pro Intervall statt bei jedem Wert</string>
+    <string name="data_smoothing_collapse_desc_match">Behält alle %1$d Minuten einen geglätteten Punkt und sendet Datenausgaben im selben Takt</string>
+    <string name="data_smoothing_collapse_desc_capped">Behält alle 5 Minuten einen geglätteten Punkt und sendet Datenausgaben im selben Takt, während die Glättung weiterhin %1$d Minuten verwendet</string>
     <string name="data_smoothing_collapse_summary_format">Blöcke alle %1$d Min</string>
+    <string name="data_smoothing_collapse_loop_note">Der xDrip-Broadcast und xInfuus (von Closed-Loop-Apps genutzt) werden nicht ausgedünnt: Sie erhalten jeden Wert mit seiner eigenen Zeit</string>
     <string name="preview_window_title">Vorschaufenster</string>
     <string name="preview_window_desc">Zeigt unter dem Diagramm auf der Startseite einen 24-Stunden-Mini-Navigator, ohne das Verhalten des Hauptdiagramms zu ändern</string>
     <string name="preview_window_expanded_only">Nur in erweiterter Ansicht (Standard)</string>

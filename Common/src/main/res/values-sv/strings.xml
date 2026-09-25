@@ -504,12 +504,13 @@
     <string name="data_smoothing_graph_only_title">Jämna bara ut diagrammet</string>
     <string name="data_smoothing_graph_only_desc">Lämnar aktuellt glukos, widgetar, varningar och datautgångar utan utjämning – om inte ”Gruppera i intervall” är på: grupperingen behöver ett utjämnat värde och slår därför på utjämning för datautgångar igen</string>
     <string name="data_smoothing_exchange_only_title">Jämna bara ut datautgångar</string>
-    <string name="data_smoothing_exchange_only_desc">Tillämpar utjämning och intervallfilter bara på utsändningar och utgående API-payloads; diagram, aktuellt glukos, widgetar och varningar lämnas oförändrade</string>
+    <string name="data_smoothing_exchange_only_desc">Tillämpar utjämning och sändningsintervall bara på utsändningar och utgående API-payloads; diagram, aktuellt glukos, widgetar och varningar lämnas oförändrade</string>
     <string name="data_smoothing_collapse_title">Gruppera i intervall</string>
-    <string name="data_smoothing_collapse_desc">Behåll en utjämnad punkt per intervall och filtrera bort punkterna däremellan</string>
-    <string name="data_smoothing_collapse_desc_match">Behåller en utjämnad punkt var %1$d:e minut</string>
-    <string name="data_smoothing_collapse_desc_capped">Behåller en utjämnad punkt var 5:e minut medan utjämningen fortfarande använder %1$d minuter</string>
+    <string name="data_smoothing_collapse_desc">Behåller en utjämnad punkt per intervall och skickar utdata en gång per intervall i stället för vid varje värde</string>
+    <string name="data_smoothing_collapse_desc_match">Behåller en utjämnad punkt var %1$d:e minut och skickar utdata i samma takt</string>
+    <string name="data_smoothing_collapse_desc_capped">Behåller en utjämnad punkt var 5:e minut och skickar utdata i samma takt, medan utjämningen fortfarande använder %1$d minuter</string>
     <string name="data_smoothing_collapse_summary_format">Intervall var %1$d min</string>
+    <string name="data_smoothing_collapse_loop_note">xDrip-utsändningen och xInfuus (används av slutna loop-appar) glesas inte ut: de får varje värde med sin egen tid</string>
     <string name="preview_window_title">Förhandsfönster</string>
     <string name="preview_window_desc">Visar en 24-timmars mininavigator under dashboarddiagrammet utan att ändra huvuddiagrammets beteende</string>
     <string name="preview_window_expanded_only">Endast i expanderat läge (standard)</string>

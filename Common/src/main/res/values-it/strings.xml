@@ -377,12 +377,13 @@
     <string name="data_smoothing_graph_only_title">Smussa solo il grafico</string>
     <string name="data_smoothing_graph_only_desc">Lascia senza smussamento glucosio attuale, widget, allerte e uscite di scambio — a meno che «Compatta in intervalli» sia attivo: la compattazione richiede una lettura smussata, quindi riattiva lo smussamento per le uscite di scambio</string>
     <string name="data_smoothing_exchange_only_title">Smussa solo uscite di scambio</string>
-    <string name="data_smoothing_exchange_only_desc">Applica smussamento e filtro a intervalli solo a broadcast e payload API in uscita; grafico, glucosio attuale, widget e allerte restano invariati</string>
+    <string name="data_smoothing_exchange_only_desc">Applica smussamento e intervallo di invio solo a broadcast e payload API in uscita; grafico, glucosio attuale, widget e allerte restano invariati</string>
     <string name="data_smoothing_collapse_title">Compatta in intervalli</string>
-    <string name="data_smoothing_collapse_desc">Mantieni un solo punto smussato per intervallo e filtra i punti intermedi</string>
-    <string name="data_smoothing_collapse_desc_match">Mantiene un punto smussato ogni %1$d minuti</string>
-    <string name="data_smoothing_collapse_desc_capped">Mantiene un punto smussato ogni 5 minuti mentre lo smussamento usa ancora %1$d minuti</string>
+    <string name="data_smoothing_collapse_desc">Mantiene un punto smussato per intervallo e invia le uscite di scambio una volta per intervallo invece che a ogni lettura</string>
+    <string name="data_smoothing_collapse_desc_match">Mantiene un punto smussato ogni %1$d minuti e invia le uscite di scambio con lo stesso ritmo</string>
+    <string name="data_smoothing_collapse_desc_capped">Mantiene un punto smussato ogni 5 minuti e invia le uscite di scambio con lo stesso ritmo, mentre lo smussamento usa ancora %1$d minuti</string>
     <string name="data_smoothing_collapse_summary_format">Intervalli ogni %1$d min</string>
+    <string name="data_smoothing_collapse_loop_note">Il broadcast xDrip e xInfuus (usati dalle app a circuito chiuso) non vengono diradati: ricevono ogni lettura con il suo orario</string>
     <string name="preview_window_title">Finestra di anteprima</string>
     <string name="preview_window_desc">Mostra un mini navigatore di 24 ore sotto il grafico della dashboard senza modificare il comportamento del grafico principale</string>
     <string name="preview_window_expanded_only">Solo in vista espansa (predefinito)</string>

@@ -404,12 +404,13 @@
     <string name="data_smoothing_graph_only_title">Suavizar só o gráfico</string>
     <string name="data_smoothing_graph_only_desc">Mantém glicose atual, widgets, alertas e saídas de troca sem suavização — a menos que «Agrupar em intervalos» esteja ativo: o agrupamento precisa de uma leitura suavizada, por isso reativa a suavização para as saídas de troca</string>
     <string name="data_smoothing_exchange_only_title">Suavizar só saídas de troca</string>
-    <string name="data_smoothing_exchange_only_desc">Aplica suavização e filtragem por intervalos só às transmissões e aos payloads da API de saída; gráfico, glicose atual, widgets e alertas ficam inalterados</string>
+    <string name="data_smoothing_exchange_only_desc">Aplica suavização e intervalo de envio só às transmissões e aos payloads da API de saída; gráfico, glicose atual, widgets e alertas ficam inalterados</string>
     <string name="data_smoothing_collapse_title">Agrupar em intervalos</string>
-    <string name="data_smoothing_collapse_desc">Mantém um ponto suavizado por intervalo e filtra os pontos intermédios</string>
-    <string name="data_smoothing_collapse_desc_match">Mantém um ponto suavizado a cada %1$d minutos</string>
-    <string name="data_smoothing_collapse_desc_capped">Mantém um ponto suavizado a cada 5 minutos enquanto a suavização ainda usa %1$d minutos</string>
+    <string name="data_smoothing_collapse_desc">Mantém um ponto suavizado por intervalo e envia as saídas de troca uma vez por intervalo em vez de a cada leitura</string>
+    <string name="data_smoothing_collapse_desc_match">Mantém um ponto suavizado a cada %1$d minutos e envia as saídas de troca ao mesmo ritmo</string>
+    <string name="data_smoothing_collapse_desc_capped">Mantém um ponto suavizado a cada 5 minutos e envia as saídas de troca ao mesmo ritmo, enquanto a suavização ainda usa %1$d minutos</string>
     <string name="data_smoothing_collapse_summary_format">Intervalos a cada %1$d min</string>
+    <string name="data_smoothing_collapse_loop_note">A transmissão xDrip e o xInfuus (usados por aplicações de ciclo fechado) não são espaçados: recebem cada leitura com a sua própria hora</string>
     <string name="preview_window_title">Janela de pré-visualização</string>
     <string name="preview_window_desc">Mostra um mini navegador de 24 horas sob o gráfico do painel sem alterar o comportamento do gráfico principal</string>
     <string name="preview_window_expanded_only">Apenas na vista expandida (padrão)</string>
