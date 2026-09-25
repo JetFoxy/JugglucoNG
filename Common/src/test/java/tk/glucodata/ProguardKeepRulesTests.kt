@@ -1,6 +1,7 @@
 package tk.glucodata
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -76,14 +77,14 @@ class ProguardKeepRulesTests {
     }
 
     @Test
-    fun theLibreviewJournalBridgeIsKept() {
-        // Two name-based hops with nothing R8 can see: journalentries.cpp does FindClass on
-        // LibreviewJournal, and LibreviewJournal does Class.forName on LibreviewJournalEntries.
+    fun theLibreviewJournalJniEntryPointIsKept() {
+        // journalentries.cpp does FindClass/GetStaticMethodID on LibreviewJournal with nothing
+        // R8 can see, so its own name and methods must survive. The second hop --
+        // LibreviewJournalEntries, resolved by Class.forName -- is gone: it goes through the
+        // registered LibreviewJournalEntriesBridge now.
         val text = activeRules()
         assertTrue(text.contains("-keep class tk.glucodata.LibreviewJournal { *; }"))
-        assertTrue(text.contains("-keepnames class tk.glucodata.data.journal.LibreviewJournalEntries"))
-        listOf("prepare(boolean)", "foodEntries()", "insulinEntries()", "noteEntries()", "commit()", "discard()")
-            .forEach { assertTrue("proguard-rules.my must keep $it", text.contains(it)) }
+        assertFalse(text.contains("-keepnames class tk.glucodata.data.journal.LibreviewJournalEntries"))
     }
 
     @Test

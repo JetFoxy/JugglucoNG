@@ -43,6 +43,7 @@ public class Specific {
 		JournalSnapshotAccess.register(tk.glucodata.OutboundApiJournalSnapshot.INSTANCE);
 		NotificationPredictionAccess.register(tk.glucodata.NotificationPredictionOverlay.INSTANCE);
 		GlucoseUncertaintyAccess.register(tk.glucodata.data.GlucoseUncertaintyStore.INSTANCE);
+		LibreviewJournalEntriesAccess.register(tk.glucodata.data.journal.LibreviewJournalEntries.INSTANCE);
 	}
 
 	static void start(Application context) {

@@ -13,5 +13,4 @@ src/main/java/tk/glucodata/CalibrationProfileAccess.kt
 src/main/java/tk/glucodata/CustomAlertAccess.kt
 src/main/java/tk/glucodata/HistoryRepositoryAccess.kt
 src/main/java/tk/glucodata/HistorySyncAccess.kt
-src/main/java/tk/glucodata/LibreviewJournal.java
 src/main/java/tk/glucodata/Notify.java
