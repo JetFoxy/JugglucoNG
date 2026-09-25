@@ -19,7 +19,7 @@ import tk.glucodata.GlucosePoint as NativeGlucosePoint
 import tk.glucodata.ui.GlucosePoint as UiGlucosePoint
 
 @Keep
-object NotificationPredictionOverlay {
+object NotificationPredictionOverlay : NotificationPredictionBridge {
     private const val PREFS_NAME = "tk.glucodata_preferences"
     private const val MASTER_KEY = "dashboard_predictive_simulation_enabled"
     private const val NOTIFICATION_CHART_KEY = "dashboard_prediction_notification_chart_enabled"
@@ -45,8 +45,7 @@ object NotificationPredictionOverlay {
     private var cachedJournalSnapshot: JournalSnapshot? = null
 
     @Keep
-    @JvmStatic
-    fun buildPredictionSeries(
+    override fun buildPredictionSeries(
         context: Context,
         data: List<NativeGlucosePoint>?,
         isMmol: Boolean,
