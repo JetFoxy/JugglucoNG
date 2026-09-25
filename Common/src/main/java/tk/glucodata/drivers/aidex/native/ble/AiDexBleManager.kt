@@ -404,6 +404,20 @@ class AiDexBleManager(
      * broadcast-only, or by removing the sensor.
      */
     @Volatile private var explicitPairRequested = false
+    /**
+     * Set when the sensor acknowledges CLEAR_STORAGE: the reset wipes its bond and PAIR
+     * credential, so the next exchange pairs fresh over F001 instead of retrying a dead key.
+     * The saved key is kept, not deleted — it is replaced only by a fresh key that decrypts
+     * live data, and restored if the fresh pair keeps failing. Persisted: the reset is
+     * followed by a disconnect, and the manager may be recreated before the next connect.
+     */
+    private var pairKeyResetPending = false
+        set(value) {
+            field = value
+            writeBoolPref("pairKeyResetPending", value)
+        }
+    /** The running exchange is the fresh pair started by [pairKeyResetPending] over a saved key. */
+    private var keyExchangeIsFreshPairAfterReset = false
     private var preAuthEncryptedFrameCount = 0
     private var preAuthFirstEncryptedFrameAtMs = 0L
     private var preAuthLastEncryptedFrameAtMs = 0L
@@ -903,16 +917,19 @@ class AiDexBleManager(
         if (persistedPairKey != null) {
             keyExchangeFailures = readIntPref("keyExchangeFailures", 0)
             savedKeyExhausted = readBoolPref("savedKeyExhausted", false)
+            pairKeyResetPending = readBoolPref("pairKeyResetPending", false)
             Log.i(
                 TAG,
                 "Restored verified AiDex PAIR credential from redundant storage " +
                     "(fp=${AiDexPairKeyVault.fingerprint(persistedPairKey)}, " +
-                    "failures=$keyExchangeFailures, exhausted=$savedKeyExhausted)"
+                    "failures=$keyExchangeFailures, exhausted=$savedKeyExhausted, " +
+                    "resetPending=$pairKeyResetPending)"
             )
         } else {
             // No credential, nothing to have exhausted: the counters belong to the key.
             keyExchangeFailures = 0
             savedKeyExhausted = false
+            pairKeyResetPending = false
         }
     }
 
@@ -1487,6 +1504,7 @@ class AiDexBleManager(
         pendingBondedCccdUuid = null
         keyExchangePendingBond = false
         keyExchangeUsingSavedPairKey = false
+        keyExchangeIsFreshPairAfterReset = false
         pairKeyAwaitingLiveValidation = false
         postCccdFollowUp = PostCccdFollowUp.NONE
         historyDownloading = false
@@ -1615,8 +1633,10 @@ class AiDexBleManager(
             resetConnectionRuntimeState(reason = "post-reset:$trigger", resetInvalidSetupCounter = false)
         }
 
-        // CLEAR_STORAGE resets sensor data, not the vendor PAIR credential. Preserve both
-        // the Android bond and the last-known-good PAIR key across this lifecycle reset.
+        // CLEAR_STORAGE also wipes the sensor's bond and PAIR credential; the ACK handler has
+        // already queued a fresh pair for the reconnect. Leave the Android bond alone (the
+        // stack drops it itself when the sensor refuses the old LTK) and keep the saved key
+        // as the fallback until a fresh one is validated by live data.
         keyExchange.reset()
         close()
         reconnect.reset()
@@ -1972,6 +1992,7 @@ class AiDexBleManager(
             }
             keyExchange.reset()
             keyExchangeUsingSavedPairKey = false
+            keyExchangeIsFreshPairAfterReset = false
             pairKeyAwaitingLiveValidation = false
             challengeWritten = false
             bondDataRead = false
@@ -3033,6 +3054,7 @@ class AiDexBleManager(
             savedKeyExhausted = savedKeyExhausted,
             explicitPairRequested = explicitPairRequested,
             bonded = currentBondState() == BluetoothDevice.BOND_BONDED,
+            pairKeyResetPending = pairKeyResetPending,
         )
     }
 
@@ -3062,6 +3084,7 @@ class AiDexBleManager(
         keyExchange.reset()
         keyExchange.onPairKeyReceived(savedPairKey)
         keyExchangeUsingSavedPairKey = true
+        keyExchangeIsFreshPairAfterReset = false
         pairKeyAwaitingLiveValidation = false
         challengeWritten = false
         bondDataRead = false
@@ -3077,8 +3100,8 @@ class AiDexBleManager(
             Log.w(
                 TAG,
                 "Fresh pair over a stored credential (fp=${AiDexPairKeyVault.fingerprint(persistedPairKey)}, " +
-                    "explicit=$explicitPairRequested, bonded=${currentBondState() == BluetoothDevice.BOND_BONDED}); " +
-                    "a validated F001 key will replace it"
+                    "explicit=$explicitPairRequested, bonded=${currentBondState() == BluetoothDevice.BOND_BONDED}, " +
+                    "afterReset=$pairKeyResetPending); a validated F001 key will replace it"
             )
         }
         pairingKeyProblemStatus = null
@@ -3088,6 +3111,7 @@ class AiDexBleManager(
         setPhase(Phase.KEY_EXCHANGE)
         keyExchange.reset()
         keyExchangeUsingSavedPairKey = false
+        keyExchangeIsFreshPairAfterReset = pairKeyResetPending && persistedPairKey != null
         pairKeyAwaitingLiveValidation = false
         challengeWritten = false
         bondDataRead = false
@@ -3293,12 +3317,14 @@ class AiDexBleManager(
      */
     private fun handleKeyExchangeFailure(reason: String) {
         val usedSavedKey = keyExchangeUsingSavedPairKey
+        val freshPairAfterReset = keyExchangeIsFreshPairAfterReset
         // Read before close(): afterwards there is no GATT device to ask.
         val bonded = currentBondState() == BluetoothDevice.BOND_BONDED ||
             bondStateAtConnection == BluetoothDevice.BOND_BONDED
         keyExchangeFailures += 1
         keyExchange.reset()
         keyExchangeUsingSavedPairKey = false
+        keyExchangeIsFreshPairAfterReset = false
         pairKeyAwaitingLiveValidation = false
         bondDataRead = false
         challengeWritten = false
@@ -3306,15 +3332,35 @@ class AiDexBleManager(
         setPhase(Phase.IDLE)
         close()
 
-        val pathName = if (usedSavedKey) "Saved-key reconnect" else "Fresh pair"
+        val pathName = when {
+            usedSavedKey -> "Saved-key reconnect"
+            freshPairAfterReset -> "Post-reset fresh pair"
+            else -> "Fresh pair"
+        }
         when (
             AiDexRuntimePolicy.decideKeyExchangeFailureAction(
                 consecutiveFailures = keyExchangeFailures,
                 maxFailures = KEY_EXCHANGE_MAX_FAILURES,
                 usedSavedKey = usedSavedKey,
                 bonded = bonded,
+                freshPairAfterReset = freshPairAfterReset,
             )
         ) {
+            AiDexRuntimePolicy.KeyExchangeFailureAction.RESTORE_SAVED_KEY -> {
+                // The sensor did not hand out a working key after the reset, so the reset
+                // may not have touched its credential. Go back to the one that was kept.
+                pairKeyResetPending = false
+                keyExchangeFailures = 0
+                savedKeyExhausted = false
+                val delay = reconnect.nextReconnectDelayMs()
+                Log.w(
+                    TAG,
+                    "$pathName failed $KEY_EXCHANGE_MAX_FAILURES times ($reason); falling back to the kept " +
+                        "PAIR credential (fp=${AiDexPairKeyVault.fingerprint(persistedPairKey)}) in ${delay}ms"
+                )
+                handler.postDelayed({ connectDevice(0) }, delay)
+                return
+            }
             AiDexRuntimePolicy.KeyExchangeFailureAction.REPLACE_SAVED_KEY -> {
                 savedKeyExhausted = true
                 // The fresh pair gets its own retry budget.
@@ -4250,9 +4296,16 @@ class AiDexBleManager(
             }
         }
         keyExchangeUsingSavedPairKey = false
+        keyExchangeIsFreshPairAfterReset = false
         keyExchangeFailures = 0
         savedKeyExhausted = false
         explicitPairRequested = false
+        if (pairKeyResetPending && !pairKeyAwaitingLiveValidation) {
+            // Either the fresh key was just persisted or the kept key still works; the reset
+            // is settled either way.
+            pairKeyResetPending = false
+            Log.i(TAG, "Post-reset pairing settled by valid live data")
+        }
 
         if (currentBondState() == BluetoothDevice.BOND_BONDED) {
             setBondValidatedByStreaming(true, "direct-live")
@@ -5128,19 +5181,44 @@ class AiDexBleManager(
     /**
      * Handle CLEAR_STORAGE (0xF3) response.
      * On success, leave the sensor command channel quiet while flash/storage clearing finishes.
+     * Success is status `0x01` (see [AiDexRuntimePolicy.COMMAND_ACCEPTED]); `0x00` is a refusal.
      */
     private fun handleClearStorageResponse(data: ByteArray) {
         val status = if (data.size >= 2) data[1].toInt() and 0xFF else 0xFF
-        Log.i(TAG, "CLEAR_STORAGE response: status=0x${"%02X".format(status)}")
+        val confirmed = AiDexRuntimePolicy.isClearStorageConfirmed(data.size, status)
+        if (data.size > 4) {
+            // Not an ACK. Newer firmware is reported to answer with key material, so log its
+            // shape and a fingerprint only, never the bytes.
+            Log.w(
+                TAG,
+                "CLEAR_STORAGE response is not an ACK: len=${data.size} " +
+                    "fp=${AiDexPairKeyVault.fingerprint(data)} — treating the reset as not confirmed"
+            )
+        } else {
+            Log.i(TAG, "CLEAR_STORAGE response: status=0x${"%02X".format(status)} confirmed=$confirmed")
+        }
         if (pendingResetReconnect || postResetRequestedAtMs > 0L) {
             postResetClearStorageAckAtMs = System.currentTimeMillis()
             resetDiag(
                 stage = "f3-ack",
-                details = "status=0x${"%02X".format(status)} responseLen=${data.size}",
+                details = "status=0x${"%02X".format(status)} responseLen=${data.size} confirmed=$confirmed",
                 nowMs = postResetClearStorageAckAtMs,
             )
         }
-        if (pendingResetReconnect && status == 0x00) {
+        if (confirmed && persistedPairKey != null) {
+            // The reset took the sensor's PAIR credential with it (a raw maintenance 0xF3 as
+            // much as the lifecycle reset). Pair fresh on the next connection rather than
+            // retrying the dead key; the kept key stays the fallback.
+            pairKeyResetPending = true
+            keyExchangeFailures = 0
+            savedKeyExhausted = false
+            Log.i(
+                TAG,
+                "CLEAR_STORAGE confirmed — next connection pairs fresh; keeping PAIR credential " +
+                    "fp=${AiDexPairKeyVault.fingerprint(persistedPairKey)} until a new one is validated"
+            )
+        }
+        if (pendingResetReconnect && confirmed) {
             clearStorageQuietWindowActive = true
             gattQueue.clear()
             postResetWarmupExtensionActive = true
@@ -5150,8 +5228,8 @@ class AiDexBleManager(
                 "CLEAR_STORAGE accepted — not sending RESET (0xF0); waiting ${CLEAR_STORAGE_QUIET_WINDOW_MS}ms for clear/reboot"
             )
             scheduleClearStorageQuietWindow("f3-ack", postResetClearStorageAckAtMs)
-        } else if (status != 0x00) {
-            Log.e(TAG, "CLEAR_STORAGE failed — not arming extended post-reset warmup")
+        } else if (!confirmed) {
+            Log.e(TAG, "CLEAR_STORAGE not confirmed by the sensor — reset abandoned, PAIR credential untouched")
             handler.removeCallbacks(clearStorageQuietWindowReconnect)
             handler.removeCallbacks(postResetDisconnectFallback)
             pendingResetReconnect = false
@@ -5189,6 +5267,7 @@ class AiDexBleManager(
                 Log.e(TAG, "Confirmed unpair credential cleanup was not fully committed")
             }
             persistedPairKey = null
+            pairKeyResetPending = false
             // Remove Android-level bond
             try {
                 val device = mBluetoothGatt?.device
@@ -6076,7 +6155,14 @@ class AiDexBleManager(
         }
     }
 
+    override fun supportsResetAction(): Boolean =
+        AiDexRuntimePolicy.supportsLifecycleReset(_firmwareVersion)
+
     override fun resetSensor(): Boolean {
+        if (!supportsResetAction()) {
+            Log.w(TAG, "resetSensor: firmware $_firmwareVersion refuses CLEAR_STORAGE — not sending it")
+            return false
+        }
         Log.i(TAG, "resetSensor: CLEAR_STORAGE (0xF3) only for $SerialNumber")
         tk.glucodata.HistorySyncAccess.markSensorReset(SerialNumber)
 
@@ -6224,6 +6310,7 @@ class AiDexBleManager(
         persistedPairKey = null
         savedKeyExhausted = false
         keyExchangeFailures = 0
+        pairKeyResetPending = false
         UiRefreshBus.requestStatusRefresh()
     }
 

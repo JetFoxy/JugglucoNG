@@ -147,6 +147,7 @@ interface AiDexDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenanceDr
             viewMode = viewMode,
             supportsDisplayModes = supportsDisplayModes(),
             supportsManualCalibration = supportsManualCalibration(),
+            supportsHardwareReset = runCatching { supportsResetAction() }.getOrDefault(true),
             isVendorPaired = runCatching { isVendorPaired() }.getOrDefault(false),
             vendorCalibrations = calibrations,
             isVendorConnected = runCatching { isVendorConnected() }.getOrDefault(false),
