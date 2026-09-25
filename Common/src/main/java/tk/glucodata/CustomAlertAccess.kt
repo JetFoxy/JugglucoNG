@@ -32,6 +32,10 @@ object CustomAlertAccess {
         this.controller = controller
     }
 
+    /** Registration-completeness check (plan §6 Q1). */
+    @JvmStatic
+    fun isRegistered(): Boolean = controller != null
+
     @JvmStatic
     fun checkAndTrigger(context: Context, glucose: Float, rate: Float, timestampMillis: Long) {
         checkAndTrigger(context, glucose, rate, timestampMillis, null, 0)

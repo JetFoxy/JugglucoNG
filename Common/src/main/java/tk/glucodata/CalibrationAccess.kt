@@ -11,6 +11,10 @@ object CalibrationAccess {
         this.provider = provider
     }
 
+    /** Registration-completeness check (plan §6 Q1). */
+    @JvmStatic
+    fun isRegistered(): Boolean = provider != null
+
     private val holder by lazy { runCatching { Class.forName(CLASS_NAME) }.getOrNull() }
     private val instance by lazy { runCatching { holder?.getField("INSTANCE")?.get(null) }.getOrNull() }
     private val hasActiveCalibrationMethod by lazy {

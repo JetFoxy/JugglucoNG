@@ -16,4 +16,8 @@ object ComposeHostAccess {
     /** Null on a flavour without a Compose host (the legacy View UI). */
     @JvmStatic
     fun get(): ComposeHost? = host
+
+    /** Registration-completeness check (plan §6 Q1). */
+    @JvmStatic
+    fun isRegistered(): Boolean = host != null
 }

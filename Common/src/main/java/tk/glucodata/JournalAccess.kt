@@ -22,6 +22,10 @@ object JournalAccess {
         this.bridge = bridge
     }
 
+    /** Registration-completeness check (plan §6 Q1). */
+    @JvmStatic
+    fun isRegistered(): Boolean = bridge != null
+
     /** Encoded journal payload, or null when there is no journal to serve. */
     @JvmStatic
     fun serveEntries(fromMs: Long): ByteArray? = bridge?.serveEntries(fromMs)
