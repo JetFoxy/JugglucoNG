@@ -27,6 +27,7 @@ object SibionicsRegistry {
     private const val PREF_PROTOCOL_PREFIX = "sibionics_managed_protocol_"
     private const val PREF_VARIANT_PREFIX = "sibionics_managed_variant_"
     private const val PREF_AUTH_KEY_HINT_PREFIX = "sibionics_managed_auth_key_hint_"
+    private const val PREF_PROBE_CODE_PREFIX = "sibionics_managed_probe_code_"
     private const val PREF_SHORT_CODE_PREFIX = "sibionics_managed_short_code_"
     private const val PREF_LAST_GLUCOSE_MGDL_PREFIX = "sibionics_managed_last_glucose_mgdl_"
     private const val PREF_LAST_RAW_MGDL_PREFIX = "sibionics_managed_last_raw_mgdl_"
@@ -74,6 +75,7 @@ object SibionicsRegistry {
         val shortCode: String,
         val bleName: String,
         val qrDerived: Boolean,
+        val probeCode: String = "",
     )
 
     fun prefs(context: Context): SharedPreferences =
@@ -177,6 +179,10 @@ object SibionicsRegistry {
             shortCode = shortCode,
             bleName = resolvedBleName,
             qrDerived = framedQrName != null,
+            probeCode = if (variant == SibionicsConstants.Variant.SIBIONICS2) {
+                supportedQrMatch(rawInput)?.groupValues?.get(2)
+                    ?.takeIf { SibionicsProbeSensitivity.tryDecode(it) != null }.orEmpty()
+            } else "",
         )
     }
 
@@ -246,6 +252,11 @@ object SibionicsRegistry {
         writeRecords(context, records)
         saveVariant(context, sensorId, lockedVariant)
         saveShortCode(context, sensorId, shortCode)
+        if (identity.probeCode.isNotEmpty()) {
+            prefs(context).edit().putString(PREF_PROBE_CODE_PREFIX + sensorId, identity.probeCode).apply()
+        } else if (lockedVariant != SibionicsConstants.Variant.SIBIONICS2) {
+            prefs(context).edit().remove(PREF_PROBE_CODE_PREFIX + sensorId).apply()
+        }
         ManagedSensorUiSignals.markDeviceListDirty()
         SensorIdentity.invalidateCaches()
         return record
@@ -276,6 +287,9 @@ object SibionicsRegistry {
             bleNameOverride = bleName,
             variantIsUserChoice = true,
         )
+        SensorBluetooth.mygatts()?.filterIsInstance<SibionicsBleManager>()
+            ?.filter { record.matchesId(it.SerialNumber) }
+            ?.forEach { it.refreshProbeCalibration(context) }
         runCatching {
             if (tk.glucodata.Natives.getusebluetooth()) {
                 SensorBluetooth.updateDevices()
@@ -364,6 +378,7 @@ object SibionicsRegistry {
                 remove(PREF_PROTOCOL_PREFIX + id)
                 remove(PREF_VARIANT_PREFIX + id)
                 remove(PREF_SHORT_CODE_PREFIX + id)
+                remove(PREF_PROBE_CODE_PREFIX + id)
                 remove(PREF_LAST_GLUCOSE_MGDL_PREFIX + id)
                 remove(PREF_LAST_RAW_MGDL_PREFIX + id)
                 remove(PREF_LAST_READING_TIME_PREFIX + id)
@@ -801,6 +816,9 @@ object SibionicsRegistry {
             ?: findRecord(context, sensorId)?.shortCode
             ?: SibionicsConstants.Variant.EU.fallbackShortCode
 
+    internal fun loadProbeCode(context: Context, sensorId: String): String? =
+        prefs(context).getString(PREF_PROBE_CODE_PREFIX + sensorId, null)
+
     fun saveShortCode(context: Context, sensorId: String, shortCode: String) {
         if (shortCode.isBlank()) return
         prefs(context).edit().putString(PREF_SHORT_CODE_PREFIX + sensorId, shortCode).apply()
@@ -927,9 +945,9 @@ object SibionicsRegistry {
 
         // V120 AI (21) values beginning with P contain the calibration-bearing
         // serial consumed by the validated local decoder. Some labels use an XPT
-        // probe identifier as the entire AI (21) value instead; it does not expose
-        // that P-format token, so retain the native identity window below rather
-        // than deriving calibration data from unrelated characters.
+        // probe identifier as the entire AI (21) value instead. Keep its native
+        // identity window; its calibration is decoded separately from the full
+        // probe code, without substituting a different sensor identity.
         if (useStructuredV120Serial) {
             deriveGs1V120CalibrationSerial(payload)?.let { serial ->
                 // The legacy/native visible identity excludes the serial check

@@ -202,6 +202,7 @@ class SibionicsBleManager(
     @Volatile private var record: SibionicsRegistry.SensorRecord? = null
     @Volatile private var variant: SibionicsConstants.Variant = SibionicsConstants.Variant.EU
     @Volatile private var protocolMode: SibionicsConstants.ProtocolMode = SibionicsConstants.ProtocolMode.UNKNOWN
+    @Volatile private var probeCode: String? = null
     @Volatile private var shortCode: String = variant.fallbackShortCode
     @Volatile private var automaticSensitivity: Float = 1.27f
     @Volatile private var sensitivityOverride: Float? = null
@@ -372,7 +373,8 @@ class SibionicsBleManager(
             SibionicsRegistry.loadProtocolMode(context, SerialNumber),
         )
         shortCode = SibionicsRegistry.loadShortCode(context, SerialNumber)
-        automaticSensitivity = SibionicsSensitivity.sensitivityFor(shortCode, variant)
+        probeCode = SibionicsRegistry.loadProbeCode(context, SerialNumber)
+        automaticSensitivity = SibionicsSensitivity.sensitivityFor(shortCode, variant, probeCode)
         sensitivityOverride = SibionicsRegistry.loadAlgorithmSensitivityOverride(context, SerialNumber)
         sensitivity = sensitivityOverride ?: automaticSensitivity
         val persistedAutoResetDays = SibionicsRegistry.loadAutoResetDays(context, SerialNumber)
@@ -2660,6 +2662,29 @@ class SibionicsBleManager(
         return true
     }
 
+    internal fun refreshProbeCalibration(context: Context) {
+        // Setup can rescan an already active sensor; updateDevices retains its callback.
+        handler.post {
+            val scannedProbe = SibionicsRegistry.loadProbeCode(context, SerialNumber)
+            val decoded = if (variant == SibionicsConstants.Variant.SIBIONICS2) {
+                SibionicsProbeSensitivity.tryDecode(scannedProbe)
+            } else null
+            if (decoded != null) {
+                probeCode = scannedProbe
+                automaticSensitivity = decoded
+                val effective = sensitivityOverride ?: decoded
+                if (effective != sensitivity) {
+                    sensitivity = effective
+                    SibionicsRegistry.clearAlgorithmState(context, SerialNumber)
+                    algorithmStateDirty = true
+                    scheduleAlgorithmRebuild(reason = "scanned probe calibration", delayMs = 0L)
+                }
+                UiRefreshBus.requestStatusRefresh()
+                UiRefreshBus.requestDataRefresh()
+            }
+        }
+    }
+
     override fun supportsAlgorithmSensitivity(): Boolean = true
 
     override fun getAlgorithmSensitivity(): Float = sensitivity
@@ -2895,7 +2920,9 @@ class SibionicsBleManager(
                 append(
                     when {
                         sensitivityOverride != null -> "customSens="
-                        SibionicsSensitivity.tryDecode(shortCode) != null -> "qrSens="
+                        (variant == SibionicsConstants.Variant.SIBIONICS2 &&
+                            SibionicsProbeSensitivity.tryDecode(probeCode) != null) ||
+                            SibionicsSensitivity.tryDecode(shortCode) != null -> "qrSens="
                         else -> "fallbackSens="
                     },
                 )
