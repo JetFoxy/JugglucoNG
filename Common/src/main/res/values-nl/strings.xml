@@ -598,7 +598,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="data_smoothing_collapse_desc_match">Bewaart elke %1$d minuten één afgevlakt punt en verstuurt uitvoer in hetzelfde tempo</string>
     <string name="data_smoothing_collapse_desc_capped">Bewaart elke 5 minuten één afgevlakt punt en verstuurt uitvoer in hetzelfde tempo, terwijl de afvlakking nog %1$d minuten gebruikt</string>
     <string name="data_smoothing_collapse_summary_format">Intervallen elke %1$d min</string>
-    <string name="data_smoothing_collapse_loop_note">De xDrip-broadcast en xInfuus (gebruikt door closed-loop-apps) worden niet uitgedund: ze krijgen elke meting met de eigen tijd</string>
+    <string name="data_smoothing_collapse_loop_note">De xDrip-broadcast en xInfuus (gebruikt door closed-loop-apps) worden niet uitgedund: ze krijgen elke meting met de eigen tijd, zonder afvlakking als „Alleen grafiek afvlakken” aan staat</string>
     <string name="preview_window_title">Voorbeeldvenster</string>
     <string name="preview_window_desc">Toont een mini-navigator van 24 uur onder de dashboardgrafiek zonder het gedrag van de hoofdgrafiek te wijzigen</string>
     <string name="preview_window_expanded_only">Alleen in uitgebreide weergave (standaard)</string>

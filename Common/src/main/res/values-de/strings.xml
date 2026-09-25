@@ -610,7 +610,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="data_smoothing_collapse_desc_match">Behält alle %1$d Minuten einen geglätteten Punkt und sendet Datenausgaben im selben Takt</string>
     <string name="data_smoothing_collapse_desc_capped">Behält alle 5 Minuten einen geglätteten Punkt und sendet Datenausgaben im selben Takt, während die Glättung weiterhin %1$d Minuten verwendet</string>
     <string name="data_smoothing_collapse_summary_format">Blöcke alle %1$d Min</string>
-    <string name="data_smoothing_collapse_loop_note">Der xDrip-Broadcast und xInfuus (von Closed-Loop-Apps genutzt) werden nicht ausgedünnt: Sie erhalten jeden Wert mit seiner eigenen Zeit</string>
+    <string name="data_smoothing_collapse_loop_note">Der xDrip-Broadcast und xInfuus (von Closed-Loop-Apps genutzt) werden nicht ausgedünnt: Sie erhalten jeden Wert mit seiner eigenen Zeit, ungeglättet, wenn „Nur Diagramm glätten“ aktiv ist</string>
     <string name="preview_window_title">Vorschaufenster</string>
     <string name="preview_window_desc">Zeigt unter dem Diagramm auf der Startseite einen 24-Stunden-Mini-Navigator, ohne das Verhalten des Hauptdiagramms zu ändern</string>
     <string name="preview_window_expanded_only">Nur in erweiterter Ansicht (Standard)</string>

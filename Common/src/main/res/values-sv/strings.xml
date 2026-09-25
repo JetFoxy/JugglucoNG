@@ -510,7 +510,7 @@
     <string name="data_smoothing_collapse_desc_match">Behåller en utjämnad punkt var %1$d:e minut och skickar utdata i samma takt</string>
     <string name="data_smoothing_collapse_desc_capped">Behåller en utjämnad punkt var 5:e minut och skickar utdata i samma takt, medan utjämningen fortfarande använder %1$d minuter</string>
     <string name="data_smoothing_collapse_summary_format">Intervall var %1$d min</string>
-    <string name="data_smoothing_collapse_loop_note">xDrip-utsändningen och xInfuus (används av slutna loop-appar) glesas inte ut: de får varje värde med sin egen tid</string>
+    <string name="data_smoothing_collapse_loop_note">xDrip-utsändningen och xInfuus (används av slutna loop-appar) glesas inte ut: de får varje värde med sin egen tid, outjämnat när ”Jämna bara ut diagrammet” är på</string>
     <string name="preview_window_title">Förhandsfönster</string>
     <string name="preview_window_desc">Visar en 24-timmars mininavigator under dashboarddiagrammet utan att ändra huvuddiagrammets beteende</string>
     <string name="preview_window_expanded_only">Endast i expanderat läge (standard)</string>

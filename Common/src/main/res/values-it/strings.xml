@@ -383,7 +383,7 @@
     <string name="data_smoothing_collapse_desc_match">Mantiene un punto smussato ogni %1$d minuti e invia le uscite di scambio con lo stesso ritmo</string>
     <string name="data_smoothing_collapse_desc_capped">Mantiene un punto smussato ogni 5 minuti e invia le uscite di scambio con lo stesso ritmo, mentre lo smussamento usa ancora %1$d minuti</string>
     <string name="data_smoothing_collapse_summary_format">Intervalli ogni %1$d min</string>
-    <string name="data_smoothing_collapse_loop_note">Il broadcast xDrip e xInfuus (usati dalle app a circuito chiuso) non vengono diradati: ricevono ogni lettura con il suo orario</string>
+    <string name="data_smoothing_collapse_loop_note">Il broadcast xDrip e xInfuus (usati dalle app a circuito chiuso) non vengono diradati: ricevono ogni lettura con il suo orario, non smussata quando «Smussa solo il grafico» è attivo</string>
     <string name="preview_window_title">Finestra di anteprima</string>
     <string name="preview_window_desc">Mostra un mini navigatore di 24 ore sotto il grafico della dashboard senza modificare il comportamento del grafico principale</string>
     <string name="preview_window_expanded_only">Solo in vista espansa (predefinito)</string>

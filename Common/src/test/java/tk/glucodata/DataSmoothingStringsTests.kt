@@ -43,11 +43,34 @@ class DataSmoothingStringsTests {
     }
 
     @Test
-    fun aTranslatedNoteIsNeverEmptyAndKeepsBothNames() {
+    fun everyLocaleHasTheNoteAndItNamesBothLoopFeeds() {
         for (file in stringFiles()) {
-            val note = value(file, "data_smoothing_collapse_loop_note") ?: continue
-            assertTrue("${file.parentFile.name}: empty note", note.isNotBlank())
+            val note = value(file, "data_smoothing_collapse_loop_note")
+            assertTrue("${file.parentFile.name}: data_smoothing_collapse_loop_note missing", note != null)
+            assertTrue("${file.parentFile.name}: empty note", note!!.isNotBlank())
             assertEquals("${file.parentFile.name}: names dropped", listOf(true, true), listOf(note.contains("xDrip"), note.contains("xInfuus")))
+        }
+    }
+
+    @Test
+    fun theNoteSaysWhichSettingLeavesTheLoopFeedsUnsmoothed() {
+        // The note refers to "Smooth only graph" by name, so it has to be the name this locale shows.
+        for (file in stringFiles()) {
+            val title = value(file, "data_smoothing_graph_only_title") ?: continue
+            val note = value(file, "data_smoothing_collapse_loop_note") ?: continue
+            assertTrue("${file.parentFile.name}: note does not mention \"$title\"", note.contains(title))
+        }
+    }
+
+    @Test
+    fun noLocaleStillShowsTheSummaryLinesInEnglish() {
+        val english = listOf("data_smoothing_collapse_desc_match", "data_smoothing_collapse_desc_capped", "data_smoothing_collapse_summary_format")
+            .associateWith { value(File(resDir, "values/strings.xml"), it) }
+        for (file in stringFiles().filter { it.parentFile.name != "values" }) {
+            for ((key, en) in english) {
+                val translated = value(file, key) ?: continue
+                assertTrue("${file.parentFile.name}: $key is still the English text", translated != en)
+            }
         }
     }
 }
