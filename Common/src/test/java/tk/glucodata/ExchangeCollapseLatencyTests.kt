@@ -330,15 +330,15 @@ class ExchangeCollapseLatencyTests {
             sensorId = sensorId,
             payloadTimeMs = boundary - 20_000L,
             intervalMinutes = 5,
-            shouldBroadcastMinuteUpdate = false,
+            shouldBroadcastMinuteUpdate = true,
             jugglucoEnabled = false,
             outboundApiEnabled = true,
             wearIntEnabled = true,
             gadgetbridgeEnabled = true
         )
         assertTrue("outbound API is eligible on every reading", early.sendOutboundApi)
-        assertFalse("minute-gated WearInt waits", early.sendWearInt)
-        assertFalse("minute-gated Gadgetbridge waits", early.sendGadgetbridge)
+        assertTrue("WearInt sends in the previous bucket", early.sendWearInt)
+        assertTrue("Gadgetbridge sends in the previous bucket", early.sendGadgetbridge)
 
         val fastDestinationUsesCurrentBucket = policy.decide(
             sensorId = sensorId,
