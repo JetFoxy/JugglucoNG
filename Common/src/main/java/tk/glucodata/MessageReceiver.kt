@@ -69,6 +69,11 @@ class MessageReceiver: WearableListenerService() {
             MessageSender.WAKESTREAM_PATH -> {
                 Natives.wakestreamhereonly()
                 }
+            MessageSender.PROTOCOL_PATH -> {
+                // Each side advertises its protocol version on the handshake; a mismatch is logged
+                // here instead of the peers silently disagreeing about message shapes.
+                WearProtocol.onPeerVersionReport(data)
+                }
             MessageSender.DATA_PATH   -> {
                 // Phone-to-phone mirroring only. On the watch this legacy
                 // stream wrote the sensor's uncalibrated values into the same
@@ -91,6 +96,8 @@ class MessageReceiver: WearableListenerService() {
                     GlucoseColorSync.pushIfChanged(messageEvent.sourceNodeId)
                     WearPrefsSync.pushIfChanged(messageEvent.sourceNodeId)
                     WearToggleSync.pushIfChanged(messageEvent.sourceNodeId)
+                    // Answer the handshake with this build's protocol version.
+                    MessageSender.sendProtocol(messageEvent.sourceNodeId)
                 }
             }
             MessageSender.SYNC2_CHUNK_PATH -> {
@@ -232,6 +239,7 @@ class MessageReceiver: WearableListenerService() {
                      WearPrefsSync.pushTo(messageEvent.sourceNodeId)
                      GlucoseColorSync.pushTo(messageEvent.sourceNodeId)
                      WearToggleSync.pushTo(messageEvent.sourceNodeId)
+                     MessageSender.sendProtocol(messageEvent.sourceNodeId)
                  }
                 }
              MessageSender.MAIN_SENSOR_CMD_PATH -> {
@@ -321,6 +329,7 @@ class MessageReceiver: WearableListenerService() {
                      }
                      val node: Node = nodes.elementAt(it)
                      Wearos.sendinitwatchapp(node);
+                     MessageSender.sendProtocol(messageEvent.sourceNodeId)
                  }
                }
             else -> {
