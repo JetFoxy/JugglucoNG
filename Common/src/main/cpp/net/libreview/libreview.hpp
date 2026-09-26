@@ -123,6 +123,7 @@ extern int libreviewJournalPrepare(bool libre3);
 extern int libreviewJournalWrite(char *out,const int kind);
 extern void libreviewJournalCommit();
 extern void libreviewJournalDiscard();
+extern void libreviewJournalInit(JNIEnv *env);
 
 //Every other exchange output -- Nightscout, the webserver, the watch, CSV export -- publishes
 //the value the app itself shows, the user's calibration and the exchange smoothing included.

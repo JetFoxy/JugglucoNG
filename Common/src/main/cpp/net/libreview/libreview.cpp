@@ -978,6 +978,7 @@ void initlibreviewjni(JNIEnv *env) {
   } else {
     LOGGER("FindClass(%s) failed\n", librclassstr);
   }
+  libreviewJournalInit(env);
 }
 static bool initlibreconfig(bool libre3, bool restart) {
   static jmethodID libreconfig =
