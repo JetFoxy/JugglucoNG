@@ -38,7 +38,7 @@ the two observed probes, native rejects 865 and reports success for three with
 invalid batch output; Kotlin rejects all 868.
 
 `Common/src/test/resources/sibionics/probe-sensitivity-native.tsv` contains
-75 outputs from the original binary: the three observed codes and 72 generated
+73 valid outputs from the original binary: the three observed codes and 70 generated
 code vectors spanning sensitivity 0.80–2.50. Synthetic vectors test conformance;
 they are not additional physical sensor observations.
 

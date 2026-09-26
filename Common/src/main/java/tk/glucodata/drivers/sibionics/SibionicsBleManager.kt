@@ -2690,6 +2690,7 @@ class SibionicsBleManager(
                     SibionicsRegistry.clearAlgorithmState(context, SerialNumber)
                     algorithmStateDirty = false
                     forceInitialLocalRebuild = true
+                    rebuildAfterNextSourceSample = true
                     scheduleReconnect("scanned probe calibration", 0L)
                 }
                 UiRefreshBus.requestStatusRefresh()

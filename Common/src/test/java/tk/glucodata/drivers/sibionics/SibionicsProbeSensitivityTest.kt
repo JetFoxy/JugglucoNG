@@ -45,7 +45,7 @@ class SibionicsProbeSensitivityTest {
     @Test
     fun malformedTokensAreRejected() {
         for (code in listOf(null, "", "EU2VCZUQPSHD5", "EU2VCZUQPSHD5QQ", "eu2vczuqpshd5q",
-            "EU2VCZUQPSHD50", "EU2VCZUQPSHD5I", "P2260201675KKW78", "J45TUMXYK4S46V")) {
+            "EU2VCZUQPSHD50", "EU2VCZUQPSHD5I", "P2260201675KKW78", "J45TUMXYK4S46V", "EU2VYYTQPSHD69", "145TGCFYK4S46Q")) {
             assertNull(code, SibionicsProbeSensitivity.tryDecode(code))
         }
     }
