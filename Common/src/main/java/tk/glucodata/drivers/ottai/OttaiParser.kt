@@ -93,8 +93,9 @@ object OttaiParser {
         deviceVersion: String,
         learned: Int? = null,
     ): Int {
-        confirmedRecordSize(deviceVersion)?.let { return it }
+        contentRecordSize(payload)?.let { return it }
         learned?.takeIf { it == BLE_RECORD_SIZE || it == BLE_RECORD_SIZE_E12 }?.let { return it }
+        confirmedRecordSize(deviceVersion)?.let { return it }
         val (nine, eight) = recordSizeEvidence(payload)
         return if (nine > eight) BLE_RECORD_SIZE_E12 else BLE_RECORD_SIZE
     }
@@ -128,8 +129,19 @@ object OttaiParser {
      * [DECISIVE_MARGIN], which a minute live notify can never do and a history page or a
      * nine-record live read always does.
      */
-    internal fun decisiveRecordSize(payload: ByteArray, deviceVersion: String): Int? {
-        confirmedRecordSize(deviceVersion)?.let { return it }
+    internal fun decisiveRecordSize(payload: ByteArray, deviceVersion: String): Int? =
+        contentRecordSize(payload) ?: confirmedRecordSize(deviceVersion)
+
+    /**
+     * The layout the payload's own records prove, or null when they cannot.
+     *
+     * This outranks the version string. A 2026-09-26 trace of a sensor whose version maps to
+     * the 9-byte family sent 168-byte history pages that advance 20 dataNos per frame and
+     * 16-byte live notifies: 8-byte records throughout. Trusting the version read them as
+     * 9-byte, so every live notify framed to zero records and only every 8th history record
+     * (where the two grids happen to coincide) survived, as a bogus constant glucose.
+     */
+    private fun contentRecordSize(payload: ByteArray): Int? {
         val (nine, eight) = recordSizeEvidence(payload)
         return when {
             nine >= MIN_DECISIVE_RECORDS && nine - eight >= DECISIVE_MARGIN -> BLE_RECORD_SIZE_E12
