@@ -1882,6 +1882,52 @@ class AnytimeBleManager(
      * (2026-09-15, after the 01:53 restart, "Loss of signal" every 350 s in
      * ble_error_history, no data written since 01:23).
      */
+    /**
+     * A CT5 handshake step that rejects its answer (bad check frame, failed setID, a
+     * malformed setParameters reply) returns without arming anything: the protocol
+     * timeout was already cleared by the answer arriving, and [connectWatchdog] only
+     * covers CONNECTING. Without this the link sits in HANDSHAKING until the
+     * transmitter happens to drop it. One cadence plus a margin leaves room for the
+     * deliberate "wait for an encrypted live push" recovery paths.
+     */
+    private val ct5HandshakeStallRunnable = Runnable {
+        if (stop || !isCt5() || phase != Phase.HANDSHAKING) return@Runnable
+        Log.w(TAG, "CT5 handshake stalled for ${ct5HandshakeStallTimeoutMs() / 1000}s; reconnecting")
+        recoverGattAndReconnect("CT5 handshake stalled", ACTIVE_SESSION_RECONNECT_DELAY_MS)
+    }
+
+    private fun ct5HandshakeStallTimeoutMs(): Long =
+        profile.readingIntervalMinutes * 60_000L + 60_000L
+
+    /**
+     * The cached-cipher paths into streaming are a bet that the transmitter is already
+     * bound. setID persists the cipher (and its removal-proof recovery copy) before the
+     * bind finishes, so a bind interrupted before setParameters/init comes back as
+     * "bound" too — even its identity check can pass — yet a transmitter that was never
+     * initialised never pushes, and [noDataWatchdog] only arms after data. A sensor
+     * that has never delivered a frame and stays silent for two cadences after
+     * entering streaming was never bound: drop the cipher and bind it.
+     */
+    private val ct5UnprovenCipherRunnable = Runnable {
+        if (stop || !isCt5() || phase != Phase.STREAMING) return@Runnable
+        if (!AnytimeConstants.ct5CachedCipherLooksUnbound(lastGlucoseId, lastLiveFrameAtMs, streamingSinceMs)) {
+            return@Runnable
+        }
+        Log.w(
+            TAG,
+            "CT5 cached cipher produced no live frame in ${ct5UnprovenCipherTimeoutMs() / 60_000L} min " +
+                    "and this sensor has never delivered one; the bind never completed — starting a fresh bind"
+        )
+        bound = false
+        ct5CipherKey = -1
+        ct5RandomB = null
+        persistAlgorithmState()
+        recoverGattAndReconnect("CT5 cached cipher never streamed", ACTIVE_SESSION_RECONNECT_DELAY_MS)
+    }
+
+    private fun ct5UnprovenCipherTimeoutMs(): Long =
+        2L * profile.readingIntervalMinutes * 60_000L + 60_000L
+
     private val connectWatchdog = Runnable {
         if (stop || phase != Phase.CONNECTING) return@Runnable
         Log.w(TAG, "No GATT callback for ${connectWatchdogMs() / 1000}s — resetting connection")
@@ -1969,6 +2015,8 @@ class AnytimeBleManager(
     private fun clearGattCallbacks() {
         handler.removeCallbacks(serviceDiscoveryWatchdog)
         handler.removeCallbacks(connectWatchdog)
+        handler.removeCallbacks(ct5HandshakeStallRunnable)
+        handler.removeCallbacks(ct5UnprovenCipherRunnable)
         handler.removeCallbacks(serviceDiscoveryRetryRunnable)
         handler.removeCallbacks(cccdWriteTimeoutRunnable)
         handler.removeCallbacks(forceScanReconnectRetryRunnable)
@@ -2766,6 +2814,10 @@ class AnytimeBleManager(
             if (nameFamily.family != AnytimeConstants.Family.UNKNOWN) resolvedName else familyEntry.prefix,
         )
 
+        if (isCt5()) {
+            handler.removeCallbacks(ct5HandshakeStallRunnable)
+            handler.postDelayed(ct5HandshakeStallRunnable, ct5HandshakeStallTimeoutMs())
+        }
         when {
             isCt2() -> {
                 Log.i(TAG, "CT2 family — starting handshake")
@@ -3129,6 +3181,11 @@ class AnytimeBleManager(
         phase = Phase.STREAMING
         streamingSinceMs = System.currentTimeMillis()
         clearProtocolFrameTimeout()
+        handler.removeCallbacks(ct5HandshakeStallRunnable)
+        handler.removeCallbacks(ct5UnprovenCipherRunnable)
+        if (isCt5() && lastGlucoseId < 0) {
+            handler.postDelayed(ct5UnprovenCipherRunnable, ct5UnprovenCipherTimeoutMs())
+        }
         // Do not invent a start time here. CT4 start/history timestamps must be
         // anchored from a real live glucose id; otherwise fresh installs display
         // a fake Started time and all pulled history is shifted.
@@ -3559,6 +3616,14 @@ class AnytimeBleManager(
             Log.i(TAG, "CT5 accepted the re-registered temporary id; retrying the unbind frames")
             ct5EndCycleVariantIndex = 0
             sendCt5EndCycleUnbind()
+            return
+        }
+        // A mid-session K/R update (a scanned code, or the deferred push on entering
+        // streaming) is answered with the same frame. `ct5-init` starts a measurement,
+        // so it belongs to the bind handshake only; on a running sensor it would
+        // restart the session and trip the id-rollback wipe.
+        if (phase != Phase.HANDSHAKING) {
+            Log.i(TAG, "CT5 K/R update accepted mid-session (phase=$phase); not re-initialising")
             return
         }
         Log.i(TAG, "CT5 K/R parameters accepted")
