@@ -141,7 +141,7 @@ object OttaiParser {
      * 9-byte, so every live notify framed to zero records and only every 8th history record
      * (where the two grids happen to coincide) survived, as a bogus constant glucose.
      */
-    private fun contentRecordSize(payload: ByteArray): Int? {
+    internal fun contentRecordSize(payload: ByteArray): Int? {
         val (nine, eight) = recordSizeEvidence(payload)
         return when {
             nine >= MIN_DECISIVE_RECORDS && nine - eight >= DECISIVE_MARGIN -> BLE_RECORD_SIZE_E12

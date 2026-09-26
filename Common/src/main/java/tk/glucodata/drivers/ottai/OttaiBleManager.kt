@@ -2906,7 +2906,10 @@ class OttaiBleManager(
      */
     private fun learnRecordSize(payload: ByteArray) {
         val id = SerialNumber ?: return
-        val decisive = OttaiParser.decisiveRecordSize(payload, materials.deviceVersion)
+        // The version string may only seed a width nothing has proved yet. Once the content has
+        // settled it, a short live frame (which proves nothing) must not flip it back.
+        val decisive = OttaiParser.contentRecordSize(payload)
+            ?: if (learnedRecordSize == 0) OttaiParser.decisiveRecordSize(payload, materials.deviceVersion) else null
         if (decisive != null) {
             recordSizeDisagreementLogged = false
             if (decisive != learnedRecordSize) {
