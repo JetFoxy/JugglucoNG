@@ -34,4 +34,38 @@ object WearProtocol {
     /** A payload with no declared version is legacy (1); one from the future is not applied. */
     fun accepts(declaredVersion: Int?): Boolean =
         declaredVersion == null || declaredVersion <= VERSION
+
+    // ---- the handshake ------------------------------------------------------------------------
+
+    @Volatile
+    private var peerVersion: Int? = null
+
+    /**
+     * The version the peer last advertised, or null before one has been heard. Used to tell a
+     * mismatched build apart from a silent one (direction.md §6 Q2, lesson #1).
+     */
+    fun peerVersion(): Int? = peerVersion
+
+    /** True until a peer version is known, and when it matches this build's. */
+    fun peerMatches(): Boolean = peerVersion == null || peerVersion == VERSION
+
+    /**
+     * Records a received handshake. Returns the parsed version, or null for a payload that
+     * carries none. A version that differs from [VERSION] is logged once so the mismatch is
+     * visible instead of the peers silently disagreeing about message shapes.
+     */
+    fun onPeerVersionReport(data: ByteArray?): Int? {
+        val text = data?.toString(Charsets.UTF_8) ?: return null
+        val version = declaredVersion(text) ?: return null
+        peerVersion = version
+        if (version != VERSION) {
+            Log.w("WearProtocol", "peer speaks protocol v$version, this build speaks v$VERSION")
+        }
+        return version
+    }
+
+    /** Test seam: forget the peer so a case starts from "unknown". */
+    internal fun resetForTest() {
+        peerVersion = null
+    }
 }
