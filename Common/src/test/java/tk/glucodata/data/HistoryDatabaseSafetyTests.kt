@@ -1,6 +1,7 @@
 package tk.glucodata.data
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,6 +23,30 @@ class HistoryDatabaseSafetyTests {
 
     private fun historyDatabaseSource() =
         source("src/mobile/java/tk/glucodata/data/HistoryDatabase.kt")
+
+    private fun calibrationDatabaseSource() =
+        source("src/mobile/java/tk/glucodata/data/calibration/CalibrationDatabase.kt")
+
+    private fun schemasRoot(): File {
+        var directory: File? = File(System.getProperty("user.dir") ?: ".").absoluteFile
+        while (directory != null) {
+            val candidate = File(directory, "Common/schemas")
+            if (candidate.isDirectory) return candidate
+            directory = directory.parentFile
+        }
+        error("Could not locate Common/schemas")
+    }
+
+    private fun highestCommittedSchemaVersion(database: String): Int =
+        schemasRoot().resolve(database)
+            .listFiles { file -> file.extension == "json" }
+            ?.map { it.nameWithoutExtension.toInt() }
+            ?.max()
+            ?: error("No committed schemas under Common/schemas/$database")
+
+    private fun declaredVersion(source: String, constant: String): Int =
+        Regex("const val $constant = (\\d+)").find(source)?.groupValues?.get(1)?.toInt()
+            ?: error("$constant not found in $source")
 
     @Test
     fun historyDatabaseDoesNotUseDestructiveMigrationFallback() {
@@ -61,12 +86,29 @@ class HistoryDatabaseSafetyTests {
     }
 
     @Test
+    fun theDatabaseVersionEqualsTheHighestCommittedSchema() {
+        // The version no longer lives in the test as a literal: that made every bump edit the app
+        // and the test together, so the pin protected nothing. It now has to match a committed
+        // schema JSON -- the actual input MigrationTestHelper validates against.
+        assertEquals(
+            "HISTORY_DATABASE_VERSION must equal the highest committed schema; bump the constant, " +
+                "commit the new JSON and add its migration test together",
+            highestCommittedSchemaVersion("tk.glucodata.data.HistoryDatabase"),
+            declaredVersion(historyDatabaseSource(), "HISTORY_DATABASE_VERSION"),
+        )
+        assertEquals(
+            "CALIBRATION_DATABASE_VERSION must equal the highest committed schema",
+            highestCommittedSchemaVersion("tk.glucodata.data.calibration.CalibrationDatabase"),
+            declaredVersion(calibrationDatabaseSource(), "CALIBRATION_DATABASE_VERSION"),
+        )
+    }
+
+    @Test
     fun insulinCurveSnapshotMigrationIsRegisteredAndAdditive() {
         val source = historyDatabaseSource()
 
-        // The version moved to a constant (plan task H5) so the migration tests
-        // migrate to the current version rather than a hard-coded number.
-        assertTrue(source.contains("const val HISTORY_DATABASE_VERSION = 32"))
+        // The version moved to a constant (plan task H5); the constant itself is checked
+        // against the committed schemas above.
         assertTrue(source.contains("version = HISTORY_DATABASE_VERSION"))
         assertTrue(source.contains("Migration(18, 19)"))
         assertTrue(source.contains("MIGRATION_18_19"))

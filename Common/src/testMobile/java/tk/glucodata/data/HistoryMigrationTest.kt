@@ -3,6 +3,7 @@ package tk.glucodata.data
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -39,19 +40,21 @@ class HistoryMigrationTest {
         FrameworkSQLiteOpenHelperFactory()
     )
 
-    private fun migrate(from: Int) {
-        helper.createDatabase(DB_NAME, from).close()
-        helper.runMigrationsAndValidate(DB_NAME, HISTORY_DATABASE_VERSION, true, *HistoryDatabase.ALL_MIGRATIONS).close()
+    private fun migrate(from: Int, databaseName: String = DB_NAME) {
+        helper.createDatabase(databaseName, from).close()
+        helper.runMigrationsAndValidate(databaseName, HISTORY_DATABASE_VERSION, true, *HistoryDatabase.ALL_MIGRATIONS).close()
     }
 
+    /**
+     * Every committed schema version must migrate to the current one. This is the version-pin
+     * check's other half (plan task H5): a version bump that commits a JSON but no migration, or a
+     * migration with no JSON, fails here rather than in a release.
+     */
     @Test
-    fun migratesFromTheReleasedV11SchemaToCurrent() {
-        migrate(from = 11)
-    }
-
-    @Test
-    fun migratesFromTheReleasedV12SchemaToCurrent() {
-        migrate(from = 12)
+    fun everyCommittedSchemaVersionMigratesToCurrent() {
+        committedSchemaVersions()
+            .filter { it < HISTORY_DATABASE_VERSION }
+            .forEach { from -> migrate(from, "history-migration-from-$from.db") }
     }
 
     @Test
@@ -223,6 +226,20 @@ class HistoryMigrationTest {
             assertEquals(1, cursor.getInt(5))
         }
         migrated.close()
+    }
+
+    private fun committedSchemaVersions(): List<Int> {
+        var directory: File? = File(System.getProperty("user.dir") ?: ".").absoluteFile
+        while (directory != null) {
+            val candidate = File(directory, "Common/schemas/tk.glucodata.data.HistoryDatabase")
+            if (candidate.isDirectory) {
+                return candidate.listFiles { file -> file.extension == "json" }!!
+                    .map { it.nameWithoutExtension.toInt() }
+                    .sorted()
+            }
+            directory = directory.parentFile
+        }
+        error("Could not locate committed history schemas")
     }
 
     private companion object {
