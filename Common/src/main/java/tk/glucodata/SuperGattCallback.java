@@ -971,7 +971,8 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         if (sensorptr == 0L || !dohealth(this)) {
             return;
         }
-        HealthConnection.Companion.writeAll(sensorptr, SerialNumber);
+        var health = HealthConnectAccess.get();
+        if (health != null) health.writeAll(sensorptr, SerialNumber);
     }
 
     protected void handleGlucoseResult(long res, long timmsec) {

@@ -110,7 +110,7 @@ import tk.glucodata.BooleanSupplier;
 import tk.glucodata.BuildConfig;
 import tk.glucodata.Floating;
 import tk.glucodata.GlucoseCurve;
-import tk.glucodata.HealthConnection;
+import tk.glucodata.HealthConnectAccess;
 import tk.glucodata.LabelAdapter;
 import tk.glucodata.Layout;
 import tk.glucodata.Log;
@@ -1538,10 +1538,12 @@ static private void exchanges(MainActivity context, View parent) {
                         Natives.sethealthConnect(isChecked);
                         if (isChecked) {
                             MainActivity.tryHealth = 5;
-                            HealthConnection.Companion.init(context);
+                            var health = HealthConnectAccess.get();
+                            if (health != null) health.start(context);
                         } else {
                             MainActivity.tryHealth = 0;
-                            HealthConnection.Companion.stop();
+                            var health = HealthConnectAccess.get();
+                            if (health != null) health.stop();
                         }
                     }
             );

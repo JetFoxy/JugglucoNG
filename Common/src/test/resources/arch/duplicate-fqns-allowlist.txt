@@ -18,11 +18,13 @@
 #   tk.glucodata.settings.LibreNumbers (category P): phone-only libraries and resources,
 #   so they stay in src/mobile and shared code reaches them through their own registry
 #   (BluetoothMeterAccess, NovoPenAccess, LibreNumbersAccess).
+#   tk.glucodata.HealthConnection, tk.glucodata.LaunchShit (category P): androidx.health,
+#   reached through HealthConnectAccess and HealthPermissionsAccess. LaunchShit needs a
+#   factory, not a ready instance, because its ActivityResultLauncher has to be registered
+#   while the activity is still being constructed.
 tk.glucodata.Dialogs
 tk.glucodata.FloatingConfig
 tk.glucodata.GlucoseAlarms
-tk.glucodata.HealthConnection
-tk.glucodata.LaunchShit
 tk.glucodata.Meal
 tk.glucodata.Menus
 tk.glucodata.Specific

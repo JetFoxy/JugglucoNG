@@ -115,7 +115,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     // public class MainActivity extends CarActivity implements
     // NfcAdapter.ReaderCallback {
     // boolean hideSystem=true;
-    LaunchShit permHealth = isWearable ? null : new LaunchShit(this);
+    HealthPermissionRequester permHealth = isWearable ? null : HealthPermissionsAccess.create(this);
     public GlucoseCurve curve = null;
     // Button okbutton=null;
     private static final String LOG_ID = "MainActivity";
@@ -919,7 +919,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 if (tryHealth > 0) {
                     if (Natives.gethealthConnect() && Build.VERSION.SDK_INT >= 28) {
                         --tryHealth;
-                        HealthConnection.Companion.init(this);
+                        var health = HealthConnectAccess.get();
+                        if (health != null) health.start(this);
                     } else
                         tryHealth = 0;
                 }
@@ -1340,7 +1341,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             if (!isWearable) {
                 if (Natives.gethealthConnect()) {
                     if (Build.VERSION.SDK_INT >= 28) {
-                        HealthConnection.Companion.init(this);
+                        var health = HealthConnectAccess.get();
+                        if (health != null) health.start(this);
                     }
                 }
             }

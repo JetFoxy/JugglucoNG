@@ -55,6 +55,8 @@ public class Specific {
 		BluetoothMeterAccess.register(tk.glucodata.MobileBluetoothMeters.INSTANCE);
 		NovoPenAccess.register(tk.glucodata.MobileNovoPenScan.INSTANCE);
 		LibreNumbersAccess.register(tk.glucodata.settings.MobileLibreNumbersLayout.INSTANCE);
+		HealthConnectAccess.register(tk.glucodata.MobileHealthConnect.INSTANCE);
+		HealthPermissionsAccess.register(tk.glucodata.MobileHealthPermissions.INSTANCE);
 	}
 
 	static void start(Application context) {

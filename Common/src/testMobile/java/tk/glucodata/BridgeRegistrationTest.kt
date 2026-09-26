@@ -33,6 +33,8 @@ class BridgeRegistrationTest {
         assertTrue("BluetoothMeterAccess", BluetoothMeterAccess.isRegistered())
         assertTrue("NovoPenAccess", NovoPenAccess.isRegistered())
         assertTrue("LibreNumbersAccess", LibreNumbersAccess.isRegistered())
+        assertTrue("HealthConnectAccess", HealthConnectAccess.isRegistered())
+        assertTrue("HealthPermissionsAccess", HealthPermissionsAccess.isRegistered())
         assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
         assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())
         assertTrue("HistorySyncBridgeAccess", HistorySyncBridgeAccess.isRegistered())

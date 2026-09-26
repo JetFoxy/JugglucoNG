@@ -1321,7 +1321,8 @@ public class Applic extends Application implements androidx.work.Configuration.P
                     }
                     ;
                     if (Build.VERSION.SDK_INT >= 28) {
-                        HealthConnection.Companion.writeAll(sensorptr, SerialNumber);
+                        var health = HealthConnectAccess.get();
+                        if (health != null) health.writeAll(sensorptr, SerialNumber);
                     }
                 }
             }
