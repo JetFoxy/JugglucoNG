@@ -94,8 +94,12 @@ object OttaiParser {
         learned: Int? = null,
     ): Int {
         contentRecordSize(payload)?.let { return it }
-        learned?.takeIf { it == BLE_RECORD_SIZE || it == BLE_RECORD_SIZE_E12 }?.let { return it }
-        confirmedRecordSize(deviceVersion)?.let { return it }
+        // A width that cannot hold even one record in this frame is not a candidate: a 16-byte
+        // live notify has an 8-byte body, which no 9-byte record fits in.
+        val bodyLen = payload.size - HEADER_SIZE
+        learned?.takeIf { (it == BLE_RECORD_SIZE || it == BLE_RECORD_SIZE_E12) && bodyLen >= it }
+            ?.let { return it }
+        confirmedRecordSize(deviceVersion)?.takeIf { bodyLen >= it }?.let { return it }
         val (nine, eight) = recordSizeEvidence(payload)
         return if (nine > eight) BLE_RECORD_SIZE_E12 else BLE_RECORD_SIZE
     }

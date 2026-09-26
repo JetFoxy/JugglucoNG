@@ -323,9 +323,23 @@ class OttaiParserTests {
 
         // Once learned, the live notify frames as one record instead of none.
         val live = hex("00000000d067ffff1e18fd54722ef70b")
-        assertEquals(0, OttaiParser.frameRecords(live, version).size)
         val recs = OttaiParser.frameRecords(live, version, OttaiParser.BLE_RECORD_SIZE)
         assertEquals(1, recs.size)
         assertEquals(30.63, OttaiParser.parseRecord(recs[0]).temperatureC, 1e-9)
+    }
+
+    @Test
+    fun sixteenByteLiveNotifyCannotBeFramedAsNineByte() {
+        // First live frame of a fresh sensor: nothing learned, and the version maps to the
+        // 9-byte family. An 8-byte body holds no 9-byte record, so the width must fall to 8.
+        val live = hex("00000000d067ffff1e18fd54722ef70b")
+        val version = "E1.2.3(V1.7.SH2542.1)"
+        assertEquals(OttaiParser.BLE_RECORD_SIZE, OttaiParser.chooseRecordSize(live, version))
+        assertEquals(1, OttaiParser.frameRecords(live, version).size)
+        // A stale learned 9 is ignored for the same reason.
+        assertEquals(
+            OttaiParser.BLE_RECORD_SIZE,
+            OttaiParser.chooseRecordSize(live, version, OttaiParser.BLE_RECORD_SIZE_E12),
+        )
     }
 }
