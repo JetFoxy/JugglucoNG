@@ -44,6 +44,8 @@ public class Specific {
 		NotificationPredictionAccess.register(tk.glucodata.NotificationPredictionOverlay.INSTANCE);
 		GlucoseUncertaintyAccess.register(tk.glucodata.data.GlucoseUncertaintyStore.INSTANCE);
 		CalibrationProfileAccess.register(tk.glucodata.data.calibration.MobileCalibrationProfileBridge.INSTANCE);
+		CalibrationAccess.register(tk.glucodata.data.calibration.MobileCalibrationProvider.INSTANCE);
+		tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.MobileAlarmActivityHost.INSTANCE);
 		LibreviewJournalEntriesAccess.register(tk.glucodata.data.journal.LibreviewJournalEntries.INSTANCE);
 		HistoryRepositoryAccess.register(tk.glucodata.data.MobileHistoryRepositoryBridge.INSTANCE);
 		HistorySyncBridgeAccess.register(tk.glucodata.data.MobileHistorySyncBridge.INSTANCE);

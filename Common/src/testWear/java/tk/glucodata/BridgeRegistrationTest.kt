@@ -16,5 +16,7 @@ class BridgeRegistrationTest {
 
         assertTrue("TrendAccess", TrendAccess.isRegistered())
         assertTrue("ComposeHostAccess", tk.glucodata.ui.ComposeHostAccess.isRegistered())
+        assertTrue("CalibrationAccess", CalibrationAccess.isRegistered())
+        assertTrue("AlarmActivityAccess", tk.glucodata.ui.AlarmActivityAccess.isRegistered())
     }
 }

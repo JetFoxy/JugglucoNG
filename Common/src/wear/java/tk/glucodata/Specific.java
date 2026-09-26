@@ -66,11 +66,12 @@ final static private String LOG_ID="Specific";
 static void registerBridges() {
     TrendAccess.register(tk.glucodata.logic.TrendEngineVelocityProvider.INSTANCE);
     tk.glucodata.ui.ComposeHostAccess.register(tk.glucodata.ui.WearComposeHost.INSTANCE);
+    CalibrationAccess.register(SyncedWearCalibrationProvider.INSTANCE);
+    tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.WearAlarmActivityHost.INSTANCE);
 }
 
 static void start(Object context) {
     registerBridges();
-    CalibrationAccess.register(SyncedWearCalibrationProvider.INSTANCE);
 }
 
 static    void splash(AppCompatActivity act) {
