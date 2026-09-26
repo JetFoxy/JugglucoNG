@@ -35,6 +35,7 @@ class BridgeRegistrationTest {
         assertTrue("LibreNumbersAccess", LibreNumbersAccess.isRegistered())
         assertTrue("HealthConnectAccess", HealthConnectAccess.isRegistered())
         assertTrue("HealthPermissionsAccess", HealthPermissionsAccess.isRegistered())
+        assertTrue("NumberDataAccess", NumberDataAccess.isRegistered())
         assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
         assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())
         assertTrue("HistorySyncBridgeAccess", HistorySyncBridgeAccess.isRegistered())

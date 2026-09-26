@@ -26,5 +26,6 @@ class BridgeRegistrationTest {
         assertFalse("LibreNumbersAccess", LibreNumbersAccess.isRegistered())
         assertFalse("HealthConnectAccess", HealthConnectAccess.isRegistered())
         assertFalse("HealthPermissionsAccess", HealthPermissionsAccess.isRegistered())
+        assertFalse("NumberDataAccess", NumberDataAccess.isRegistered())
     }
 }

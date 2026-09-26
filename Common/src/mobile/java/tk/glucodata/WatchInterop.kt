@@ -12,6 +12,7 @@ import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import tk.glucodata.nums.AllData
+import tk.glucodata.nums.AllDataAccess
 import java.util.concurrent.TimeUnit
 
 object WatchInterop {
@@ -304,9 +305,22 @@ object WatchInterop {
         }
     }
 
+    /**
+     * The phone's numbers hub as its concrete class. Applic.numdata is a NumberDataHub now,
+     * because shared code holds it in a field; this file is phone-only and reads phone-only
+     * state the interface does not describe, so it casts once here rather than widening the
+     * interface. Null when the phone's instance is not registered, which every caller here
+     * already handles.
+     */
+    private fun allData(): AllData? = AllDataAccess.phone()
+
     @JvmStatic
     fun getGarminSnapshot(): GarminSnapshot {
-        val data: AllData? = Applic.app?.numdata
+        // The concrete class, not the NumberDataHub: this reads phone-only state the
+        // interface does not describe (sdkready, reinit, sync, nextmessage, ...), and the
+        // snapshot is written defensively anyway -- a null here is a handled state, which
+        // is why the cast is safe and the interface stays the size shared code needs.
+        val data: AllData? = allData()
         if (data == null) {
             return GarminSnapshot(
                 sdkReady = false,
@@ -332,7 +346,7 @@ object WatchInterop {
     @JvmStatic
     fun reinitGarmin(): Boolean {
         val app = Applic.app ?: return false
-        val data = app.numdata ?: return false
+        val data = allData() ?: return false
         return try {
             data.reinit(MainActivity.thisone ?: app)
             true
@@ -343,7 +357,7 @@ object WatchInterop {
 
     @JvmStatic
     fun syncGarmin(): Boolean {
-        val data = Applic.app?.numdata ?: return false
+        val data = allData() ?: return false
         return try {
             data.sync()
             true
@@ -354,7 +368,7 @@ object WatchInterop {
 
     @JvmStatic
     fun sendGarminQueueNext(): Boolean {
-        val data = Applic.app?.numdata ?: return false
+        val data = allData() ?: return false
         return try {
             data.nextmessage()
             true
@@ -372,7 +386,7 @@ object WatchInterop {
         val wasEnabled = try { Natives.getusegarmin() } catch (_: Throwable) { false }
         return try {
             Natives.setusegarmin(enabled)
-            val data = app.numdata
+            val data = allData()
             if (enabled && !wasEnabled) {
                 data?.reinit(context)
             } else if (!enabled && wasEnabled) {
@@ -391,7 +405,7 @@ object WatchInterop {
     @JvmStatic
     fun setKerfstokDarkMode(enabled: Boolean) {
         Natives.setkerfstokblack(enabled)
-        try { Applic.app?.numdata?.setcolor(enabled) } catch (_: Throwable) {}
+        try { allData()?.setcolor(enabled) } catch (_: Throwable) {}
     }
 
     @JvmStatic

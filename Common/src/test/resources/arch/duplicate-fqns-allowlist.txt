@@ -26,6 +26,11 @@
 #   export label, so those became openExport/setExportStatus on LegacyScreens and the
 #   GlucoseCurve field is gone. Its showdays was read by shared code, so it moved to
 #   LegacyScreensAccess.exportShowDays.
+#   tk.glucodata.nums.AllData (category P): shared code held it as the public field
+#   Applic.numdata, so the field is typed as the NumberDataHub interface instead, the phone
+#   class implements it, and Specific supplies the instance. Its devices field is no longer
+#   read from shared code -- NumberDataHub.hasGarminDevices(). The watch copy was all no-ops
+#   and its devices was never filled, so the watch now gets a no-op from src/main.
 #   tk.glucodata.Menus (category P): show() became openMenus on LegacyScreens, and its
 #   on/off flag -- read by shared code in about a dozen places, written by ScanNfcV and by
 #   show() itself -- became LegacyScreensAccess.menusOn. The watch copy held the flag and an
@@ -37,6 +42,5 @@ tk.glucodata.Specific
 tk.glucodata.WearOngoingActivity
 tk.glucodata.glucosecomplication.ColorConfig
 tk.glucodata.glucosecomplication.GlucoseValue
-tk.glucodata.nums.AllData
 tk.glucodata.settings.SetColors
 tk.glucodata.ui.AlarmActivity

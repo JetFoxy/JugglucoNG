@@ -58,7 +58,6 @@ import java.util.Date;
 import java.util.Locale;
 
 
-import tk.glucodata.nums.AllData;
 import tk.glucodata.nums.numio;
 
 import static android.widget.LinearLayout.VERTICAL;
@@ -566,7 +565,7 @@ void deletedialog(View v,int[] mealptr) {
                     int pos=Natives.hitremove(currentnum);
                     int last=numio.getlastnum(index);
                     if(!isWearable) {
-                        AllData alldata=((Applic) ((Activity) v.getContext()).getApplication()).numdata;
+                        NumberDataHub alldata=((Applic) ((Activity) v.getContext()).getApplication()).numdata;
                         alldata.deletelast(index,last,waslast);
                         if(pos<last)
                              alldata.changedback(index);
@@ -679,7 +678,7 @@ private boolean saveamount(Activity activity,TextView timeview,TextView value,in
         Natives.hitchange(currentnum,dat/1000L,val,labelsel,mealptr);
         int index=Natives.gethitindex(currentnum);
         if(!isWearable) {
-            tk.glucodata.nums.AllData  alldata=Applic.app.numdata;
+            NumberDataHub alldata=Applic.app.numdata;
             alldata.changedback(index);
             }
         Natives.freehitptr(currentnum);
@@ -700,7 +699,7 @@ private boolean saveamount(Activity activity,TextView timeview,TextView value,in
         final int index=1;
         Natives.saveNum(numio.numptrs[index],dat/1000,val,labelsel,mealptr);
         if(!isWearable) {
-           tk.glucodata.nums.AllData  alldata=Applic.app.numdata;
+           NumberDataHub alldata=Applic.app.numdata;
             alldata.changedback(index);
             }
         }

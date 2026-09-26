@@ -57,6 +57,7 @@ public class Specific {
 		LibreNumbersAccess.register(tk.glucodata.settings.MobileLibreNumbersLayout.INSTANCE);
 		HealthConnectAccess.register(tk.glucodata.MobileHealthConnect.INSTANCE);
 		HealthPermissionsAccess.register(tk.glucodata.MobileHealthPermissions.INSTANCE);
+		NumberDataAccess.register(new tk.glucodata.nums.AllData());
 	}
 
 	static void start(Application context) {

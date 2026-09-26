@@ -79,7 +79,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import tk.glucodata.nums.AllData;
 import tk.glucodata.nums.numio;
 import tk.glucodata.settings.Broadcasts;
 import java.util.concurrent.Executors;
@@ -117,7 +116,8 @@ public class Applic extends Application implements androidx.work.Configuration.P
         return Natives.getLabels();
     }
 
-    public tk.glucodata.nums.AllData numdata = null;
+    /** The numbers / ConnectIQ hub; the phone's, or a no-op. See NumberDataHub. */
+    public NumberDataHub numdata = NumberDataAccess.get();
     public GlucoseCurve curve = null;
     public static int unit = 0;
 
@@ -198,9 +198,6 @@ public class Applic extends Application implements androidx.work.Configuration.P
         mintimefilter.addAction(Intent.ACTION_TIME_TICK);
         mHandler = new Handler(Looper.getMainLooper());
         uiThreadId = Thread.currentThread().getId();
-        if (!isWearable) {
-            numdata = new AllData();
-        }
     }
 
 
@@ -326,9 +323,7 @@ public class Applic extends Application implements androidx.work.Configuration.P
     public void onTerminate() {
         super.onTerminate();
         if (!isWearable) {
-            if (numdata != null) {
-                numdata.onCleared();
-            }
+            numdata.onCleared();
         }
     }
 
@@ -558,7 +553,7 @@ public class Applic extends Application implements androidx.work.Configuration.P
         }
         ;
         if (!isWearable) {
-            if (Natives.getusegarmin() && numdata.devices == null)
+            if (Natives.getusegarmin() && !numdata.hasGarminDevices())
                 numdata.initIQ(context);
         }
 
