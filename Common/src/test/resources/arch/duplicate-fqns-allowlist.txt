@@ -8,6 +8,8 @@
 # fixed but not removed from the list, so the guard would stop noticing it).
 #
 # Removed so far: tk.glucodata.receivers.AlarmLaunchReceiver (T5.1).
+#   tk.glucodata.Stats, tk.glucodata.Watch (category P): their watch stubs had no
+#   caller anywhere in src/main or src/wear, so they were deleted.
 tk.glucodata.BluetoothGlucoseMeter
 tk.glucodata.Dialogs
 tk.glucodata.FloatingConfig
@@ -22,8 +24,6 @@ tk.glucodata.MeterList
 tk.glucodata.Nightscout
 tk.glucodata.NovoPen.Scan
 tk.glucodata.Specific
-tk.glucodata.Stats
-tk.glucodata.Watch
 tk.glucodata.WearOngoingActivity
 tk.glucodata.glucosecomplication.ColorConfig
 tk.glucodata.glucosecomplication.GlucoseValue
