@@ -69,14 +69,25 @@ object WearToggleSync {
 
     @JvmStatic
     fun encode(toggles: List<Toggle>): ByteArray = buildString {
+        // The protocol version, first. An old receiver skips a line with no '=', so the toggles
+        // still arrive; a newer receiver checks it before applying (plan §6 Q2).
+        append(WearProtocol.versionLine()).append('\n')
         toggles.forEach { append(it.scope).append(':').append(it.id).append('=').append(it.enabled).append('\n') }
     }.toByteArray(Charsets.UTF_8)
 
     @JvmStatic
     fun decode(data: ByteArray?): List<Toggle> {
         if (data == null || data.isEmpty()) return emptyList()
+        val text = runCatching { data.toString(Charsets.UTF_8) }.getOrElse {
+            Log.stack(LOG_ID, "decode", it)
+            return emptyList()
+        }
+        if (!WearProtocol.accepts(WearProtocol.declaredVersion(text))) {
+            Log.w(LOG_ID, "ignoring toggles from a newer protocol")
+            return emptyList()
+        }
         return runCatching {
-            data.toString(Charsets.UTF_8).lineSequence().mapNotNull { line ->
+            text.lineSequence().mapNotNull { line ->
                 val scopeSplit = line.indexOf(':')
                 val valueSplit = line.indexOf('=')
                 if (scopeSplit <= 0 || valueSplit <= scopeSplit + 1) return@mapNotNull null
