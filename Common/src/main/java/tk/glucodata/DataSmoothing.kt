@@ -1,14 +1,11 @@
 package tk.glucodata
 
 import android.content.Context
+import tk.glucodata.settings.SettingsRegistry
 
 object DataSmoothing {
-    private const val PREFS_NAME = "tk.glucodata_preferences"
-    private const val MINUTES_KEY = "dashboard_chart_smoothing_minutes"
+    private const val PREFS_NAME = SettingsRegistry.FILE
     private const val LAST_ENABLED_MINUTES_KEY = "dashboard_data_smoothing_last_enabled_minutes"
-    private const val GRAPH_ONLY_KEY = "dashboard_data_smoothing_graph_only"
-    private const val COLLAPSE_CHUNKS_KEY = "dashboard_data_smoothing_collapse_chunks"
-    private const val EXCHANGE_OUTPUTS_ONLY_KEY = "dashboard_data_smoothing_exchange_outputs_only"
     private const val MAX_CHUNK_INTERVAL_MINUTES = 5
     private const val DEFAULT_ENABLED_MINUTES = MAX_CHUNK_INTERVAL_MINUTES
 
@@ -28,14 +25,17 @@ object DataSmoothing {
 
     @JvmStatic
     fun getMinutes(context: Context): Int {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return sanitizeMinutes(prefs.getInt(MINUTES_KEY, 0))
+        return sanitizeMinutes(SettingsRegistry.SMOOTHING_MINUTES.readInt(context))
     }
 
     @JvmStatic
     fun getLastEnabledMinutes(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val current = sanitizeMinutes(prefs.getInt(MINUTES_KEY, DEFAULT_ENABLED_MINUTES))
+        // The same key, but a different question: the fallback here is the last
+        // window that was on, not the setting's own default of 0.
+        val current = sanitizeMinutes(
+            prefs.getInt(SettingsRegistry.SMOOTHING_MINUTES.key, DEFAULT_ENABLED_MINUTES)
+        )
         val fallback = current.takeIf { it > 0 } ?: DEFAULT_ENABLED_MINUTES
         return sanitizeMinutes(prefs.getInt(LAST_ENABLED_MINUTES_KEY, fallback))
             .takeIf { it > 0 }
@@ -46,22 +46,16 @@ object DataSmoothing {
     fun isEnabled(context: Context): Boolean = getMinutes(context) > 0
 
     @JvmStatic
-    fun isGraphOnly(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(GRAPH_ONLY_KEY, false)
-    }
+    fun isGraphOnly(context: Context): Boolean =
+        SettingsRegistry.SMOOTHING_GRAPH_ONLY.readBool(context)
 
     @JvmStatic
-    fun collapseChunks(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(COLLAPSE_CHUNKS_KEY, false)
-    }
+    fun collapseChunks(context: Context): Boolean =
+        SettingsRegistry.SMOOTHING_COLLAPSE_CHUNKS.readBool(context)
 
     @JvmStatic
-    fun smoothOnlyExchangeOutputs(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(EXCHANGE_OUTPUTS_ONLY_KEY, false)
-    }
+    fun smoothOnlyExchangeOutputs(context: Context): Boolean =
+        SettingsRegistry.SMOOTHING_EXCHANGE_OUTPUTS_ONLY.readBool(context)
 
     /**
      * The three places a reading is used, and the one question each of them asks.
@@ -178,7 +172,7 @@ object DataSmoothing {
         val sanitized = sanitizeMinutes(minutes)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putInt(MINUTES_KEY, sanitized)
+            .putInt(SettingsRegistry.SMOOTHING_MINUTES.key, sanitized)
             .apply()
         if (sanitized > 0) {
             setLastEnabledMinutes(context, sanitized)
@@ -197,7 +191,7 @@ object DataSmoothing {
     fun setGraphOnly(context: Context, graphOnly: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean(GRAPH_ONLY_KEY, graphOnly)
+            .putBoolean(SettingsRegistry.SMOOTHING_GRAPH_ONLY.key, graphOnly)
             .apply()
     }
 
@@ -205,7 +199,7 @@ object DataSmoothing {
     fun setCollapseChunks(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean(COLLAPSE_CHUNKS_KEY, enabled)
+            .putBoolean(SettingsRegistry.SMOOTHING_COLLAPSE_CHUNKS.key, enabled)
             .apply()
     }
 
@@ -213,7 +207,7 @@ object DataSmoothing {
     fun setSmoothOnlyExchangeOutputs(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean(EXCHANGE_OUTPUTS_ONLY_KEY, enabled)
+            .putBoolean(SettingsRegistry.SMOOTHING_EXCHANGE_OUTPUTS_ONLY.key, enabled)
             .apply()
     }
 

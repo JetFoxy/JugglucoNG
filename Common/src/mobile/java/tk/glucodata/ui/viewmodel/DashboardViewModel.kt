@@ -198,19 +198,21 @@ class DashboardViewModel(
         const val DASHBOARD_SHOW_READING_AGE_KEY = "dashboard_show_reading_age"
         const val DELTA_INTERVAL_KEY = "delta_interval_minutes"
         const val JOURNAL_HEALTH_CONNECT_ACTIVITY_KEY = "dashboard_journal_health_connect_activity_enabled"
-        const val PREDICTION_CARB_RATIO_KEY = "dashboard_prediction_carb_ratio_g_per_u"
-        const val PREDICTION_INSULIN_SENSITIVITY_KEY = "dashboard_prediction_insulin_sensitivity_mgdl_per_u"
-        const val PREDICTION_HORIZON_MINUTES_KEY = "dashboard_prediction_horizon_minutes"
+        const val PREDICTION_CARB_RATIO_KEY = tk.glucodata.settings.KEY_PREDICTION_CARB_RATIO
+        const val PREDICTION_INSULIN_SENSITIVITY_KEY = tk.glucodata.settings.KEY_PREDICTION_INSULIN_SENSITIVITY
+        const val PREDICTION_HORIZON_MINUTES_KEY = tk.glucodata.settings.KEY_PREDICTION_HORIZON
         const val PREDICTION_NOTIFICATION_CHART_KEY = "dashboard_prediction_notification_chart_enabled"
         const val PREDICTION_DOSE_TARGET_KEY = "dashboard_prediction_dose_target_mgdl"
         const val STATE_DOSE_HINT_KEY = "dashboard_state_dose_hint_enabled"
         const val STATE_DOSE_HINT_HORIZON_KEY = "dashboard_state_dose_hint_horizon_minutes"
         const val STATE_DOSE_HINT_PROFILE_NOTICE_KEY = "dashboard_state_dose_hint_profile_notice_ack"
         const val STATE_DOSE_HINT_IN_RANGE_KEY = "dashboard_state_dose_hint_in_range_enabled"
-        const val PREDICTION_CARB_RATIO_DEFAULT = 10f
-        const val PREDICTION_INSULIN_SENSITIVITY_DEFAULT = 54f
-        const val PREDICTION_CARB_ABSORPTION_DEFAULT = 35f
-        const val PREDICTION_HORIZON_MINUTES_DEFAULT = 120
+        const val PREDICTION_CARB_RATIO_DEFAULT = tk.glucodata.settings.DEFAULT_PREDICTION_CARB_RATIO_G_PER_U
+        const val PREDICTION_INSULIN_SENSITIVITY_DEFAULT =
+            tk.glucodata.settings.DEFAULT_PREDICTION_INSULIN_SENSITIVITY_MGDL_PER_U
+        const val PREDICTION_CARB_ABSORPTION_DEFAULT =
+            tk.glucodata.settings.DEFAULT_PREDICTION_CARB_ABSORPTION_G_PER_H
+        const val PREDICTION_HORIZON_MINUTES_DEFAULT = tk.glucodata.settings.DEFAULT_PREDICTION_HORIZON_MINUTES
 
         private val processUiRecoveryLock = Any()
         private val processHistoryRecoveryLock = Any()
@@ -870,15 +872,15 @@ class DashboardViewModel(
         )
         _journalHealthConnectActivityEnabled.value = prefs.getBoolean(JOURNAL_HEALTH_CONNECT_ACTIVITY_KEY, false)
         _aapsJournalImportEnabled.value = AapsJournalImport.isEnabled(context)
-        _predictiveSimulationEnabled.value = prefs.getBoolean("dashboard_predictive_simulation_enabled", true)
+        _predictiveSimulationEnabled.value =
+            tk.glucodata.settings.SettingsRegistry.PREDICTION_ENABLED.readBool(prefs)
         _predictiveSimulationNotificationChartEnabled.value = prefs.getBoolean(PREDICTION_NOTIFICATION_CHART_KEY, true)
-        _predictionTrendMomentumEnabled.value = prefs.getBoolean("dashboard_prediction_trend_momentum_enabled", true)
-        _predictionCarbRatioGramsPerUnit.value = prefs
-            .getFloat(PREDICTION_CARB_RATIO_KEY, PREDICTION_CARB_RATIO_DEFAULT)
-            .coerceIn(3f, 30f)
-        _predictionInsulinSensitivityMgDlPerUnit.value = prefs
-            .getFloat(PREDICTION_INSULIN_SENSITIVITY_KEY, PREDICTION_INSULIN_SENSITIVITY_DEFAULT)
-            .coerceIn(10f, 180f)
+        _predictionTrendMomentumEnabled.value =
+            tk.glucodata.settings.SettingsRegistry.PREDICTION_TREND_MOMENTUM.readBool(prefs)
+        _predictionCarbRatioGramsPerUnit.value =
+            tk.glucodata.settings.SettingsRegistry.PREDICTION_CARB_RATIO.readFloatClamped(prefs)
+        _predictionInsulinSensitivityMgDlPerUnit.value =
+            tk.glucodata.settings.SettingsRegistry.PREDICTION_INSULIN_SENSITIVITY.readFloatClamped(prefs)
         _predictionModelProfile.value = PredictionModelProfileStore.load(prefs)
         _predictionModelProfileSaved.value = PredictionModelProfileStore.isSaved(prefs)
         _predictionCarbRatioGramsPerUnit.value = _predictionModelProfile.value.blocks.first().carbRatioGramsPerUnit
@@ -886,9 +888,8 @@ class DashboardViewModel(
             _predictionModelProfile.value.blocks.first().insulinSensitivityMgDlPerUnit
         _predictionCarbAbsorptionGramsPerHour.value =
             _predictionModelProfile.value.blocks.first().carbAbsorptionGramsPerHour
-        _predictionHorizonMinutes.value = prefs
-            .getInt(PREDICTION_HORIZON_MINUTES_KEY, PREDICTION_HORIZON_MINUTES_DEFAULT)
-            .coerceIn(30, 360)
+        _predictionHorizonMinutes.value =
+            tk.glucodata.settings.SettingsRegistry.PREDICTION_HORIZON.readIntClamped(prefs)
         _predictionDoseTargetMgDl.value = prefs
             .getFloat(PREDICTION_DOSE_TARGET_KEY, DoseTarget.DEFAULT_MGDL)
             .coerceIn(DoseTarget.MIN_MGDL, DoseTarget.MAX_MGDL)

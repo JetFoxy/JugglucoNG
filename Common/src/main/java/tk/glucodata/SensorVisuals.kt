@@ -31,8 +31,8 @@ object SensorVisuals {
      */
     const val LANE_IDENTITY_TINT = 0.28f
 
-    private const val PREFS_NAME = "tk.glucodata_preferences"
-    private const val KEY_COLOR_OVERRIDES = "sensor_color_overrides_argb"
+    private const val PREFS_NAME = tk.glucodata.settings.SettingsRegistry.FILE
+    private const val KEY_COLOR_OVERRIDES = tk.glucodata.settings.KEY_SENSOR_COLORS
 
     @Volatile
     private var cachedOverrides: Map<String, Int>? = null

@@ -31,11 +31,11 @@ object WearToggleSync {
     /** Boolean display preferences the watch is allowed to flip. */
     const val SCOPE_PREF = "p"
 
-    private const val PREFS_FILE = "tk.glucodata_preferences"
+    private const val PREFS_FILE = tk.glucodata.settings.SettingsRegistry.FILE
 
     /** id -> (preference key, the default the phone reads it with). */
     private val PREF_TOGGLES: Map<String, Pair<String, Boolean>> = mapOf(
-        "prediction" to ("dashboard_predictive_simulation_enabled" to true),
+        "prediction" to (tk.glucodata.settings.KEY_PREDICTION_ENABLED to tk.glucodata.settings.DEFAULT_PREDICTION_ENABLED),
         AutoSensorSwitch.TOGGLE_ID to (AutoSensorSwitch.PREF_KEY to false),
     )
 
