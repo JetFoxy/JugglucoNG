@@ -323,12 +323,21 @@ class MessageReceiver: WearableListenerService() {
                      Wearos.sendinitwatchapp(node);
                  }
                }
+            else -> {
+                // A path this build does not handle. Ignoring it is right; doing so in silence is
+                // not, because a message from a mismatched peer then disappears with no trace
+                // (plan §6 Q2). Log each unknown path once.
+                if (unknownPaths.add(path)) {
+                    Log.w(LOG_ID, "ignoring unknown wear message path=$path")
+                }
+            }
         }
         Log.i(LOG_ID,"onMessageReceived end $path"  )
       }
 
  companion object {
    private const val LOG_ID = "MessageReceiver"
+   private val unknownPaths = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
    private const val DISABLED_MESSAGE_LOG_INTERVAL_MS = 60_000L
    private val lastDisabledMessageLogMs = AtomicLong(0L)
     private const val offbyte:Byte=0
