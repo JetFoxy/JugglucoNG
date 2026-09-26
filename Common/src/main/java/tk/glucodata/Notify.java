@@ -2545,8 +2545,10 @@ public class Notify {
 
     private static Intent buildAlarmActivityIntent(String glucoseValue, String alarmMessage, float rate, int alertTypeId,
             String customAlertId, String deliveryMode) throws ClassNotFoundException {
-        Class<?> alarmClass = Class.forName("tk.glucodata.ui.AlarmActivity");
-        Intent alarmIntent = new Intent(Applic.app, alarmClass);
+        Intent alarmIntent = tk.glucodata.ui.AlarmActivityAccess.newIntent(Applic.app);
+        if (alarmIntent == null) {
+            throw new ClassNotFoundException("tk.glucodata.ui.AlarmActivity host not registered");
+        }
         alarmIntent.putExtra("EXTRA_GLUCOSE_VAL", glucoseValue);
         alarmIntent.putExtra("EXTRA_ALARM_TYPE", "ALARM");
         alarmIntent.putExtra("EXTRA_ALARM_MESSAGE", alarmMessage);

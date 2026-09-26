@@ -70,6 +70,18 @@ class ProguardKeepRulesTests {
     }
 
     @Test
+    fun theCalibrationManagerLookupNamesAreNoLongerNeeded() {
+        // CalibrationAccess reached CalibrationManager reflectively, so its members needed a
+        // hand-kept keep list or the watch's calibration mutations silently returned
+        // "applied=false" in release builds. It now goes through the registered
+        // CalibrationProvider, so the list is gone. This guards against it being re-added as a
+        // duplicate of the interface call.
+        val text = activeRules()
+        assertFalse(text.contains("-keepnames class tk.glucodata.data.calibration.CalibrationManager"))
+        assertFalse(text.contains("tk.glucodata.data.calibration.CalibrationManager {"))
+    }
+
+    @Test
     fun mlKitDynamicComponentsAreKeptForR8FullMode() {
         val text = activeRules()
         assertTrue(

@@ -54,38 +54,6 @@
     public void onConnectionUpdated(android.bluetooth.BluetoothGatt, int, int, int, int);
 }
 
-# CalibrationAccess in src/main resolves these mobile-only methods by name.
--keepnames class tk.glucodata.data.calibration.CalibrationManager
--keepclassmembers class tk.glucodata.data.calibration.CalibrationManager {
-    public static final tk.glucodata.data.calibration.CalibrationManager INSTANCE;
-    public final boolean hasActiveCalibration(boolean,java.lang.String);
-    public final float getCalibratedValue(float,long,boolean,boolean,java.lang.String);
-    public final boolean shouldHideInitialWhenCalibrated();
-    public final boolean shouldOverwriteSensorValues();
-    public final long getRevision();
-    public static void notifyExternalCalibrationPipelineChanged();
-    public static double[] getActiveCalibrationAnchors(java.lang.String,boolean);
-    public static double[] getIntegratedCalibrationAnchors(java.lang.String,boolean);
-    public final tk.glucodata.data.calibration.CalibrationTuning tuningForMode(boolean);
-    public static boolean isCalibrationStateLoaded();
-    public static float[] getIntegratedCalibratedSeries(float[],long[],boolean,java.lang.String);
-    public static long getIntegratedCalibrationFingerprint(java.lang.String,boolean);
-    public static void seedIntegratedCalibrationBaseline(float[],long[],boolean,java.lang.String);
-    public final java.lang.String exportProfileForSensorAsJson(java.lang.String);
-    public final *** importProfileFromJsonBlocking(java.lang.String,boolean,java.lang.String);
-    public final *** importMirrorProfileFromJsonBlocking(java.lang.String,java.lang.String);
-    # The mutations WearCalibrationCommand relays from the watch. These have no
-    # non-reflective caller under their exact name, so R8 renamed
-    # setEnabledForMode and deleted the four *Blocking methods outright: every
-    # calibration action taken on the watch logged "applied=false" in release
-    # builds while working in debug.
-    public final void setEnabledForMode(boolean,boolean,java.lang.String);
-    public final boolean addCalibrationFromWearAtBlocking(long,float,float);
-    public final boolean deleteCalibrationAtBlocking(long);
-    public final boolean updateCalibrationUserValueBlocking(long,float);
-    public final void clearAllBlocking();
-}
-
 -keep class tk.glucodata.CalibrationProfileAccess { *; }
 
 # Keep the native exported-value bridge stable. uploader.cpp and common.cpp resolve

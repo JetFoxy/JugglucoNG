@@ -5,19 +5,24 @@ import android.content.Context
 import android.content.Intent
 import tk.glucodata.Applic
 import tk.glucodata.Log
-import tk.glucodata.ui.AlarmActivity
+import tk.glucodata.ui.AlarmActivityAccess
 
 /**
- * Forwards the alarm extras to [AlarmActivity] when a notification cannot carry
- * the full-screen intent. One class for both flavours: the only difference was
- * [launchFlags], and the two copies of this receiver had the same FQN, so a
- * change made on the phone silently did not reach the watch (see the
- * duplicate-FQN guard in `NoDuplicateFqnTest`).
+ * Forwards the alarm extras to the flavour's alarm activity through
+ * [AlarmActivityAccess] when a notification cannot carry the full-screen intent.
+ * One class for both flavours: the only difference was [launchFlags], and the two
+ * copies of this receiver had the same FQN, so a change made on the phone silently
+ * did not reach the watch (see the duplicate-FQN guard in `NoDuplicateFqnTest`).
  */
 class AlarmLaunchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         try {
-            val alarmIntent = Intent(context.applicationContext, AlarmActivity::class.java).apply {
+            val base = AlarmActivityAccess.newIntent(context.applicationContext)
+            if (base == null) {
+                Log.e(LOG_ID, "no alarm activity registered; dropping launch")
+                return
+            }
+            val alarmIntent = base.apply {
                 putExtras(intent)
                 flags = launchFlags(Applic.isWearable)
             }

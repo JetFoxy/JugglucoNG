@@ -8,5 +8,5 @@
 #
 # This list may only shrink: a new file added to it, or a stale line for one already fixed, fails
 # the build (ArchitectureGateTests.classForNameFromMainDoesNotGrow).
-src/main/java/tk/glucodata/CalibrationAccess.kt
-src/main/java/tk/glucodata/Notify.java
+# Empty since the calibration and alarm-activity seams landed (plan §6 Q1); Log.java is excluded
+# above, so `src/main` no longer resolves a variant class by name.
