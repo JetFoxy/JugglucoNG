@@ -192,7 +192,7 @@ These are features, not refactors, so their PRs follow the behaviour-change rule
 | `Libreview` | 984 / 36 | `Settings` | legacy View screen (see open question O1) |
 | `MeterList` | 215 / 25 | `MainActivity`, `Settings` | legacy View screen |
 | `NovoPen.Scan` | 102 / 12 | `MainActivity` | NFC pen import, phone UI |
-| `nums.AllData` | 1114 / 62 | `Applic` | Garmin ConnectIQ (phone library) |
+| `nums.AllData` | 1114 / 62 | `Applic`, `NumberView`, `Notify`, `MainActivity`, `SensorBluetooth`, `SuperGattCallback` | numbers hub + Garmin ConnectIQ, held as the field `Applic.numdata` |
 | `settings.LabelsClass` | 369 / 29 | `Settings` | legacy View screen |
 | `settings.LibreNumbers` | 163 / 27 | `NightPost` | phone-only layout `R.layout.librenumoptions` |
 | `Menus` | 359 / 37 | 8 files | legacy View menus |
@@ -205,6 +205,8 @@ These are features, not refactors, so their PRs follow the behaviour-change rule
 - **Class needs phone-only libraries or resources** (Health Connect, Garmin, `librenumoptions`): leave the class in `src/mobile` under a phone-specific name. Put the shared call behind a registered interface; the phone registers it, the watch registers nothing, and the caller handles the absence (P2). Do not copy phone resources into `main` just to make a move compile.
 - **Otherwise** (plain legacy View screens reached from `Settings.java` / `MainActivity`): use one phone-only screen registry, for example `LegacyScreens` with entries such as `openBatteryScreen` and `openLabels`. The phone registers it once, and shared code calls `LegacyScreens.get()?.openLabels(...)`. This replaces a dozen one-off seams with one, and it is the same shape as the first batch's bridges.
 - "Move into `main` with an `isWearable` early return" remains acceptable only for a small class that needs nothing phone-specific. The first batch has already used up most of those.
+- **Failure contract** (ruling on #465): keep what the call did before. These were direct calls with a no-op watch stub, so nothing is caught on the phone. Absence on the watch is null (with a caller-side check) or a `src/main` no-op object where the stub was all no-ops and the call sites are many. A catch that did not exist before is a behaviour change in its own PR.
+- **Held as a field or shared state** (#465): `AllData` becomes an interface on the field `Applic.numdata`, supplied by the phone and a no-op on the watch. `Dialogs` is really the export screen (`showexport` + `exportlabel`), so it moves into `LegacyScreens`. `Menus.on` is shared state and moves to `src/main`, and `Menus.show()` goes into `LegacyScreens`. No per-flavour subclass of `GlucoseCurve`.
 
 ### Category S — two real implementations
 
