@@ -276,11 +276,19 @@ class MessageReceiver: WearableListenerService() {
                  val sourceId= messageEvent.getSourceNodeId()
                  val name:String=(if(isWearable) sender.localnode; else sourceId)?:return
                 val on=booldata(data)
+                if(on==null) {
+                    Log.w(LOG_ID,"ignoring /messages with an unusable payload")
+                    return
+                    }
                 Natives.setBlueMessage(name,on)
                 }
              MessageSender.BLUETOOTH_PATH -> {
                 val context=if(MainActivity.thisone==null)Applic.app;else MainActivity.thisone;
                 val on=booldata(data)
+                if(on==null) {
+                    Log.w(LOG_ID,"ignoring /bluetooth with an unusable payload")
+                    return
+                    }
                 if(tk.glucodata.Log.doLog) {Log.i(LOG_ID,"set bluetooth $on  ${data[0]}");}
                 if (isWearable) WearSensorClaim.setDirectRequested(on)
                 // The phone tells the watch to drop Bluetooth whenever it means
@@ -350,7 +358,16 @@ class MessageReceiver: WearableListenerService() {
    private const val DISABLED_MESSAGE_LOG_INTERVAL_MS = 60_000L
    private val lastDisabledMessageLogMs = AtomicLong(0L)
     private const val offbyte:Byte=0
-    fun booldata(data:ByteArray):Boolean {
+    /**
+     * The on/off a one-byte payload carries, or null when it carries nothing usable.
+     *
+     * Null rather than false on purpose: a payload that cannot be read is not the same
+     * message as "off", and acting on it would drop a sensor's Bluetooth or its messages
+     * over a truncated send. The callers ignore it and keep what they have, which is what
+     * /displayprefs and /glucosecolors already do with a payload they cannot apply.
+     */
+    fun booldata(data:ByteArray?):Boolean? {
+        if(data==null||data.isEmpty()) return null
         return data[0]!=offbyte
         }
        }
