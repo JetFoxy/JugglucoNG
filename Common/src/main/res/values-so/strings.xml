@@ -1397,6 +1397,7 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="anytime_calibration_used_status">Qalabaynta loo isticmaalo akhrinta #%1$d: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Soo dirida calibration ayaa fashilantay</string>
     <string name="anytime_calibration_waiting_for_reading_status">Qalabaynta lama heli karo; sugitaanka akhrinta koowaad</string>
+    <string name="anytime_ct5_default_calibration_status">Qiyaasta caadiga ah ayaa la isticmaalayaa; iskaan garee koodhka dareemaha</string>
     <string name="anytime_calibration_not_allowed_status">Qalabaynta ma oggola dareenka hadda</string>
     <string name="anytime_calibration_not_streaming_status">Qalabaynta lama heli karo halka dareeruhu aanu soconayn</string>
     <string name="anytime_calibration_after_24h_status">Qalabaynta lama heli karo kahor 24h</string>

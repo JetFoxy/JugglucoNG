@@ -1235,6 +1235,7 @@
     <string name="anytime_calibration_used_status">Kalibracja użyta przy odczycie #%1$d: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Nie udało się wysłać kalibracji</string>
     <string name="anytime_calibration_waiting_for_reading_status">Kalibracja niedostępna; oczekiwanie na pierwszy odczyt</string>
+    <string name="anytime_ct5_default_calibration_status">Używana jest kalibracja domyślna; zeskanuj kod sensora</string>
     <string name="anytime_calibration_not_allowed_status">Czujnik nie pozwala teraz na kalibrację</string>
     <string name="anytime_calibration_not_streaming_status">Kalibracja niedostępna, gdy czujnik nie przesyła danych</string>
     <string name="anytime_calibration_after_24h_status">Kalibracja niedostępna przez pierwsze 24 h</string>

@@ -1214,6 +1214,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="anytime_calibration_used_status">Калібрування використано для показу #%1$d: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Не вдалося надіслати калібрування</string>
     <string name="anytime_calibration_waiting_for_reading_status">Калібрування недоступне; очікування першого показу</string>
+    <string name="anytime_ct5_default_calibration_status">Використовується стандартне калібрування; відскануйте код сенсора</string>
     <string name="anytime_calibration_not_allowed_status">Датчик зараз не дозволяє калібрування</string>
     <string name="anytime_calibration_not_streaming_status">Калібрування недоступне, доки датчик не передає дані</string>
     <string name="anytime_calibration_after_24h_status">Калібрування недоступне перші 24 год</string>

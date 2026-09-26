@@ -341,6 +341,15 @@ object AnytimeConstants {
     const val CT5_WARMUP_MINUTES = 40
 
     /**
+     * K/R sent in CT5 setParameters when neither the transmitter SSN nor a scanned
+     * code yields a calibration. Both SSNs seen so far decode to R=1.0 with
+     * K=1.09 and K=1.15; the transmitter computes Auto glucose from these, so a
+     * scanned code replaces them as soon as the user has one.
+     */
+    const val CT5_DEFAULT_K = 1.10f
+    const val CT5_DEFAULT_R = 1.0f
+
+    /**
      * Whether a sample falls inside the post-activation settling window and so must
      * not be published, stored or exported.
      *
@@ -360,6 +369,18 @@ object AnytimeConstants {
             sampleMs > 0L &&
             windowMs > 0L &&
             sampleMs < anchorMs + windowMs
+
+    /**
+     * Whether a CT5 that entered streaming should be re-bound: the sensor has never
+     * delivered a frame ([lastGlucoseId] < 0) and no 0x35/0x37 notification of any kind
+     * ([lastDataRxAtMs], set before parsing) arrived since streaming began. Content is
+     * irrelevant — a malformed or glucose-less push still proves a measuring
+     * transmitter — and a sensor that has ever produced data is never re-bound, so
+     * this cannot re-initialise a running session.
+     */
+    @JvmStatic
+    fun ct5CachedCipherLooksUnbound(lastGlucoseId: Int, lastDataRxAtMs: Long, streamingSinceMs: Long): Boolean =
+        lastGlucoseId < 0 && lastDataRxAtMs < streamingSinceMs
 
     /** Watchdog — official app's pullDataDelay is 190 s. */
     const val PULL_WATCHDOG_SECONDS = 190L

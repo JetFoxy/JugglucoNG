@@ -1206,6 +1206,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="anytime_calibration_used_status">Calibration utilisée à la lecture #%1$d : %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Échec de l’envoi de la calibration</string>
     <string name="anytime_calibration_waiting_for_reading_status">Calibration indisponible; attente de la première lecture</string>
+    <string name="anytime_ct5_default_calibration_status">Étalonnage par défaut utilisé ; scannez le code du capteur</string>
     <string name="anytime_calibration_not_allowed_status">Le capteur n’autorise pas la calibration pour le moment</string>
     <string name="anytime_calibration_not_streaming_status">Calibration indisponible tant que le capteur ne transmet pas</string>
     <string name="anytime_calibration_after_24h_status">Calibration indisponible pendant les premières 24 h</string>

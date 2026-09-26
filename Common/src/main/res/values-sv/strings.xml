@@ -1200,6 +1200,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="anytime_calibration_used_status">Kalibrering använd vid avläsning #%1$d: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Kunde inte skicka kalibrering</string>
     <string name="anytime_calibration_waiting_for_reading_status">Kalibrering inte tillgänglig; väntar på första avläsning</string>
+    <string name="anytime_ct5_default_calibration_status">Standardkalibrering används; skanna sensorkoden</string>
     <string name="anytime_calibration_not_allowed_status">Sensorn tillåter inte kalibrering just nu</string>
     <string name="anytime_calibration_not_streaming_status">Kalibrering inte tillgänglig när sensorn inte streamar</string>
     <string name="anytime_calibration_after_24h_status">Kalibrering inte tillgänglig under de första 24 h</string>
