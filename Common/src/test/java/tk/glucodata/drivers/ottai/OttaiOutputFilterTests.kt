@@ -120,6 +120,36 @@ class OttaiOutputFilterTests {
     }
 
     @Test
+    fun misframedFrame_keepsAColdButCorrectlyFramedFrame() {
+        // Outdoors in winter: 18 records fail the hard gate at 11-14 C, 2 pass at 15.5 C. Every
+        // record is real, so the frame is not misframed and the two good readings are kept.
+        val cold = List(20) { index ->
+            val passes = index < 2
+            OttaiReading(
+                record = record(raw = 7_691, temp = if (passes) 15.5 else 11.0 + (index % 4)),
+                adjustGlucose = 6.2,
+                monitorTimeMs = 0L,
+                valid = true,
+            )
+        }
+        assertFalse(OttaiOutputFilter.isMisframedFrame(cold))
+    }
+
+    @Test
+    fun misframedFrame_keepsAFrameThatFailsOnlyOnCurrent() {
+        // A failing electrode (raw under the gate) is a sensor problem, not a framing one.
+        val weak = List(20) { index ->
+            OttaiReading(
+                record = record(raw = if (index < 2) 7_691 else 400, temp = 31.0),
+                adjustGlucose = 5.0,
+                monitorTimeMs = 0L,
+                valid = true,
+            )
+        }
+        assertFalse(OttaiOutputFilter.isMisframedFrame(weak))
+    }
+
+    @Test
     fun misframedFrame_ignoresFramesTooSmallToJudge() {
         assertFalse(OttaiOutputFilter.isMisframedFrame(frame(total = 7, good = 0)))
         assertFalse(OttaiOutputFilter.isMisframedFrame(emptyList()))
