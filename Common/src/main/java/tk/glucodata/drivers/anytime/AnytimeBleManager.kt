@@ -384,6 +384,8 @@ class AnytimeBleManager(
 
     /** When the current GATT session entered STREAMING (0 when not streaming). */
     @Volatile private var streamingSinceMs: Long = 0L
+    /** Any CT5 0x35/0x37 notification, parsed or not: only a bound, measuring transmitter sends one. */
+    @Volatile private var ct5LastDataRxAtMs: Long = 0L
 
     private val ct5HistoryHealth = AnytimeCt5HistoryHealth(
         maxTimeoutsPerConnection = CT5_HISTORY_MAX_TIMEOUTS_PER_CONNECTION,
@@ -1905,17 +1907,19 @@ class AnytimeBleManager(
      * bind finishes, so a bind interrupted before setParameters/init comes back as
      * "bound" too — even its identity check can pass — yet a transmitter that was never
      * initialised never pushes, and [noDataWatchdog] only arms after data. A sensor
-     * that has never delivered a frame and stays silent for two cadences after
-     * entering streaming was never bound: drop the cipher and bind it.
+     * that has never delivered a frame and sends no 0x35/0x37 at all — parsed or not,
+     * so a sensor pushing garbage or no glucose still counts as alive — for two
+     * cadences after entering streaming was never bound: drop the cipher and bind it.
+     * Two cadences, so one push lost to radio noise does not trigger a re-bind.
      */
     private val ct5UnprovenCipherRunnable = Runnable {
         if (stop || !isCt5() || phase != Phase.STREAMING) return@Runnable
-        if (!AnytimeConstants.ct5CachedCipherLooksUnbound(lastGlucoseId, lastLiveFrameAtMs, streamingSinceMs)) {
+        if (!AnytimeConstants.ct5CachedCipherLooksUnbound(lastGlucoseId, ct5LastDataRxAtMs, streamingSinceMs)) {
             return@Runnable
         }
         Log.w(
             TAG,
-            "CT5 cached cipher produced no live frame in ${ct5UnprovenCipherTimeoutMs() / 60_000L} min " +
+            "CT5 sent no data frame in ${ct5UnprovenCipherTimeoutMs() / 60_000L} min of streaming " +
                     "and this sensor has never delivered one; the bind never completed — starting a fresh bind"
         )
         bound = false
@@ -3070,6 +3074,9 @@ class AnytimeBleManager(
     }
 
     private fun dispatchCt5(opcode: Byte, data: ByteArray): Boolean {
+        if (opcode == AnytimeConstants.RX_CT5_PUSH_GLUCOSE || opcode == AnytimeConstants.RX_CT5_SERIES) {
+            ct5LastDataRxAtMs = System.currentTimeMillis()
+        }
         when (opcode) {
             AnytimeConstants.RX_SET_DATE_ACK_A,
             AnytimeConstants.RX_SET_DATE_ACK_B -> handleCt5DateResponse(data)

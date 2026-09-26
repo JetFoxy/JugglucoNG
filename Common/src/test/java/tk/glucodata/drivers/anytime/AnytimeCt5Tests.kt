@@ -424,7 +424,8 @@ class AnytimeCt5Tests {
     @Test
     fun aSensorThatHasEverDeliveredIsNeverRebound() {
         val streamingSince = 1_000_000L
-        // A frame since streaming began (warm-up frames count) proves the bind.
+        // Any 0x35/0x37 since streaming began proves the bind, including warm-up,
+        // no-glucose and malformed pushes: the caller stamps it before parsing.
         assertFalse(AnytimeConstants.ct5CachedCipherLooksUnbound(-1, streamingSince, streamingSince))
         // Any stored id, however silent the link is now, rules out a re-bind: that
         // would re-initialise a running session.

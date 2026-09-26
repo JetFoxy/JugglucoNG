@@ -371,14 +371,16 @@ object AnytimeConstants {
             sampleMs < anchorMs + windowMs
 
     /**
-     * Whether a CT5 that entered streaming on a cached cipher should be re-bound: the
-     * sensor has never delivered a frame ([lastGlucoseId] < 0) and none arrived since
-     * streaming began. A sensor that has ever produced data is never re-bound here, so
+     * Whether a CT5 that entered streaming should be re-bound: the sensor has never
+     * delivered a frame ([lastGlucoseId] < 0) and no 0x35/0x37 notification of any kind
+     * ([lastDataRxAtMs], set before parsing) arrived since streaming began. Content is
+     * irrelevant — a malformed or glucose-less push still proves a measuring
+     * transmitter — and a sensor that has ever produced data is never re-bound, so
      * this cannot re-initialise a running session.
      */
     @JvmStatic
-    fun ct5CachedCipherLooksUnbound(lastGlucoseId: Int, lastLiveFrameAtMs: Long, streamingSinceMs: Long): Boolean =
-        lastGlucoseId < 0 && lastLiveFrameAtMs < streamingSinceMs
+    fun ct5CachedCipherLooksUnbound(lastGlucoseId: Int, lastDataRxAtMs: Long, streamingSinceMs: Long): Boolean =
+        lastGlucoseId < 0 && lastDataRxAtMs < streamingSinceMs
 
     /** Watchdog — official app's pullDataDelay is 190 s. */
     const val PULL_WATCHDOG_SECONDS = 190L
