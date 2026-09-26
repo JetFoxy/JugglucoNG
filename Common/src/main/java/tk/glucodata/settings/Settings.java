@@ -1600,7 +1600,8 @@ static private void exchanges(MainActivity context, View parent) {
         exportview.setOnClickListener(v ->{
             var c=Applic.app.curve;
             if(c!=null) {
-                c.dialogs.showexport(context,c.getWidth(),c.getHeight(),lay);
+                var screens = legacyScreens();
+                if (screens != null) screens.openExport(context,c.getWidth(),c.getHeight(),lay);
             }
         });
         meters.setOnClickListener(v->{

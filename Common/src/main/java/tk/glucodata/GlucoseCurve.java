@@ -125,7 +125,6 @@ static View[] reopen=new View[5];
 static int reopennr=0;
     //    SearchLayout search;
     Layout search;
-    public Dialogs dialogs;
     private static final String LOG_ID = "GlucoseCurve";
 static   public float smallfontsize;
     Calendar cal = Calendar.getInstance();
@@ -366,7 +365,6 @@ static public float getDensity() {
 public GlucoseCurve(MainActivity context) {
     super(context);
     metrics= getResources().getDisplayMetrics();
-    dialogs=new Dialogs(metrics.density);
     }
 
 /**

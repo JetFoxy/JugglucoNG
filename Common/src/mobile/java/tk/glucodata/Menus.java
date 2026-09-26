@@ -169,7 +169,8 @@ public class Menus {
 				;
 				act.lightBars(!getInvertColors());
 				removeContentView(view);
-				c.dialogs.showexport(act, c.getWidth(), c.getHeight(), null);
+				var screens = tk.glucodata.LegacyScreensAccess.get();
+				if (screens != null) screens.openExport(act, c.getWidth(), c.getHeight(), null);
 			}
 
 		});

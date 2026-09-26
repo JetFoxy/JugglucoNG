@@ -39,9 +39,36 @@ interface LegacyScreens {
         sendTo: CheckBox,
         noChange: BooleanArray,
     )
+
+    /** The export screen, opened from the settings screen. */
+    /**
+     * The export screen, opened from the settings screen. [parent] is null when opened
+     * from the menus, which is how that caller has always called showexport.
+     */
+    fun openExport(activity: MainActivity, width: Int, height: Int, parent: View?)
+
+    /** The export screen's status line, set from the result of the document picker. */
+    fun setExportStatus(text: CharSequence)
+
+    /** As [setExportStatus], for a string resource. */
+    fun setExportStatus(resId: Int)
 }
 
 object LegacyScreensAccess {
+    /**
+     * How many days of history the pending export covers, remembered between asking for a
+     * document and getting the result back.
+     *
+     * Shared state rather than a screen, and it lives here because the ruling on #465 for
+     * `Menus.on` was to move a phone static that shared code reads into `src/main`. It was
+     * `Dialogs.showdays` before: written only by the phone's `Dialogs`, read only from
+     * shared `MainActivity`, and the watch's copy was a `final int` nobody read while the
+     * native call takes a float.
+     */
+    @JvmStatic
+    @Volatile
+    var exportShowDays: Float = 0f
+
     @Volatile
     private var screens: LegacyScreens? = null
 

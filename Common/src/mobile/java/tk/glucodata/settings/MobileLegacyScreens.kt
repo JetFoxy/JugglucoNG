@@ -3,6 +3,7 @@ package tk.glucodata.settings
 import android.app.Activity
 import android.view.View
 import android.widget.CheckBox
+import tk.glucodata.Dialogs
 import tk.glucodata.IOB
 import tk.glucodata.LegacyScreens
 import tk.glucodata.Libreview
@@ -17,6 +18,14 @@ import tk.glucodata.Nightscout
  * watch no longer needs a stub.
  */
 object MobileLegacyScreens : LegacyScreens {
+    /**
+     * The export screen's dialogs, built on first use. It used to be a field on
+     * [tk.glucodata.GlucoseCurve], which shared code reached as `curve.dialogs`; nothing
+     * owned it by anything shorter-lived than the process before either (Applic holds the
+     * one curve), so holding it here is the same lifetime.
+     */
+    private var dialogs: Dialogs? = null
+
     override fun openLabels(activity: MainActivity, parent: View) {
         LabelsClass(activity).mklabellayout(parent)
     }
@@ -41,4 +50,20 @@ object MobileLegacyScreens : LegacyScreens {
     ) {
         Libreview.config(activity, parent, sendTo, noChange)
     }
+
+    override fun openExport(activity: MainActivity, width: Int, height: Int, parent: View?) {
+        exportDialogs(activity).showexport(activity, width, height, parent)
+    }
+
+    override fun setExportStatus(text: CharSequence) {
+        dialogs?.setExportStatus(text)
+    }
+
+    override fun setExportStatus(resId: Int) {
+        dialogs?.setExportStatus(resId)
+    }
+
+    /** Density comes from the activity, the same way GlucoseCurve used to pass it. */
+    private fun exportDialogs(activity: MainActivity): Dialogs =
+        dialogs ?: Dialogs.create(activity.resources.displayMetrics.density).also { dialogs = it }
 }

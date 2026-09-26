@@ -25,6 +25,10 @@ class LegacyScreensAccessTests {
             noChange: BooleanArray,
         ) {
         }
+
+        override fun openExport(activity: MainActivity, width: Int, height: Int, parent: View?) {}
+        override fun setExportStatus(text: CharSequence) {}
+        override fun setExportStatus(resId: Int) {}
     }
 
     @Test

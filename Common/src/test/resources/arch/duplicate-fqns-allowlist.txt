@@ -22,7 +22,10 @@
 #   reached through HealthConnectAccess and HealthPermissionsAccess. LaunchShit needs a
 #   factory, not a ready instance, because its ActivityResultLauncher has to be registered
 #   while the activity is still being constructed.
-tk.glucodata.Dialogs
+#   tk.glucodata.Dialogs (category P): shared code only ever reached showexport and the
+#   export label, so those became openExport/setExportStatus on LegacyScreens and the
+#   GlucoseCurve field is gone. Its showdays was read by shared code, so it moved to
+#   LegacyScreensAccess.exportShowDays.
 tk.glucodata.FloatingConfig
 tk.glucodata.GlucoseAlarms
 tk.glucodata.Meal

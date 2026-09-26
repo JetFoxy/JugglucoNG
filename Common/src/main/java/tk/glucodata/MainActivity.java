@@ -304,6 +304,21 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
+    /**
+     * The export screen's status line. A local rather than five repetitions of the
+     * null-check, and it tolerates a registry that was never registered (a flavour without
+     * the export screen), which is what a flavour without a Dialogs now has.
+     */
+    private void exportStatus(int resId) {
+        var screens = LegacyScreensAccess.get();
+        if (screens != null) screens.setExportStatus(resId);
+    }
+
+    private void exportStatus(CharSequence text) {
+        var screens = LegacyScreensAccess.get();
+        if (screens != null) screens.setExportStatus(text);
+    }
+
     @Keep
     public static void openSensorListPanel() {
         if (thisone != null) {
@@ -1773,7 +1788,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         int type = requestCode & 0xF;
                         Uri uri;
                         if (data == null || (uri = data.getData()) == null) {
-                            curve.dialogs.exportlabel.setText(R.string.nodata);
+                            exportStatus(R.string.nodata);
                             return;
                         }
                         int fd = -1;
@@ -1782,24 +1797,24 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                             if (parcelFileDescriptor != null)
                                 fd = parcelFileDescriptor.detachFd();
                             else {
-                                curve.dialogs.exportlabel.setText("Can't save: parcelFileDescriptor == null");
+                                exportStatus("Can't save: parcelFileDescriptor == null");
                                 return;
                             }
 
                         } catch (IOException e) {
 
                             Log.stack(LOG_ID, e);
-                            curve.dialogs.exportlabel.setText(R.string.failedbyexception);
+                            exportStatus(R.string.failedbyexception);
                             return;
                         }
-                        if (Natives.exportdata(type, fd, Dialogs.showdays)) {
-                            curve.dialogs.exportlabel.setText(R.string.saved);
+                        if (Natives.exportdata(type, fd, LegacyScreensAccess.getExportShowDays())) {
+                            exportStatus(R.string.saved);
                         } else {
-                            curve.dialogs.exportlabel.setText(R.string.savefailed);
+                            exportStatus(R.string.savefailed);
                         }
                     } else {
 
-                        curve.dialogs.exportlabel.setText(R.string.notsaved);
+                        exportStatus(R.string.notsaved);
                     }
 
                 } catch (Throwable th) {
