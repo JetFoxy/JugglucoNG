@@ -341,6 +341,7 @@ companion object {
     private const val WEAR_API_UNAVAILABLE_LOG_INTERVAL_MS = 60_000L
     const val WAKE_PATH = "/wake"
     const val WAKESTREAM_PATH = "/wakestream"
+    const val PROTOCOL_PATH = "/protocol"
     const val NET_PATH = "/netinfo"
     const val START_PATH = "/start"
     const val ASKFORSTART_PATH = "/askforstart"
@@ -522,7 +523,26 @@ companion object {
         val sender = messagesender ?: return
         val ar = byteArrayOf(0);
         sender.sendmessage(ASKFORSTART_PATH, ar)
+        // Advertise the protocol version on the same handshake, so the phone can answer with its
+        // own and both sides can see a mismatched build (plan §6 Q2). A missed report is harmless:
+        // each managed message also carries its own version.
+        sender.sendmessage(PROTOCOL_PATH, WearProtocol.versionLine().toByteArray(Charsets.UTF_8))
       }
+
+    /** Advertises this build's protocol version (plan §6 Q2). */
+    @JvmStatic
+    public fun sendProtocol() {
+        val sender = messagesender ?: return
+        sender.sendmessage(PROTOCOL_PATH, WearProtocol.versionLine().toByteArray(Charsets.UTF_8))
+    }
+
+    /** Advertises this build's protocol version to one peer. */
+    @JvmStatic
+    public fun sendProtocol(nodeName: String?) {
+        val target = nodeName ?: return
+        val sender = messagesender ?: return
+        sender.nameSendMessage(target, PROTOCOL_PATH, WearProtocol.versionLine().toByteArray(Charsets.UTF_8))
+    }
 
     // Watch → phone: relay a fingerstick calibration (mg/dL) to the side that
     // owns the BLE connection in companion mode.
