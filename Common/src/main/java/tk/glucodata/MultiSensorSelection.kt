@@ -5,8 +5,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 object MultiSensorSelection {
-    private const val PREFS_NAME = "tk.glucodata_preferences"
-    private const val KEY_SELECTED_ORDER = "dashboard_multi_sensor_selection_order"
+    private const val PREFS_NAME = tk.glucodata.settings.SettingsRegistry.FILE
+    private const val KEY_SELECTED_ORDER = tk.glucodata.settings.KEY_SENSOR_SELECTION
     const val SEPARATOR = "\n"
 
     private val _revision = MutableStateFlow(0L)

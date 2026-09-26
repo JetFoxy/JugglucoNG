@@ -1,6 +1,10 @@
 package tk.glucodata
 
 import android.content.Context
+import android.content.SharedPreferences
+import tk.glucodata.settings.SettingDefinition
+import tk.glucodata.settings.SettingType
+import tk.glucodata.settings.SettingsRegistry
 
 /**
  * Mirrors the phone's display preferences onto the watch.
@@ -10,96 +14,37 @@ import android.content.Context
  * was the first case to bite: the watch read [DataSmoothing] happily, found the
  * compiled-in defaults, and drew an unsmoothed curve beside a smoothed phone.
  *
- * Only the keys named in [MIRRORED] travel, so a watch-local setting is never
- * stamped on by the phone, and a payload from a newer phone carrying keys this
- * build has never heard of is ignored rather than mis-applied.
+ * The list of keys that travel is not kept here any more: it is
+ * [SettingsRegistry.mirrored], so a default is declared once and cannot disagree
+ * with itself (plan §2.4). This object only serialises it — the line format is
+ * unchanged, because an older peer has to keep reading it.
  *
- * Colours have their own channel ([GlucoseColorSync]) because applying them
- * means re-running the palette's own load, not just writing prefs.
+ * Colours travel over the same channel but with their own apply step
+ * ([SensorVisuals.invalidateOverrides]), so they are encoded here and
+ * re-applied on the receiving side by [MessageReceiver].
  */
 object WearPrefsSync {
     private const val LOG_ID = "WearPrefsSync"
-    private const val PREFS = "tk.glucodata_preferences"
+    private const val PREFS = SettingsRegistry.FILE
 
-    private const val TYPE_INT = "i"
-    private const val TYPE_BOOL = "b"
-    private const val TYPE_FLOAT = "f"
-    private const val TYPE_STRING = "s"
+    /** The sensor order the phone displays, primary first. */
+    const val KEY_SENSOR_SELECTION = tk.glucodata.settings.KEY_SENSOR_SELECTION
 
-    /** The sensor order the phone displays, primary first; see [MIRRORED]. */
-    const val KEY_SENSOR_SELECTION = "dashboard_multi_sensor_selection_order"
-    private const val KEY_SENSOR_COLORS = "sensor_color_overrides_argb"
-
-    /**
-     * A key that travels. [read] overrides the plain preference read on the
-     * sending side, for values whose stored form is not the effective one.
-     */
-    private class Mirrored(
-        val type: String,
-        val default: Any,
-        val read: (() -> String?)? = null,
-    )
-
-    /**
-     * The keys the phone owns, with the type each is stored as and the default
-     * the phone reads it with.
-     *
-     * The default matters as much as the key. A setting the user has never
-     * touched is absent from the phone's preferences, so sending only what is
-     * stored sent nothing — and the watch fell back to its own default, which
-     * for the predictive simulation was the opposite of the phone's. It showed
-     * "off" on a phone where it was on. The effective value always travels now,
-     * and these defaults must stay in step with the phone's readers.
-     */
-    private val MIRRORED: Map<String, Mirrored> = mapOf(
-        // Data smoothing — the window, and the three switches that decide
-        // whether it reaches the graph at all.
-        "dashboard_chart_smoothing_minutes" to Mirrored(TYPE_INT, 0),
-        "dashboard_data_smoothing_graph_only" to Mirrored(TYPE_BOOL, false),
-        "dashboard_data_smoothing_collapse_chunks" to Mirrored(TYPE_BOOL, false),
-        "dashboard_data_smoothing_exchange_outputs_only" to Mirrored(TYPE_BOOL, false),
-        // Predictive simulation. Both switches default on, as the phone reads them.
-        "dashboard_predictive_simulation_enabled" to Mirrored(TYPE_BOOL, true),
-        "dashboard_prediction_trend_momentum_enabled" to Mirrored(TYPE_BOOL, true),
-        "dashboard_prediction_carb_ratio_g_per_u" to Mirrored(TYPE_FLOAT, 10f),
-        "dashboard_prediction_insulin_sensitivity_mgdl_per_u" to Mirrored(TYPE_FLOAT, 54f),
-        "dashboard_prediction_carb_absorption_g_per_h" to Mirrored(TYPE_FLOAT, 35f),
-        "dashboard_prediction_horizon_minutes" to Mirrored(TYPE_INT, 120),
-        // Which sensors the phone displays, and in what order. The watch
-        // used to make its own choice — whichever sensor had reported most
-        // recently — so with two live sensors its screens and complications
-        // flipped between them on every reading. The stored preference is
-        // not enough on its own: it is empty until the user reorders, and
-        // then the primary is whatever the phone resolves as its main
-        // sensor. What travels is the effective list the phone draws.
-        KEY_SENSOR_SELECTION to Mirrored(TYPE_STRING, "", read = ::effectiveSensorSelection),
-        // The colours the user pinned to sensors, so a peer trace on the
-        // watch chart is the same colour as on the phone chart.
-        KEY_SENSOR_COLORS to Mirrored(TYPE_STRING, ""),
-    )
-
-    /** Phone: the sensors it displays, primary first. */
-    private fun effectiveSensorSelection(): String? = runCatching {
-        val primary = SensorIdentity.resolveMainSensor()
-        selectionToWire(NotificationMultiSensorSource.selectedSensorIds(primary))
-    }.getOrNull()
-
-    /**
-     * The payload is line-based and [MultiSensorSelection] stores its list one
-     * id per line, so the list travels with its own separator instead.
-     */
-    private const val SELECTION_SEPARATOR = ","
-
-    @JvmStatic
-    fun selectionToWire(sensorIds: List<String>): String =
-        sensorIds.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(SELECTION_SEPARATOR)
-
-    @JvmStatic
-    fun selectionFromWire(raw: String): List<String> =
-        raw.split(SELECTION_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
-
+    private val KEY_SENSOR_COLORS = tk.glucodata.settings.KEY_SENSOR_COLORS
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun mirrorValue(definition: SettingDefinition, source: SharedPreferences): String? {
+        definition.effectiveString?.let { return it() }
+        return when (definition.type) {
+            SettingType.INT -> definition.readInt(source).toString()
+            SettingType.BOOL -> definition.readBool(source).toString()
+            SettingType.FLOAT -> definition.readFloat(source).toString()
+            // A string with a line break in it would be read back as two keys; it
+            // is escaped on the way out and restored on the way in.
+            SettingType.STRING -> escapeLine(definition.readString(source))
+        }
+    }
 
     /** Serialises the mirrored keys this device currently holds. */
     @JvmStatic
@@ -107,28 +52,10 @@ object WearPrefsSync {
         if (context == null) return ByteArray(0)
         val source = prefs(context)
         val text = buildString {
-            MIRRORED.forEach { (key, spec) ->
-                val reader = spec.read
-                val raw = when {
-                    reader != null -> reader()
-                    spec.type == TYPE_INT -> runCatching {
-                        source.getInt(key, spec.default as Int).toString()
-                    }.getOrNull()
-                    spec.type == TYPE_BOOL -> runCatching {
-                        source.getBoolean(key, spec.default as Boolean).toString()
-                    }.getOrNull()
-                    spec.type == TYPE_FLOAT -> runCatching {
-                        source.getFloat(key, spec.default as Float).toString()
-                    }.getOrNull()
-                    spec.type == TYPE_STRING -> runCatching {
-                        escapeLine(source.getString(key, spec.default as String).orEmpty())
-                    }.getOrNull()
-                    else -> null
-                } ?: return@forEach
-                // A string with a line break in it would be read back as two
-                // keys; it is escaped on the way out and restored on the way in.
+            SettingsRegistry.mirrored.forEach { definition ->
+                val raw = mirrorValue(definition, source) ?: return@forEach
                 if (raw.contains('\n')) return@forEach
-                append(spec.type).append(':').append(key).append('=').append(raw).append('\n')
+                append(definition.type.wire).append(':').append(definition.key).append('=').append(raw).append('\n')
             }
         }
         return text.toByteArray(Charsets.UTF_8)
@@ -162,17 +89,19 @@ object WearPrefsSync {
             val raw = line.substring(valueSplit + 1)
             // An unknown key, or one that arrives as the wrong type, is skipped:
             // writing it would give this device a pref it cannot read back.
-            if (MIRRORED[key]?.type != type) return@forEach
-            when (type) {
-                TYPE_INT -> raw.toIntOrNull()?.let { editor.putInt(key, it); written++ }
-                TYPE_BOOL -> raw.toBooleanStrictOrNull()?.let { editor.putBoolean(key, it); written++ }
-                TYPE_FLOAT -> raw.toFloatOrNull()
+            val definition = SettingsRegistry.find(key) ?: return@forEach
+            if (definition.type.wire != type) return@forEach
+            when (definition.type) {
+                SettingType.INT -> raw.toIntOrNull()?.let { editor.putInt(key, it); written++ }
+                SettingType.BOOL -> raw.toBooleanStrictOrNull()?.let { editor.putBoolean(key, it); written++ }
+                SettingType.FLOAT -> raw.toFloatOrNull()
                     ?.takeIf { it.isFinite() }
                     ?.let { editor.putFloat(key, it); written++ }
-                TYPE_STRING -> {
+                SettingType.STRING -> {
                     val value = when (key) {
                         // Stored in the form MultiSensorSelection reads.
-                        KEY_SENSOR_SELECTION -> selectionFromWire(raw).joinToString(MultiSensorSelection.SEPARATOR)
+                        KEY_SENSOR_SELECTION -> SettingsRegistry.selectionFromWire(raw)
+                            .joinToString(MultiSensorSelection.SEPARATOR)
                         else -> unescapeLine(raw)
                     }
                     if (key == KEY_SENSOR_SELECTION && value != prefs(context).getString(key, "")) {
@@ -198,6 +127,12 @@ object WearPrefsSync {
         UiRefreshBus.requestDataRefresh()
         return written
     }
+
+    @JvmStatic
+    fun selectionToWire(sensorIds: List<String>): String = SettingsRegistry.selectionToWire(sensorIds)
+
+    @JvmStatic
+    fun selectionFromWire(raw: String): List<String> = SettingsRegistry.selectionFromWire(raw)
 
     /** A string value on one payload line: line breaks and backslashes escaped. */
     @JvmStatic
