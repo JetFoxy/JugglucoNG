@@ -35,6 +35,24 @@ object WearProtocol {
     fun accepts(declaredVersion: Int?): Boolean =
         declaredVersion == null || declaredVersion <= VERSION
 
+    // ---- the other version carriers ------------------------------------------------------------------
+    //
+    // The `v:` line above is not the only version in the protocol, and the others do not
+    // agree with it. Worth knowing before changing any of them:
+    //
+    // | family | carrier | policy |
+    // |---|---|---|
+    // | text payloads (display prefs, toggles, glucose colours) | `v:<n>` line | legacy and older accepted, newer refused |
+    // | sensor ownership (`/sync2/own`) | private version byte in [SensorOwnershipRuntime] | that one value only |
+    // | sensor handoff (`/sensorhandoff`) | `version` key in the JSON | that one value only; no key reads as 0 |
+    //
+    // So the text payloads degrade, and the two binary ones break: a version bump in
+    // either direction makes the pair drop messages with nothing on screen. Relaxing the
+    // binary policies means letting a build that does not know a field apply a payload
+    // that carries one, which is a behaviour change on which device reads a sensor --
+    // a maintainer decision (plan §8.3), not a refactor. The behaviour as it stands is
+    // pinned in WearPayloadVersionPolicyTests.
+
     // ---- the handshake ------------------------------------------------------------------------
 
     @Volatile
