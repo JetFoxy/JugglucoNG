@@ -110,50 +110,15 @@ object CurrentDisplaySource {
             emptyList()
         }
         val viewMode = resolveSensorViewMode(resolvedSensorId)
-        val processedPoints = prepareRecentPointsForCurrent(
-            recentPoints = recentPoints,
+        return resolveSnapshot(
             current = current,
+            recentPoints = recentPoints,
             historyStart = historyStart,
             viewMode = viewMode,
-            smoothAllData = smoothingMode.smoothAllData,
-            smoothingMinutes = smoothingMode.smoothingMinutes,
-            collapseChunks = smoothingMode.collapseChunks
-        )
-        val initialSnapshot = resolveFromLive(
-            liveValueText = current?.valueText,
-            liveNumericValue = current?.numericValue ?: Float.NaN,
-            liveCalibratedValue = current?.calibratedNumericValue ?: Float.NaN,
-            rate = current?.rate ?: Float.NaN,
-            targetTimeMillis = exchangeTargetTimeMillis(
-                collapseChunks = smoothingMode.collapseChunks,
-                processedPoints = processedPoints,
-                liveTimeMillis = current?.timeMillis
-            ),
-            sensorId = resolvedSensorId,
-            sensorGen = current?.sensorGen ?: 0,
-            index = current?.index ?: 0,
-            source = current?.source ?: if (processedPoints.isNotEmpty()) "history" else "none",
-            recentPoints = processedPoints,
-            viewMode = viewMode,
-            isMmol = isMmol
-        )
-        if (initialSnapshot == null) {
-            return null
-        }
-        val trendPoints = DisplayTrendSource.augmentHistory(
-            historyPoints = processedPoints,
-            current = initialSnapshot,
-            activeSensorSerial = resolvedSensorId,
-            startTimeMs = historyStart
-        )
-        val canonicalRate = DisplayTrendSource.resolveArrowRate(
-            recentPoints = trendPoints,
-            current = initialSnapshot,
-            viewMode = viewMode,
             isMmol = isMmol,
-            fallbackRate = current?.rate ?: Float.NaN
+            smoothingMode = smoothingMode,
+            sensorId = resolvedSensorId
         )
-        return initialSnapshot.copy(rate = canonicalRate)
     }
 
     @JvmStatic
@@ -167,15 +132,40 @@ object CurrentDisplaySource {
         index: Int = 0,
         source: String = "incoming",
         historyWindowMs: Long = DEFAULT_HISTORY_WINDOW_MS
+    ): Snapshot? = resolveIncomingReading(
+        reading = LiveReadingLanes.stock(liveNumericValue, Float.NaN),
+        rate = rate,
+        targetTimeMillis = targetTimeMillis,
+        preferredSensorId = preferredSensorId,
+        sensorGen = sensorGen,
+        index = index,
+        source = source,
+        historyWindowMs = historyWindowMs
+    )
+
+    /**
+     * A reading that has not necessarily reached history yet, resolved exactly as
+     * [resolveCurrent] would resolve it once it is the current one. The two used
+     * to be separate copies, and the alert engine switches between them from one
+     * tick to the next: any difference fires an alert and clears it again.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun resolveIncomingReading(
+        reading: LiveReadingLanes,
+        rate: Float,
+        targetTimeMillis: Long,
+        preferredSensorId: String? = null,
+        sensorGen: Int = 0,
+        index: Int = 0,
+        source: String = "incoming",
+        historyWindowMs: Long = DEFAULT_HISTORY_WINDOW_MS
     ): Snapshot? {
-        if (!liveNumericValue.isFinite() || liveNumericValue <= 0.1f || targetTimeMillis <= 0L) {
+        if (!reading.hasValue || targetTimeMillis <= 0L) {
             return null
         }
         val resolvedSensorId = preferredSensorId ?: SensorIdentity.resolveMainSensor()
         val isMmol = Applic.unit == 1
-        val smoothingMinutes = DataSmoothing.getMinutes(Applic.app)
-        val smoothAllData = DataSmoothing.shouldSmoothLocalData(Applic.app)
-        val collapseChunks = smoothAllData && DataSmoothing.collapseChunks(Applic.app)
         val liveHistoryWindowMs = historyWindowMs.coerceAtLeast(LIVE_CONTEXT_WINDOW_MS)
         val historyStart = (targetTimeMillis - liveHistoryWindowMs).coerceAtLeast(0L)
         val recentPoints = try {
@@ -183,42 +173,60 @@ object CurrentDisplaySource {
         } catch (_: Throwable) {
             emptyList()
         }
-        val viewMode = resolveSensorViewMode(resolvedSensorId)
-        val current = CurrentGlucoseSource.Snapshot(
+        val current = CurrentGlucoseSource.Snapshot.of(
+            reading = reading,
             timeMillis = targetTimeMillis,
             valueText = "",
-            numericValue = liveNumericValue,
-            rawNumericValue = Float.NaN,
-            calibratedNumericValue = Float.NaN,
             rate = rate,
             sensorId = resolvedSensorId,
             sensorGen = sensorGen,
             index = index,
             source = source
         )
+        return resolveSnapshot(
+            current = current,
+            recentPoints = recentPoints,
+            historyStart = historyStart,
+            viewMode = resolveSensorViewMode(resolvedSensorId),
+            isMmol = isMmol,
+            smoothingMode = localSmoothingMode(),
+            sensorId = resolvedSensorId
+        )
+    }
+
+    /** The part of both resolutions that touches no storage. */
+    internal fun resolveSnapshot(
+        current: CurrentGlucoseSource.Snapshot?,
+        recentPoints: List<GlucosePoint>,
+        historyStart: Long,
+        viewMode: Int,
+        isMmol: Boolean,
+        smoothingMode: SmoothingMode,
+        sensorId: String?
+    ): Snapshot? {
         val processedPoints = prepareRecentPointsForCurrent(
             recentPoints = recentPoints,
             current = current,
             historyStart = historyStart,
             viewMode = viewMode,
-            smoothAllData = smoothAllData,
-            smoothingMinutes = smoothingMinutes,
-            collapseChunks = collapseChunks
+            smoothAllData = smoothingMode.smoothAllData,
+            smoothingMinutes = smoothingMode.smoothingMinutes,
+            collapseChunks = smoothingMode.collapseChunks
         )
         val initialSnapshot = resolveFromLive(
-            liveValueText = null,
-            liveNumericValue = liveNumericValue,
-            liveCalibratedValue = Float.NaN,
-            rate = rate,
-            targetTimeMillis = if (collapseChunks) {
-                processedPoints.lastOrNull()?.timestamp ?: targetTimeMillis
-            } else {
-                targetTimeMillis
-            },
-            sensorId = resolvedSensorId,
-            sensorGen = sensorGen,
-            index = index,
-            source = source,
+            liveValueText = current?.valueText,
+            liveNumericValue = current?.let { liveLaneValue(it, viewMode) } ?: Float.NaN,
+            liveCalibratedValue = current?.calibratedNumericValue ?: Float.NaN,
+            rate = current?.rate ?: Float.NaN,
+            targetTimeMillis = exchangeTargetTimeMillis(
+                collapseChunks = smoothingMode.collapseChunks,
+                processedPoints = processedPoints,
+                liveTimeMillis = current?.timeMillis
+            ),
+            sensorId = sensorId,
+            sensorGen = current?.sensorGen ?: 0,
+            index = current?.index ?: 0,
+            source = current?.source ?: if (processedPoints.isNotEmpty()) "history" else "none",
             recentPoints = processedPoints,
             viewMode = viewMode,
             isMmol = isMmol
@@ -226,7 +234,7 @@ object CurrentDisplaySource {
         val trendPoints = DisplayTrendSource.augmentHistory(
             historyPoints = processedPoints,
             current = initialSnapshot,
-            activeSensorSerial = resolvedSensorId,
+            activeSensorSerial = sensorId,
             startTimeMs = historyStart
         )
         val canonicalRate = DisplayTrendSource.resolveArrowRate(
@@ -234,9 +242,16 @@ object CurrentDisplaySource {
             current = initialSnapshot,
             viewMode = viewMode,
             isMmol = isMmol,
-            fallbackRate = rate
+            fallbackRate = current?.rate ?: Float.NaN
         )
         return initialSnapshot.copy(rate = canonicalRate)
+    }
+
+    /** The live value for the lane this view mode shows first. */
+    private fun liveLaneValue(current: CurrentGlucoseSource.Snapshot, viewMode: Int): Float {
+        val auto = current.numericValue.takeIf { it.isFinite() && it > 0.1f }
+        val raw = current.rawNumericValue.takeIf { it.isFinite() && it > 0.1f }
+        return (if (isRawPrimary(viewMode)) raw ?: auto else auto ?: raw) ?: Float.NaN
     }
 
     /**

@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import tk.glucodata.Applic
 import tk.glucodata.CurrentDisplaySource
 import tk.glucodata.GlucoseDelta
+import tk.glucodata.LiveReadingLanes
 import tk.glucodata.Log
 import tk.glucodata.Notify
 import tk.glucodata.R
@@ -105,10 +106,20 @@ object AlertRuntimeManager {
         rate: Float,
         readingTimeMs: Long,
         sensorGen: Int = 0
+    ): AlertRuntimeEvaluation =
+        onNewReading(sensorId, LiveReadingLanes.stock(glucoseValue, Float.NaN), rate, readingTimeMs, sensorGen)
+
+    /** [reading] says whether the value was already calibrated; see [LiveReadingLanes]. */
+    fun onNewReading(
+        sensorId: String?,
+        reading: LiveReadingLanes,
+        rate: Float,
+        readingTimeMs: Long,
+        sensorGen: Int
     ): AlertRuntimeEvaluation {
         val snapshot = try {
             CurrentDisplaySource.resolveIncomingReading(
-                liveNumericValue = glucoseValue,
+                reading = reading,
                 rate = rate,
                 targetTimeMillis = readingTimeMs,
                 preferredSensorId = sensorId,

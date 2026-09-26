@@ -50,13 +50,25 @@ object CustomAlertAccess {
         sensorId: String?,
         sensorGen: Int
     ) {
+        checkAndTrigger(context, LiveReadingLanes.stock(glucose, Float.NaN), rate, timestampMillis, sensorId, sensorGen)
+    }
+
+    @JvmStatic
+    fun checkAndTrigger(
+        context: Context,
+        reading: LiveReadingLanes,
+        rate: Float,
+        timestampMillis: Long,
+        sensorId: String?,
+        sensorGen: Int
+    ) {
         val target = controller
         if (target == null) {
             warnMissing("checkAndTrigger")
             return
         }
         runCatching {
-            target.checkAndTrigger(context, glucose, rate, timestampMillis, sensorId, sensorGen)
+            target.checkAndTrigger(context, reading, rate, timestampMillis, sensorId, sensorGen)
         }.onFailure { Log.stack(LOG_ID, "checkAndTrigger", it) }
     }
 
