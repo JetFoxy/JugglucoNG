@@ -599,6 +599,11 @@ bool sendlibreviewdata(const int newcurrent, const uint32_t nu) {
     for (; i >= 0; i--) {
       int index = sensints[i];
       SensorGlucoseData *sensdata = sensors->getSensorData(index);
+      if (!sensdata) {
+        LOGGER("sendlibreviewdata: no data for sensor slot %d\n", index);
+        lists[i] = {};
+        continue;
+      }
       auto *info = sensdata->getinfo();
       if (!info->libreviewsendall) {
         if (sensdata->isLibre2()) {
@@ -690,6 +695,8 @@ bool sendlibreviewdata(const int newcurrent, const uint32_t nu) {
       if (lists[i].size || (i == newcurrent)) {
         const int index = sensints[i];
         SensorGlucoseData *sensdata = sensors->getSensorData(index);
+        if (!sensdata)
+          continue;
         if (!sensdata->getinfo()->libreviewsendall) {
           if (!putwhenneeded(false, sensdata))
             return false;
@@ -842,6 +849,10 @@ bool sendlibreviewdata(const int newcurrent, const uint32_t nu) {
     for (int i = last; i >= startsensor; i--) {
       int index = sensints[i];
       SensorGlucoseData *sensdata = sensors->getSensorData(index);
+      if (!sensdata) {
+        scanids[i] = 0;
+        continue;
+      }
 
       if (!sensdata->getinfo()->libreviewsendall) {
         auto scans = sensdata->getScandata();
@@ -910,6 +921,8 @@ bool sendlibreviewdata(const int newcurrent, const uint32_t nu) {
         for (int i = last; i >= startsensor; i--) {
           const int index = sensints[i];
           SensorGlucoseData *sensdata = sensors->getSensorData(index);
+          if (!sensdata)
+            continue;
           if (!sensdata->getinfo()->libreviewsendall) {
             if (sensdata->isLibre2()) {
               sensdata->viewed.clear();
