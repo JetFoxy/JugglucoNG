@@ -107,6 +107,9 @@ object WearPrefsSync {
         if (context == null) return ByteArray(0)
         val source = prefs(context)
         val text = buildString {
+            // The protocol version, first. An old receiver has no `=` on this line and skips it, so
+            // the settings themselves still arrive; a newer receiver checks it before applying.
+            append(WearProtocol.versionLine()).append('\n')
             MIRRORED.forEach { (key, spec) ->
                 val reader = spec.read
                 val raw = when {
@@ -142,12 +145,23 @@ object WearPrefsSync {
     @JvmStatic
     fun apply(context: Context?, data: ByteArray?): Int {
         if (context == null || data == null || data.isEmpty()) return 0
-        val lines = try {
-            data.toString(Charsets.UTF_8).lines()
+        val text = try {
+            data.toString(Charsets.UTF_8)
         } catch (t: Throwable) {
             Log.stack(LOG_ID, "decode", t)
             return 0
         }
+        val declaredVersion = WearProtocol.declaredVersion(text)
+        if (!WearProtocol.accepts(declaredVersion)) {
+            // A newer peer's payload: applying a shape this build does not know is worse than
+            // leaving the settings alone. A legacy payload (no version line) is version 1.
+            Log.w(
+                LOG_ID,
+                "ignoring display prefs from a newer protocol: v$declaredVersion > v${WearProtocol.VERSION}",
+            )
+            return 0
+        }
+        val lines = text.lines()
 
         val editor = prefs(context).edit()
         var written = 0
