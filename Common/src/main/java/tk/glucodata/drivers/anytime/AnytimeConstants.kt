@@ -341,6 +341,15 @@ object AnytimeConstants {
     const val CT5_WARMUP_MINUTES = 40
 
     /**
+     * K/R sent in CT5 setParameters when neither the transmitter SSN nor a scanned
+     * code yields a calibration. Both SSNs seen so far decode to R=1.0 with
+     * K=1.09 and K=1.15; the transmitter computes Auto glucose from these, so a
+     * scanned code replaces them as soon as the user has one.
+     */
+    const val CT5_DEFAULT_K = 1.10f
+    const val CT5_DEFAULT_R = 1.0f
+
+    /**
      * Whether a sample falls inside the post-activation settling window and so must
      * not be published, stored or exported.
      *

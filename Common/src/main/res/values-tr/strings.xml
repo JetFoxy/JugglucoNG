@@ -1228,6 +1228,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="anytime_calibration_used_status">Kalibrasyon #%1$d okumasında kullanıldı: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Kalibrasyon gönderilemedi</string>
     <string name="anytime_calibration_waiting_for_reading_status">Kalibrasyon kullanılamıyor; ilk okuma bekleniyor</string>
+    <string name="anytime_ct5_default_calibration_status">Varsayılan kalibrasyon kullanılıyor; sensör kodunu tarayın</string>
     <string name="anytime_calibration_not_allowed_status">Sensör şu anda kalibrasyona izin vermiyor</string>
     <string name="anytime_calibration_not_streaming_status">Sensör veri akışı yapmıyorken kalibrasyon kullanılamaz</string>
     <string name="anytime_calibration_after_24h_status">İlk 24 saatte kalibrasyon kullanılamaz</string>

@@ -1315,6 +1315,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="anytime_calibration_used_status">Kalibrierung bei Messung #%1$d verwendet: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Kalibrierung konnte nicht gesendet werden</string>
     <string name="anytime_calibration_waiting_for_reading_status">Kalibrierung nicht verfügbar; warte auf erste Messung</string>
+    <string name="anytime_ct5_default_calibration_status">Standardkalibrierung aktiv; Sensorcode scannen</string>
     <string name="anytime_calibration_not_allowed_status">Der Sensor erlaubt derzeit keine Kalibrierung</string>
     <string name="anytime_calibration_not_streaming_status">Kalibrierung nicht verfügbar, solange der Sensor nicht streamt</string>
     <string name="anytime_calibration_after_24h_status">Kalibrierung in den ersten 24 h nicht verfügbar</string>

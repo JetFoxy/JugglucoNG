@@ -1199,6 +1199,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="anytime_calibration_used_status">Каліброўка выкарыстана для паказання #%1$d: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Не ўдалося адправіць каліброўку</string>
     <string name="anytime_calibration_waiting_for_reading_status">Каліброўка недаступная; чаканне першага паказання</string>
+    <string name="anytime_ct5_default_calibration_status">Выкарыстоўваецца стандартная каліброўка; адсканіруйце код сэнсара</string>
     <string name="anytime_calibration_not_allowed_status">Датчык зараз не дазваляе каліброўку</string>
     <string name="anytime_calibration_not_streaming_status">Каліброўка недаступная, пакуль датчык не перадае дадзеныя</string>
     <string name="anytime_calibration_after_24h_status">Каліброўка недаступная першыя 24 гадз</string>

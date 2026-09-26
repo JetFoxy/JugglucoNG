@@ -3511,14 +3511,10 @@ class AnytimeBleManager(
         // During an end cycle this answer exists only to supply K/R for the
         // re-registration; the ordinary path from here would set parameters and
         // then start a measurement.
+        val calibration = parsed ?: ct5SetupCalibration()
         if (ct5EndCycleSsnInFlight) {
-            Log.i(TAG, "CT5 end-cycle SSN answered (calibration=${(parsed ?: qr) != null})")
+            Log.i(TAG, "CT5 end-cycle SSN answered (decoded=${parsed != null})")
             sendCt5EndCycleReRegister("ct5-endCycle-querySSN")
-            return
-        }
-        val calibration = parsed ?: qr
-        if (calibration == null) {
-            Log.w(TAG, "CT5 setup cannot continue without K/R calibration")
             return
         }
         if (ct5TempId.isBlank()) ct5TempId = generateCt5TempId()
@@ -3526,6 +3522,25 @@ class AnytimeBleManager(
             AnytimeFrames.Builders.ct5SetParameters(calibration.k, calibration.r, key, ct5TempId),
             "ct5-setParameters",
         )
+    }
+
+    /**
+     * K/R for setParameters when the SSN did not decode (see
+     * [AnytimeQr.ct5SetupCalibration]). Never a stall: without setParameters the
+     * bind never finishes. Switching to the default is logged and shown on the card.
+     */
+    private fun ct5SetupCalibration(): AnytimeQrCalibration {
+        val fallback = AnytimeQr.ct5SetupCalibration(qr, voltageFlag)
+        if (fallback === qr) return fallback
+        qr = fallback
+        persistAlgorithmState()
+        Log.w(TAG, "CT5 SSN gave no K/R; using default K=${fallback.k} R=${fallback.r} until a sensor code is scanned")
+        // An end cycle only needs the K/R to re-register the id; the sensor is finishing.
+        if (!ct5EndCycleSsnInFlight) setCalibrationStatus(
+            resId = R.string.anytime_ct5_default_calibration_status,
+            fallback = "Default calibration in use; scan the sensor code",
+        )
+        return fallback
     }
 
     private fun handleCt5SetParametersResponse(data: ByteArray) {
@@ -5302,7 +5317,7 @@ class AnytimeBleManager(
      * so this re-states the existing calibration rather than changing it.
      */
     private fun sendCt5EndCycleReRegister(refusedTag: String) {
-        val calibration = qr
+        val calibration = qr?.takeIf { it.hasTransmitterKr }
         val key = ct5CipherKey
         if (key !in 0..255) {
             failCt5EndCycle(
@@ -5311,10 +5326,10 @@ class AnytimeBleManager(
             )
             return
         }
-        // No stored K/R is itself evidence for the theory: handleCt5QuerySsnResponse
-        // returns before sending setParameters when it cannot decode a calibration,
-        // which is exactly the interrupted bind that would leave the transmitter
-        // without our id. Ask the transmitter for its own SSN and try again.
+        // No stored K/R suggests a bind that was interrupted before setParameters
+        // (older builds stalled there on an undecodable SSN), leaving the
+        // transmitter without our id. Ask the transmitter for its own SSN and try
+        // again; its answer, or the CT5 default, supplies the K/R.
         if (calibration == null) {
             if (ct5EndCycleSsnInFlight) {
                 failCt5EndCycle(

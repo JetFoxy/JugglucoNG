@@ -1243,6 +1243,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="anytime_calibration_used_status">Kalibratie gebruikt bij meting #%1$d: %2$.0f mg/dL</string>
     <string name="anytime_calibration_send_failed_status">Kalibratie verzenden mislukt</string>
     <string name="anytime_calibration_waiting_for_reading_status">Kalibratie niet beschikbaar; wachten op eerste meting</string>
+    <string name="anytime_ct5_default_calibration_status">Standaardkalibratie in gebruik; scan de sensorcode</string>
     <string name="anytime_calibration_not_allowed_status">De sensor staat kalibratie nu niet toe</string>
     <string name="anytime_calibration_not_streaming_status">Kalibratie niet beschikbaar zolang de sensor niet streamt</string>
     <string name="anytime_calibration_after_24h_status">Kalibratie niet beschikbaar in de eerste 24 u</string>
