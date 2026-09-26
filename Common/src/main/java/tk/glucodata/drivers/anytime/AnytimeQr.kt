@@ -88,6 +88,9 @@ data class AnytimeQrCalibration(
             Regex("^([1-9A-ZABDEFYTSRQ])([1-9])([A-Z0-9])([0-9])$MONTH$THREE_DIGIT$THREE_DIGIT([0-9]{6})([0-9A-Z]{3})$")
         @JvmField
         val PATTERN_MANUAL: Regex = Regex("^[A-Z0-9]{7}$")
+        /** Numeric-lead CT5 SSN; K at [13..16), R at [16..18) like the alpha-lead form. */
+        @JvmField
+        val PATTERN_NUMERIC_SSN: Regex = Regex("^[0-9]{19}[0-9A-Z]{2}$")
         @JvmField
         val PATTERN_GS1_UDI: Regex = Regex("^01(\\d{14})11(\\d{6})17(\\d{6})10(.+)$")
     }
@@ -123,11 +126,19 @@ object AnytimeQr {
         AnytimeQrCalibration.PATTERN_D.matchEntire(trimmed)?.let { return parseFormatD(trimmed, it) }
         parseManual(trimmed)?.let { return it }
         parseGs1Udi(trimmed)?.let { return it }
-        return null
+        // CT5 querySSN can also answer with a numeric lead
+        // (0056131041576115100F1). No scanner pattern claims that shape, so
+        // it is tried last instead of ahead of Formats B/D.
+        return parseTrailingKrFactoryCode(trimmed, numericLead = true)
     }
 
-    private fun parseTrailingKrFactoryCode(qr: String): AnytimeQrCalibration? {
-        if (qr.length != 21 || qr.firstOrNull() !in 'A'..'C') return null
+    private fun parseTrailingKrFactoryCode(qr: String, numericLead: Boolean = false): AnytimeQrCalibration? {
+        if (qr.length != 21) return null
+        if (numericLead) {
+            if (!AnytimeQrCalibration.PATTERN_NUMERIC_SSN.matches(qr)) return null
+        } else if (qr.first() !in 'A'..'C') {
+            return null
+        }
         val kDigits = qr.substring(13, 16)
         val rDigits = qr.substring(16, 18)
         if (kDigits.any { it !in '0'..'9' } || rDigits.any { it !in '0'..'9' }) return null

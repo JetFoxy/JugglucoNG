@@ -95,6 +95,31 @@ class AnytimeQrTests {
     }
 
     @Test
+    fun parse_acceptsNumericLeadCt5Ssn() {
+        // Real querySSN answer that stalled a fresh CT5 bind before K/R.
+        val parsed = AnytimeQr.parse("0056131041576115100F1")
+        assertNotNull(parsed)
+        parsed!!
+
+        assertTrue(parsed.isFactoryCalibration)
+        assertEquals(1.15f, parsed.k, 0.0001f)
+        assertEquals(1.0f, parsed.r, 0.0001f)
+        assertEquals(0, parsed.voltageFlag)
+    }
+
+    @Test
+    fun parse_numericLeadFormatBStillWinsOverSsnLayout() {
+        // 21-char Format B code: must keep the scanner's K/R, not the trailing layout.
+        val parsed = AnytimeQr.parse("2142121234561234561AB")
+        assertNotNull(parsed)
+        parsed!!
+
+        assertEquals(AnytimeQrCalibration.Format.B, parsed.format)
+        assertEquals(1.23f, parsed.k, 0.0001f)
+        assertEquals(45.6f, parsed.r, 0.0001f)
+    }
+
+    @Test
     fun parse_acceptsOfficialScannerPatternD() {
         val parsed = AnytimeQr.parse("Q1B2031234561234567ZZ")
         assertNotNull(parsed)
