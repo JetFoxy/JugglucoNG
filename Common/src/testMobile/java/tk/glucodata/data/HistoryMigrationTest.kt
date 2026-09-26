@@ -72,17 +72,33 @@ class HistoryMigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(DB_NAME, HISTORY_DATABASE_VERSION, true, *HistoryDatabase.ALL_MIGRATIONS)
 
-        migrated.query("SELECT sensorSerial, value, rate FROM history_readings").use { cursor ->
+        migrated.query("SELECT id, sensorSerial, value, rate, source, firstStoredAt FROM history_readings").use { cursor ->
             assertTrue("the reading survived", cursor.moveToFirst())
-            assertEquals("S-1", cursor.getString(0))
-            assertEquals(123.0, cursor.getDouble(1), 0.001)
-            assertEquals(1.5, cursor.getDouble(2), 0.001)
+            assertEquals("S-1", cursor.getString(1))
+            assertEquals(123.0, cursor.getDouble(2), 0.001)
+            assertEquals(1.5, cursor.getDouble(3), 0.001)
+            assertEquals("an old reading is a sensor reading", "sensor", cursor.getString(4))
+            assertEquals(
+                "firstStoredAt is backfilled from the row id, not left at the column default",
+                cursor.getLong(0),
+                cursor.getLong(5),
+            )
             assertEquals(1, cursor.count)
         }
         migrated.query("SELECT sensorSerial FROM history_deleted_readings").use { cursor ->
             assertTrue("the tombstone survived", cursor.moveToFirst())
             assertEquals("S-1", cursor.getString(0))
             assertEquals(1, cursor.count)
+        }
+        // The v17/v18 step rebuilds reading_display; the minute-keyed schema has to be there
+        // afterwards or the dashboard writes into the old per-sensor table (the divergent-history
+        // guard). A missing index would also mean the rebuild silently did not run.
+        migrated.query("SELECT name FROM sqlite_master WHERE type = 'index'").use { cursor ->
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(0) == "index_reading_display_sensorSerial") found = true
+            }
+            assertTrue("reading_display was rebuilt with its per-sensor index", found)
         }
         migrated.close()
     }
@@ -240,6 +256,50 @@ class HistoryMigrationTest {
             directory = directory.parentFile
         }
         error("Could not locate committed history schemas")
+    }
+
+    @Test
+    fun onlyLocalJournalSourcesAreBackfilledAsOrigin() {
+        // ensureCloneSchema backfills originSource from source only for the local entry kinds
+        // (manual / health_connect / meter / pen). A Nightscout- or Clone-sourced row must stay
+        // NULL: backfilling it as "manual" would let Clone recovery treat a foreign entry as local
+        // content it authored. CloneJournalRecoveryStore then resolves the missing origin as
+        // `originSource ?: source`, so the NULL rows keep their real source on import.
+        helper.createDatabase(DB_NAME, 11).use { db ->
+            listOf(1L to "manual", 2L to "health_connect", 3L to "meter", 4L to "pen").forEach { (id, source) ->
+                db.execSQL(
+                    "INSERT INTO journal_entries " +
+                        "(id, timestamp, entryType, title, source, createdAt, updatedAt) " +
+                        "VALUES ($id, ${id * 1000}, 'note', '$source', '$source', 1, 2)"
+                )
+            }
+            listOf(5L to "nightscout", 6L to "clone_turn", 7L to "api").forEach { (id, source) ->
+                db.execSQL(
+                    "INSERT INTO journal_entries " +
+                        "(id, timestamp, entryType, title, source, createdAt, updatedAt) " +
+                        "VALUES ($id, ${id * 1000}, 'note', '$source', '$source', 1, 2)"
+                )
+            }
+        }
+
+        val migrated = helper.runMigrationsAndValidate(DB_NAME, HISTORY_DATABASE_VERSION, true, *HistoryDatabase.ALL_MIGRATIONS)
+
+        listOf(1L to "manual", 2L to "health_connect", 3L to "meter", 4L to "pen").forEach { (id, source) ->
+            migrated.query("SELECT source, originSource FROM journal_entries WHERE id = $id").use { cursor ->
+                assertTrue("entry $id survived", cursor.moveToFirst())
+                assertEquals("source is preserved", source, cursor.getString(0))
+                assertEquals("a local source becomes its own origin", source, cursor.getString(1))
+            }
+        }
+        listOf(5L to "nightscout", 6L to "clone_turn", 7L to "api").forEach { (id, source) ->
+            migrated.query("SELECT source, originSource, recoveryId FROM journal_entries WHERE id = $id").use { cursor ->
+                assertTrue("entry $id survived", cursor.moveToFirst())
+                assertEquals("source is preserved", source, cursor.getString(0))
+                assertTrue("a non-local source is not claimed as manual", cursor.isNull(1))
+                assertTrue("the recovery identity is still assigned", !cursor.isNull(2))
+            }
+        }
+        migrated.close()
     }
 
     private companion object {

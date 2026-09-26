@@ -50,12 +50,17 @@ class CalibrationMigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(DB_NAME, CALIBRATION_DATABASE_VERSION, true, *CalibrationDatabase.ALL_MIGRATIONS)
 
-        migrated.query("SELECT sensorId, sensorValue, userValue, journalEntryId FROM calibrations").use { cursor ->
+        migrated.query(
+            "SELECT sensorId, sensorValue, sensorValueRaw, userValue, sensorValueStock, journalEntryId " +
+                "FROM calibrations"
+        ).use { cursor ->
             assertTrue("the calibration survived", cursor.moveToFirst())
             assertEquals("S-1", cursor.getString(0))
             assertEquals(5.5, cursor.getDouble(1), 0.001)
-            assertEquals(6.0, cursor.getDouble(2), 0.001)
-            assertTrue("journalEntryId starts null (entered by hand)", cursor.isNull(3))
+            assertEquals("the sensor's own raw value survives the migration", 5.4, cursor.getDouble(2), 0.001)
+            assertEquals(6.0, cursor.getDouble(3), 0.001)
+            assertEquals("sensorValueStock is a column added at v5 with a zero default", 0.0, cursor.getDouble(4), 0.001)
+            assertTrue("journalEntryId starts null (entered by hand)", cursor.isNull(5))
             assertEquals(1, cursor.count)
         }
         migrated.close()
