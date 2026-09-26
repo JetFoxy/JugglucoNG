@@ -35,6 +35,7 @@ import android.widget.Button;
 import tk.glucodata.MainActivity;
 import tk.glucodata.Natives;
 import tk.glucodata.R;
+import tk.glucodata.LegacyScreensAccess;
 import yuku.ambilwarna.AmbilWarnaDialog;
 
 import static android.view.View.GONE;
@@ -107,8 +108,8 @@ static void show(MainActivity act) {
                 close.setOnClickListener(v->{
                     removeContentView(view);
                     act.poponback();
-                    if(tk.glucodata.Menus.on)
-                        tk.glucodata.Menus.show(act);
+                    if(LegacyScreensAccess.getMenusOn())
+                        LegacyScreensAccess.get().openMenus(act);
                             });
                 help.setOnClickListener(v->{
                     tk.glucodata.help.helplight(R.string.colorhelp,act);
@@ -119,8 +120,8 @@ static void show(MainActivity act) {
 
     act.setonback(()-> {
         removeContentView(view);
-        if(tk.glucodata.Menus.on)
-            tk.glucodata.Menus.show(act);
+        if(LegacyScreensAccess.getMenusOn())
+            LegacyScreensAccess.get().openMenus(act);
             
     });
 }

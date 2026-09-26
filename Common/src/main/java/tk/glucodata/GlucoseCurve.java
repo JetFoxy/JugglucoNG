@@ -183,8 +183,8 @@ if(!isWearable) {
         hidemealsearch();
 
     hidekeyboard(); reopener();
-    if(Menus.on)
-        Menus.show(activity);
+    if(LegacyScreensAccess.getMenusOn())
+        LegacyScreensAccess.get().openMenus(activity);
 
     } );
     }
@@ -325,8 +325,8 @@ void getnumcontrol(MainActivity activity) {
     activity.setonback(()-> {
         numcontrol.setVisibility(GONE);
         Natives.endnumlist();
-         if(Menus.on) {
-             Menus.show(activity);
+         if(LegacyScreensAccess.getMenusOn()) {
+             LegacyScreensAccess.get().openMenus(activity);
              }
         else
              requestRender();

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.view.View
 import android.widget.CheckBox
 import tk.glucodata.Dialogs
+import tk.glucodata.Menus
 import tk.glucodata.IOB
 import tk.glucodata.LegacyScreens
 import tk.glucodata.Libreview
@@ -61,6 +62,10 @@ object MobileLegacyScreens : LegacyScreens {
 
     override fun setExportStatus(resId: Int) {
         dialogs?.setExportStatus(resId)
+    }
+
+    override fun openMenus(activity: MainActivity) {
+        Menus.show(activity)
     }
 
     /** Density comes from the activity, the same way GlucoseCurve used to pass it. */

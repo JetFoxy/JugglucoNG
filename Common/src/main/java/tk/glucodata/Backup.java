@@ -1126,8 +1126,8 @@ CheckBox ICE;
          act.showui=false;
          if(!isWearable)
             Applic.app.getHandler().postDelayed(act::hideSystemUI,1);
-         if(Menus.on)
-            Menus.show(act);
+         if(LegacyScreensAccess.getMenusOn())
+            LegacyScreensAccess.get().openMenus(act);
 
          };
       act.setonback(closerun);    

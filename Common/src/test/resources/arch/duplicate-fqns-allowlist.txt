@@ -26,10 +26,13 @@
 #   export label, so those became openExport/setExportStatus on LegacyScreens and the
 #   GlucoseCurve field is gone. Its showdays was read by shared code, so it moved to
 #   LegacyScreensAccess.exportShowDays.
+#   tk.glucodata.Menus (category P): show() became openMenus on LegacyScreens, and its
+#   on/off flag -- read by shared code in about a dozen places, written by ScanNfcV and by
+#   show() itself -- became LegacyScreensAccess.menusOn. The watch copy held the flag and an
+#   empty show(), and both moved, so nothing was left of it.
 tk.glucodata.FloatingConfig
 tk.glucodata.GlucoseAlarms
 tk.glucodata.Meal
-tk.glucodata.Menus
 tk.glucodata.Specific
 tk.glucodata.WearOngoingActivity
 tk.glucodata.glucosecomplication.ColorConfig

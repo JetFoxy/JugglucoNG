@@ -52,6 +52,13 @@ interface LegacyScreens {
 
     /** As [setExportStatus], for a string resource. */
     fun setExportStatus(resId: Int)
+
+    /**
+     * The number/label menus, opened from about a dozen places including some the watch
+     * also runs. It also turns the menus on, which is why [LegacyScreensAccess.menusOn]
+     * is shared state rather than something this returns.
+     */
+    fun openMenus(activity: MainActivity)
 }
 
 object LegacyScreensAccess {
@@ -69,6 +76,40 @@ object LegacyScreensAccess {
     @Volatile
     var exportShowDays: Float = 0f
 
+    /**
+     * Whether the number/label menus are on. Shared state, and the watch reads it as
+     * readily as the phone: it was a phone static before, read from shared code in about a
+     * dozen places and written both by ScanNfcV and by Menus.show itself, with a watch copy
+     * that only had to exist so those reads compiled.
+     */
+    @JvmStatic
+    @Volatile
+    var menusOn: Boolean = false
+
+    /**
+     * The no-op a flavour without the legacy screens gets. Explicit rather than default
+     * interface methods on purpose: a method the phone adapter forgets to override then
+     * fails to compile instead of quietly doing nothing.
+     */
+    private val none = object : LegacyScreens {
+        override fun openLabels(activity: MainActivity, parent: View) {}
+        override fun openIob(activity: MainActivity) {}
+        override fun openMeterList(activity: MainActivity, parent: View?) {}
+        override fun openNightscout(activity: Activity, parent: View) {}
+        override fun configureLibreview(
+            activity: MainActivity,
+            parent: View,
+            sendTo: CheckBox,
+            noChange: BooleanArray,
+        ) {
+        }
+
+        override fun openExport(activity: MainActivity, width: Int, height: Int, parent: View?) {}
+        override fun setExportStatus(text: CharSequence) {}
+        override fun setExportStatus(resId: Int) {}
+        override fun openMenus(activity: MainActivity) {}
+    }
+
     @Volatile
     private var screens: LegacyScreens? = null
 
@@ -81,7 +122,12 @@ object LegacyScreensAccess {
     @JvmStatic
     fun isRegistered(): Boolean = screens != null
 
-    /** Null on a flavour without the legacy screens (the watch). */
+    /**
+     * The registered screens, or the no-op. Never null: the menus have about a dozen call
+     * sites and the watch's copy of them was empty, so the ruling on #465 for many call
+     * sites applies -- a no-op the watch gets by default, and every call site stays one
+     * line. Absence is still a distinct, testable state: [isRegistered] is false there.
+     */
     @JvmStatic
-    fun get(): LegacyScreens? = screens
+    fun get(): LegacyScreens = screens ?: none
 }

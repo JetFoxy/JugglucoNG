@@ -3,6 +3,7 @@ package tk.glucodata
 import android.app.Activity
 import android.view.View
 import android.widget.CheckBox
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +30,18 @@ class LegacyScreensAccessTests {
         override fun openExport(activity: MainActivity, width: Int, height: Int, parent: View?) {}
         override fun setExportStatus(text: CharSequence) {}
         override fun setExportStatus(resId: Int) {}
+        override fun openMenus(activity: MainActivity) {}
+    }
+
+    @Test
+    fun thereIsAlwaysSomethingToCall() {
+        // The menus have about a dozen call sites and the watch copy was empty, so the
+        // registry hands out a no-op rather than null (the ruling on #465 for many call
+        // sites). Absence stays a distinct state: isRegistered() is false without a
+        // register() call, which the wear BridgeRegistrationTest asserts.
+        LegacyScreensAccess.register(Fake)
+
+        assertNotNull(LegacyScreensAccess.get())
     }
 
     @Test

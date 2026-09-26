@@ -170,8 +170,8 @@ static public void show(MainActivity context) {
         context.poponback();
         removeContentView(layout);
         context.hideSystemUI(); 
-        if(Menus.on) {
-            Menus.show(context);
+        if(LegacyScreensAccess.getMenusOn()) {
+            LegacyScreensAccess.get().openMenus(context);
             }
         });
 

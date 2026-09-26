@@ -310,21 +310,18 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
      * the export screen), which is what a flavour without a Dialogs now has.
      */
     private void exportStatus(int resId) {
-        var screens = LegacyScreensAccess.get();
-        if (screens != null) screens.setExportStatus(resId);
+        LegacyScreensAccess.get().setExportStatus(resId);
     }
 
     private void exportStatus(CharSequence text) {
-        var screens = LegacyScreensAccess.get();
-        if (screens != null) screens.setExportStatus(text);
+        LegacyScreensAccess.get().setExportStatus(text);
     }
 
     @Keep
     public static void openSensorListPanel() {
         if (thisone != null) {
             thisone.runOnUiThread(() -> {
-                var screens = tk.glucodata.LegacyScreensAccess.get();
-                if (screens != null) screens.openMeterList(thisone, null); });
+                tk.glucodata.LegacyScreensAccess.get().openMeterList(thisone, null); });
         }
     }
 
@@ -537,8 +534,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             return;
         startall();
         Natives.onCreate();
-        if (Menus.on)
-            Menus.show(this);
+        if (LegacyScreensAccess.getMenusOn())
+            LegacyScreensAccess.get().openMenus(this);
 
         initComposeUI();
 
@@ -948,8 +945,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 if (!DontTalk) {
                     talkbackon(this);
                 }
-                if (!Menus.on)
-                    Menus.show(this);
+                if (!LegacyScreensAccess.getMenusOn())
+                    LegacyScreensAccess.get().openMenus(this);
             } else {
                 if (!DontTalk) {
                     talkbackoff();
@@ -2007,8 +2004,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             curve.render.stepresult = 0;
             curve.render.badscan = 0;
             hideSystemUI();
-            if (Menus.on)
-                Menus.show(this);
+            if (LegacyScreensAccess.getMenusOn())
+                LegacyScreensAccess.get().openMenus(this);
             else
                 curve.requestRender();
             return true;

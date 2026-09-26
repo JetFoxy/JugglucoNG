@@ -33,6 +33,7 @@ import android.view.ViewGroup;
 
 import tk.glucodata.MainActivity;
 import tk.glucodata.Natives;
+import tk.glucodata.LegacyScreensAccess;
 import yuku.ambilwarna.AmbilWarnaDialog;
 
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -87,8 +88,8 @@ static void show(MainActivity act) {
         removeContentView(view);
         if(ok!=null)
             removeContentView(ok);
-        if(tk.glucodata.Menus.on)
-            tk.glucodata.Menus.show(act);
+        if(LegacyScreensAccess.getMenusOn())
+            LegacyScreensAccess.get().openMenus(act);
             
     });
 }

@@ -237,8 +237,8 @@ public class Dialogs {
                 ;
                 parent.setVisibility(VISIBLE);
             } else {
-                if (Menus.on)
-                    Menus.show(activity);
+                if (LegacyScreensAccess.getMenusOn())
+                    LegacyScreensAccess.get().openMenus(activity);
             }
         });
     }

@@ -111,11 +111,11 @@ import tk.glucodata.BuildConfig;
 import tk.glucodata.Floating;
 import tk.glucodata.GlucoseCurve;
 import tk.glucodata.HealthConnectAccess;
+import tk.glucodata.LegacyScreensAccess;
 import tk.glucodata.LabelAdapter;
 import tk.glucodata.Layout;
 import tk.glucodata.Log;
 import tk.glucodata.MainActivity;
-import tk.glucodata.Menus;
 import tk.glucodata.Natives;
 import tk.glucodata.Notify;
 import tk.glucodata.NumAlarm;
@@ -194,8 +194,8 @@ private class Closerun implements Runnable {
         hidekeyboard();
         finish();
          activity.lightBars(!getInvertColors( ));
-        if(tk.glucodata.Menus.on)
-            tk.glucodata.Menus.show(activity);
+        if(LegacyScreensAccess.getMenusOn())
+            LegacyScreensAccess.get().openMenus(activity);
         }
     };
 private void makesettingsin(MainActivity act) {
@@ -216,8 +216,8 @@ private void makesettingsin(MainActivity act) {
         hidekeyboard();
         finish();
            act.lightBars(!getInvertColors( ));
-        if(tk.glucodata.Menus.on)
-            tk.glucodata.Menus.show(activity);
+        if(LegacyScreensAccess.getMenusOn())
+            LegacyScreensAccess.get().openMenus(activity);
 
         };
     act.setonback(closerun[0]);
@@ -1074,8 +1074,7 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
 //      var iob=getcheckbox(context,"IOB",Natives.getIOB());
       var iob=getbutton(context,"IOB");
       iob.setOnClickListener(v-> {
-        var screens = legacyScreens();
-        if (screens != null) screens.openIob(context);
+        legacyScreens().openIob(context);
         });
         var dexfuture=getcheckbox(context,R.string.dexfuture,Natives.getdexcomPredict());
          dexfuture.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setdexcomPredict(isChecked) );
@@ -1274,7 +1273,7 @@ private    void mksettings(MainActivity context) {
             hidekeyboard();
             finish();
      context.lightBars(!getInvertColors( ));
-         if(tk.glucodata.Menus.on) tk.glucodata.Menus.show(context);
+         if(LegacyScreensAccess.getMenusOn()) LegacyScreensAccess.get().openMenus(context);
 
             });
    var displayview=getbutton(context,R.string.display);
@@ -1283,8 +1282,7 @@ private    void mksettings(MainActivity context) {
         changelabels.setText(R.string.numberlabels);
         changelabels.setOnClickListener(v-> {
                 hidekeyboard();
-                var screens = legacyScreens();
-                if (screens != null) screens.openLabels(context, thelayout[0]);});
+                legacyScreens().openLabels(context, thelayout[0]);});
               }
     Button numalarm=getbutton(context,R.string.remindersname);
     Button advanced=null;
@@ -1558,8 +1556,7 @@ static private void exchanges(MainActivity context, View parent) {
         }
         var webserver = getbutton(context, R.string.webserver);
         webserver.setOnClickListener(v -> {
-                var screens = legacyScreens();
-                if (screens != null) screens.openNightscout(context, thelayout[0]);});
+                legacyScreens().openNightscout(context, thelayout[0]);});
         uploader.setOnClickListener(v -> tk.glucodata.NightPost.config(context, thelayout[0]));
         final boolean[] donothing = {false};
         libreview.setOnCheckedChangeListener(
@@ -1567,8 +1564,7 @@ static private void exchanges(MainActivity context, View parent) {
                     if (!donothing[0]) {
                         donothing[0] = true;
                         libreview.setChecked(!isChecked);
-                        var screens = legacyScreens();
-                        if (screens != null) screens.configureLibreview(context, thelayout[0], libreview, donothing);
+                        legacyScreens().configureLibreview(context, thelayout[0], libreview, donothing);
                     }
                 });
         final boolean[] xdripdonthing = {false};
@@ -1600,13 +1596,11 @@ static private void exchanges(MainActivity context, View parent) {
         exportview.setOnClickListener(v ->{
             var c=Applic.app.curve;
             if(c!=null) {
-                var screens = legacyScreens();
-                if (screens != null) screens.openExport(context,c.getWidth(),c.getHeight(),lay);
+                legacyScreens().openExport(context,c.getWidth(),c.getHeight(),lay);
             }
         });
         meters.setOnClickListener(v->{
-            var screens = legacyScreens();
-            if (screens != null) screens.openMeterList(context,lay); });
+            legacyScreens().openMeterList(context,lay); });
       }
 
     thelayout[0] = lay;

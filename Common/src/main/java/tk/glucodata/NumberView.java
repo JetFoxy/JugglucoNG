@@ -403,9 +403,9 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
             ((Applic) act.getApplication()). redraw();
               MainActivity.poponback();
 
-             if(Menus.on) {
+             if(LegacyScreensAccess.getMenusOn()) {
                 if(deletebutton.getVisibility()==GONE) {
-                        Menus.show(context);
+                        LegacyScreensAccess.get().openMenus(context);
                         }
                 }
             } 
@@ -501,8 +501,8 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
             currentnum=0L;
             }
         else {
-             if(Menus.on) {
-                Menus.show(context);
+             if(LegacyScreensAccess.getMenusOn()) {
+                LegacyScreensAccess.get().openMenus(context);
                 }
             }
 
@@ -578,8 +578,8 @@ void deletedialog(View v,int[] mealptr) {
                 }
                 /*
             else  {
-             if(Menus.on) {
-                Menus.show(context);
+             if(LegacyScreensAccess.getMenusOn()) {
+                LegacyScreensAccess.get().openMenus(context);
                 }
                 } */
          newnumview.setVisibility(GONE);
@@ -803,8 +803,8 @@ activity.setonback(()->{
     if(newnumview!=null)
         EnableControls(newnumview,true);
     else {
-        if(Menus.on)
-                    Menus.show(activity);
+        if(LegacyScreensAccess.getMenusOn())
+                    LegacyScreensAccess.get().openMenus(activity);
         }
         });
 
