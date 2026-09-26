@@ -10,20 +10,18 @@
 # Removed so far: tk.glucodata.receivers.AlarmLaunchReceiver (T5.1).
 #   tk.glucodata.Stats, tk.glucodata.Watch (category P): their watch stubs had no
 #   caller anywhere in src/main or src/wear, so they were deleted.
-#   tk.glucodata.settings.LabelsClass (category P): the shared Settings.java now opens
-#   it through the LegacyScreens registry, so its watch stub was deleted.
+#   tk.glucodata.settings.LabelsClass, tk.glucodata.IOB, tk.glucodata.Libreview,
+#   tk.glucodata.MeterList, tk.glucodata.Nightscout (category P): shared code now opens
+#   them through the LegacyScreens registry, and their watch copies were dead no-ops,
+#   so the stubs were deleted.
 tk.glucodata.BluetoothGlucoseMeter
 tk.glucodata.Dialogs
 tk.glucodata.FloatingConfig
 tk.glucodata.GlucoseAlarms
 tk.glucodata.HealthConnection
-tk.glucodata.IOB
 tk.glucodata.LaunchShit
-tk.glucodata.Libreview
 tk.glucodata.Meal
 tk.glucodata.Menus
-tk.glucodata.MeterList
-tk.glucodata.Nightscout
 tk.glucodata.NovoPen.Scan
 tk.glucodata.Specific
 tk.glucodata.WearOngoingActivity

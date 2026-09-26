@@ -113,11 +113,9 @@ import tk.glucodata.GlucoseCurve;
 import tk.glucodata.HealthConnection;
 import tk.glucodata.LabelAdapter;
 import tk.glucodata.Layout;
-import tk.glucodata.Libreview;
 import tk.glucodata.Log;
 import tk.glucodata.MainActivity;
 import tk.glucodata.Menus;
-import tk.glucodata.MeterList;
 import tk.glucodata.Natives;
 import tk.glucodata.Notify;
 import tk.glucodata.NumAlarm;
@@ -245,6 +243,10 @@ void layoutweg() {
 public static void closeview() {
     if(thisone!=null)
         thisone.finish();
+    }
+/** The phone-only legacy screens, or null on a flavour that has none (the watch). */
+static tk.glucodata.LegacyScreens legacyScreens() {
+    return tk.glucodata.LegacyScreensAccess.get();
     }
 static void hideSystemUI() {
     }
@@ -1072,7 +1074,8 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
 //      var iob=getcheckbox(context,"IOB",Natives.getIOB());
       var iob=getbutton(context,"IOB");
       iob.setOnClickListener(v-> {
-        tk.glucodata.IOB.mkview(context);
+        var screens = legacyScreens();
+        if (screens != null) screens.openIob(context);
         });
         var dexfuture=getcheckbox(context,R.string.dexfuture,Natives.getdexcomPredict());
          dexfuture.setOnCheckedChangeListener( (buttonView,  isChecked) -> Natives.setdexcomPredict(isChecked) );
@@ -1280,7 +1283,7 @@ private    void mksettings(MainActivity context) {
         changelabels.setText(R.string.numberlabels);
         changelabels.setOnClickListener(v-> {
                 hidekeyboard();
-                tk.glucodata.LegacyScreens screens = tk.glucodata.LegacyScreensAccess.get();
+                var screens = legacyScreens();
                 if (screens != null) screens.openLabels(context, thelayout[0]);});
               }
     Button numalarm=getbutton(context,R.string.remindersname);
@@ -1552,7 +1555,9 @@ static private void exchanges(MainActivity context, View parent) {
             }
         }
         var webserver = getbutton(context, R.string.webserver);
-        webserver.setOnClickListener(v -> tk.glucodata.Nightscout.show(context, thelayout[0]));
+        webserver.setOnClickListener(v -> {
+                var screens = legacyScreens();
+                if (screens != null) screens.openNightscout(context, thelayout[0]);});
         uploader.setOnClickListener(v -> tk.glucodata.NightPost.config(context, thelayout[0]));
         final boolean[] donothing = {false};
         libreview.setOnCheckedChangeListener(
@@ -1560,7 +1565,8 @@ static private void exchanges(MainActivity context, View parent) {
                     if (!donothing[0]) {
                         donothing[0] = true;
                         libreview.setChecked(!isChecked);
-                        Libreview.config(context, thelayout[0], libreview, donothing);
+                        var screens = legacyScreens();
+                        if (screens != null) screens.configureLibreview(context, thelayout[0], libreview, donothing);
                     }
                 });
         final boolean[] xdripdonthing = {false};
@@ -1596,7 +1602,8 @@ static private void exchanges(MainActivity context, View parent) {
             }
         });
         meters.setOnClickListener(v->{
-            MeterList.show(context,lay); });
+            var screens = legacyScreens();
+            if (screens != null) screens.openMeterList(context,lay); });
       }
 
     thelayout[0] = lay;

@@ -307,7 +307,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     @Keep
     public static void openSensorListPanel() {
         if (thisone != null) {
-            thisone.runOnUiThread(() -> tk.glucodata.MeterList.show(thisone, null));
+            thisone.runOnUiThread(() -> {
+                var screens = tk.glucodata.LegacyScreensAccess.get();
+                if (screens != null) screens.openMeterList(thisone, null); });
         }
     }
 

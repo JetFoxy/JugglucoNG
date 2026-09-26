@@ -1,6 +1,8 @@
 package tk.glucodata
 
+import android.app.Activity
 import android.view.View
+import android.widget.CheckBox
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,6 +15,16 @@ import org.junit.Test
 class LegacyScreensAccessTests {
     private object Fake : LegacyScreens {
         override fun openLabels(activity: MainActivity, parent: View) {}
+        override fun openIob(activity: MainActivity) {}
+        override fun openMeterList(activity: MainActivity, parent: View?) {}
+        override fun openNightscout(activity: Activity, parent: View) {}
+        override fun configureLibreview(
+            activity: MainActivity,
+            parent: View,
+            sendTo: CheckBox,
+            noChange: BooleanArray,
+        ) {
+        }
     }
 
     @Test
