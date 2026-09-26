@@ -839,11 +839,16 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         // thinned. Only its smoothing can differ from the chunked outputs ("graph only" + collapse).
         final boolean loopFeedWanted = shouldBroadcastMinuteUpdate
                 && (Natives.getxbroadcast() || (!isWearable && Natives.getlibrelinkused()));
-        final ExchangeGlucosePayload loopFeedPayload = !loopFeedWanted ? null
-                : (exchangePayload != null
-                        && DataSmoothing.shouldSmoothExchangeSnapshot(app, true) == DataSmoothing.shouldSmoothExchangeSnapshot(app, false))
-                        ? exchangePayload
-                        : ExchangeGlucosePayload.resolve(SerialNumber, gl, rate, timmsec, sensorgen, primaryText, true);
+        // Reuse the shared payload only when the loop feed and the chunked output would send the
+        // same numbers; otherwise the loop feed resolves the newest reading itself (see
+        // LoopFeedPayload). The null-shared-payload path is the fallback when no exchange target
+        // needed a snapshot this time.
+        final ExchangeGlucosePayload loopFeedPayload = LoopFeedPayload.choose(
+                loopFeedWanted,
+                exchangePayload,
+                () -> DataSmoothing.shouldSmoothExchangeSnapshot(app, false),
+                () -> DataSmoothing.shouldSmoothExchangeSnapshot(app, true),
+                () -> ExchangeGlucosePayload.resolve(SerialNumber, gl, rate, timmsec, sensorgen, primaryText, true));
 
         if (Natives.getJugglucobroadcast() && shouldEmitExchangeUpdate)
             JugglucoSend.broadcastglucose(SerialNumber, exchangePayload, alarm);
