@@ -408,6 +408,10 @@ class ICanHealthBleManager(
 
     override fun canConnectWithoutDataptr(): Boolean = true
 
+    // No dataptr is kept (ensureNativeDataptr frees it), so the base lookup would find no record
+    // and Health Connect would never see an iCan reading.
+    override fun nativeSensorPtr(): Long = resolveNativeSensorPtr(SerialNumber)
+
     override fun shouldShowSearchingStatusWhenIdle(): Boolean = true
 
     private fun syncingStatus(): String {
