@@ -2679,6 +2679,22 @@ void setbackuptime(int ind,uint32_t starttime) {
     if (!info || !starttime)
       return;
 
+    // The Health Connect cursor is a poll index, and direct-stream indices
+    // count minutes from starttime. Left alone it points into the old window:
+    // past pollcount the export stalls, and once pollcount catches up it
+    // resumes there, skipping every reading refilled below it. Carry the
+    // cursor to the same minute in the new window instead; resetting it
+    // would re-send what was already exported, and Health Connect keeps
+    // duplicates. 0 (a window that starts past the cursor) means "from
+    // pollstart", i.e. everything in the new window is still to export.
+    if (const int cursor = info->healthconnectiter; cursor > 0) {
+      const int64_t shiftMinutes =
+          (static_cast<int64_t>(starttime) - info->starttime) / 60;
+      const int64_t moved = cursor - shiftMinutes;
+      info->healthconnectiter = static_cast<uint16_t>(
+          std::clamp<int64_t>(moved, 0, UINT16_MAX));
+    }
+
     info->starttime = starttime;
     info->pollcount = 0;
     info->pollstart = 0;

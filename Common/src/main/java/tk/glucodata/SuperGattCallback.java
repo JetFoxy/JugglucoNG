@@ -953,11 +953,19 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         }
     }
 
+    /**
+     * The native record this callback's readings land in, or 0 if it has none.
+     * Drivers that write by name and keep no dataptr (iCan) override this.
+     */
+    protected long nativeSensorPtr() {
+        return Natives.getsensorptr(dataptr);
+    }
+
     private void exportToHealthConnect() {
         if (isWearable || !Natives.gethealthConnect() || Build.VERSION.SDK_INT < 28) {
             return;
         }
-        final long sensorptr = Natives.getsensorptr(dataptr);
+        final long sensorptr = nativeSensorPtr();
         // Checked before dohealth(): claiming the export for a sensor with nothing to hand over
         // would stop every other sensor from exporting.
         if (sensorptr == 0L || !dohealth(this)) {
