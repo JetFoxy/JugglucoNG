@@ -2935,6 +2935,22 @@ class OttaiBleManager(
         )
     }
 
+    /**
+     * A history response that yielded nothing usable is still a response: don't let it stall the
+     * chunk chain — treat the in-flight window as yielding nothing and advance to the next pending
+     * chunk. Record the miss first: a detected-gap window stays on the hole ledger until its data
+     * arrives or the attempt cap retires it (truly-empty overshoot ranges).
+     */
+    private fun abandonHistoryWindow() {
+        if (activeHistoryEndExclusive <= 0) return
+        val missedStart = activeHistoryStart
+        val missedEnd = activeHistoryEndExclusive
+        cancelHistoryWatchdog()
+        historyRetryCount = 0
+        noteHoleFailure(missedStart, missedEnd)
+        advanceHistoryChunkChain()
+    }
+
     private fun handleGlucosePayload(cipher: ByteArray, live: Boolean, source: String) {
         if (sessionKeyHex.isBlank()) { Log.w(TAG, "payload before session key"); return }
         if (live && commandStatus >= 4) {
@@ -2957,17 +2973,8 @@ class OttaiBleManager(
             Log.w(TAG, "$kind $source no records payloadLen=${payload.size} hex=${OttaiCrypto.bytesToHex(payload).take(160)}")
             if (live) {
                 handler.postDelayed({ requestRecentHistory("empty-live") }, 1_800L)
-            } else if (activeHistoryEndExclusive > 0) {
-                // An empty response IS a response: don't let it stall the chunk chain — treat the
-                // in-flight window as yielding nothing and advance to the next pending chunk.
-                // Record the miss first: a detected-gap window stays on the hole ledger until its
-                // data arrives or the attempt cap retires it (truly-empty overshoot ranges).
-                val missedStart = activeHistoryStart
-                val missedEnd = activeHistoryEndExclusive
-                cancelHistoryWatchdog()
-                historyRetryCount = 0
-                noteHoleFailure(missedStart, missedEnd)
-                advanceHistoryChunkChain()
+            } else {
+                abandonHistoryWindow()
             }
             return
         }
@@ -2976,6 +2983,14 @@ class OttaiBleManager(
             listOf(OttaiParser.toReading(records.last(), materials.method, materials.coefficients, activeMs))
         } else {
             records.map { OttaiParser.toReading(it, materials.method, materials.coefficients, activeMs) }
+        }
+        // A history frame decoded at the wrong record width is almost entirely rejects, and the
+        // few records that slip through are coincidental grid matches that look like glucose.
+        // Judge the frame whole before any of it can be stored or mirrored.
+        if (!live && OttaiOutputFilter.isMisframedFrame(readings)) {
+            Log.w(TAG, "$kind $source misframed: ${readings.size} records at width ${heldRecordSize() ?: "auto"}, discarding frame")
+            abandonHistoryWindow()
+            return
         }
         val previousDataNo = lastDataNo
         // Corrupt/misaligned frames: a dataNo far past the sensor's current position is garbage

@@ -25,6 +25,25 @@ object OttaiOutputFilter {
     const val SINGLE_SAMPLE_DELTA_MMOL = 1.5f
     const val RAW_EXCURSION_RATIO = 0.18f
 
+    /** Smallest history frame worth judging as a whole; a couple of records prove nothing. */
+    const val MISFRAMED_MIN_RECORDS = 8
+
+    /**
+     * True when a history frame is almost certainly decoded at the wrong record width.
+     *
+     * A frame read at the wrong width is not a few bad records among good ones: nearly all of
+     * it fails the hard gate, and the few survivors are coincidences where the two grids line
+     * up (2026-09-26: 2 of 17 passed, as a constant ~4.5 mmol/L). Those survivors are still
+     * plausible-looking glucose, so they are worse than the rejects — the frame is judged
+     * whole and none of it is stored. A real frame with under a quarter of its records
+     * accepted has nothing worth keeping either.
+     */
+    fun isMisframedFrame(readings: List<OttaiReading>): Boolean {
+        if (readings.size < MISFRAMED_MIN_RECORDS) return false
+        val accepted = readings.count { hardRejectReason(it.record, it.adjustGlucose.toFloat()) == null }
+        return accepted * 4 < readings.size
+    }
+
     fun hardRejectReason(record: OttaiRecord, mmol: Float): String? {
         if (!mmol.isFinite() || mmol <= 0f) return "glucose=$mmol"
         if (mmol > MAX_GLUCOSE_MMOL) return "glucose=$mmol"

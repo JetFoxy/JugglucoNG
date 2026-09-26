@@ -96,4 +96,32 @@ class OttaiOutputFilterTests {
             )
         )
     }
+
+    private fun reading(good: Boolean) = OttaiReading(
+        record = record(raw = if (good) 7_691 else 17_017, temp = if (good) 29.6 else 463.6),
+        adjustGlucose = 4.5,
+        monitorTimeMs = 0L,
+        valid = true,
+    )
+
+    private fun frame(total: Int, good: Int) = List(total) { reading(good = it < good) }
+
+    @Test
+    fun misframedFrame_2026_09_26_traceShape() {
+        // 17 records read at the wrong width: 2 coincidental survivors, 15 impossible temperatures.
+        assertTrue(OttaiOutputFilter.isMisframedFrame(frame(total = 17, good = 2)))
+    }
+
+    @Test
+    fun misframedFrame_keepsHealthyAndBorderlineFrames() {
+        assertFalse(OttaiOutputFilter.isMisframedFrame(frame(total = 20, good = 20)))
+        assertFalse(OttaiOutputFilter.isMisframedFrame(frame(total = 20, good = 5))) // exactly a quarter
+        assertTrue(OttaiOutputFilter.isMisframedFrame(frame(total = 20, good = 4)))
+    }
+
+    @Test
+    fun misframedFrame_ignoresFramesTooSmallToJudge() {
+        assertFalse(OttaiOutputFilter.isMisframedFrame(frame(total = 7, good = 0)))
+        assertFalse(OttaiOutputFilter.isMisframedFrame(emptyList()))
+    }
 }
