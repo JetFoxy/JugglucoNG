@@ -7,6 +7,18 @@ class SibionicsProbeSensitivityTest {
     private val variant = SibionicsConstants.Variant.SIBIONICS2
 
     @Test
+    fun matchesOriginalNativeBinaryAcrossSupportedSensitivities() {
+        val fixture = checkNotNull(javaClass.getResourceAsStream("/sibionics/probe-sensitivity-native.tsv"))
+        fixture.bufferedReader().useLines { lines ->
+            lines.drop(1).forEach { line ->
+                val fields = line.split('\t')
+                assertEquals(fields[0], fields[1].toInt() / 100f,
+                    checkNotNull(SibionicsProbeSensitivity.tryDecode(fields[0])), 0.00001f)
+            }
+        }
+    }
+
+    @Test
     fun observedProbeCodesDecodeWithoutPrintedSerials() {
         assertEquals(1.73f, SibionicsProbeSensitivity.tryDecode("EU2VCZUQPSHD5Q")!!, 0.00001f)
         assertEquals(1.75f, SibionicsProbeSensitivity.tryDecode("145TUMXYK4S46V")!!, 0.00001f)

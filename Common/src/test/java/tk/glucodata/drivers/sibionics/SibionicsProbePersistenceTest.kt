@@ -8,6 +8,22 @@ import org.junit.Test
 
 class SibionicsProbePersistenceTest {
     @Test
+    fun activeBleAliasResolvesCalibrationAfterQrReplacesItsRecord() {
+        val context = PrefsContext(FakePreferences())
+        val variant = SibionicsConstants.Variant.SIBIONICS2
+        val ble = "P225043JMV"
+        val active = SibionicsRegistry.ensureSensorRecord(context, ble, null, ble, variant)
+        assertNull(SibionicsRegistry.loadProbeCode(context, active.sensorId))
+        val qr = "\u001D0106972831641476112602081727080710LT46260201C\u001D21EU2VCZUQPSHD5Q"
+        val scanned = SibionicsRegistry.ensureSensorRecord(context, qr, null, null, variant, bleNameOverride = ble)
+        assertNotEquals(active.sensorId, scanned.sensorId)
+        assertEquals(1, SibionicsRegistry.persistedRecords(context).size)
+        val probe = SibionicsRegistry.loadProbeCode(context, active.sensorId)
+        assertEquals("EU2VCZUQPSHD5Q", probe)
+        assertEquals(1.73f, SibionicsSensitivity.sensitivityFor(active.shortCode, variant, probe), 0.00001f)
+    }
+
+    @Test
     fun scannedCalibrationSurvivesAddressWritesAndSessionRestart() {
         val prefs = FakePreferences()
         val context = PrefsContext(prefs)

@@ -816,8 +816,12 @@ object SibionicsRegistry {
             ?: findRecord(context, sensorId)?.shortCode
             ?: SibionicsConstants.Variant.EU.fallbackShortCode
 
-    internal fun loadProbeCode(context: Context, sensorId: String): String? =
-        prefs(context).getString(PREF_PROBE_CODE_PREFIX + sensorId, null)
+    internal fun loadProbeCode(context: Context, sensorId: String): String? {
+        // A live callback can retain its BLE/manual alias after setup replaces
+        // that record with a QR identity. Calibration belongs to the current record.
+        val canonicalId = findRecord(context, sensorId)?.sensorId ?: sensorId
+        return prefs(context).getString(PREF_PROBE_CODE_PREFIX + canonicalId, null)
+    }
 
     fun saveShortCode(context: Context, sensorId: String, shortCode: String) {
         if (shortCode.isBlank()) return

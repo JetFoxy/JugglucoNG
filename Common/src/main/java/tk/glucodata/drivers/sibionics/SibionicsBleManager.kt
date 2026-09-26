@@ -2674,10 +2674,23 @@ class SibionicsBleManager(
                 automaticSensitivity = decoded
                 val effective = sensitivityOverride ?: decoded
                 if (effective != sensitivity) {
+                    // A different factory calibration invalidates exact continuation.
+                    // Stop the old stream and reuse startup recovery: replay the local
+                    // journal when complete, otherwise rehydrate from sensor index 1.
+                    prepareForReconnect()
+                    rebuildGeneration++
+                    handler.removeCallbacks(rebuildLaunchRunnable)
+                    startupRecoveryGeneration++
+                    startupRecoveryRunning = false
+                    startupRecoveryIndex = maxOf(lastIndex, rehydrationTargetIndex)
                     sensitivity = effective
+                    synchronized(algorithmLock) {
+                        algorithm.configure(shortCode, sensitivity, variant, algorithmSelection)
+                    }
                     SibionicsRegistry.clearAlgorithmState(context, SerialNumber)
-                    algorithmStateDirty = true
-                    scheduleAlgorithmRebuild(reason = "scanned probe calibration", delayMs = 0L)
+                    algorithmStateDirty = false
+                    forceInitialLocalRebuild = true
+                    scheduleReconnect("scanned probe calibration", 0L)
                 }
                 UiRefreshBus.requestStatusRefresh()
                 UiRefreshBus.requestDataRefresh()
