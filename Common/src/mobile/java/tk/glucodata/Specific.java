@@ -52,6 +52,9 @@ public class Specific {
 		CloneRecoveryAccessBridge.register(tk.glucodata.data.MobileCloneRecoveryBridge.INSTANCE);
 		CloneOutgoingRecoveryAccessBridge.register(tk.glucodata.data.MobileCloneOutgoingRecoveryBridge.INSTANCE);
 		LegacyScreensAccess.register(tk.glucodata.settings.MobileLegacyScreens.INSTANCE);
+		BluetoothMeterAccess.register(tk.glucodata.MobileBluetoothMeters.INSTANCE);
+		NovoPenAccess.register(tk.glucodata.MobileNovoPenScan.INSTANCE);
+		LibreNumbersAccess.register(tk.glucodata.settings.MobileLibreNumbersLayout.INSTANCE);
 	}
 
 	static void start(Application context) {

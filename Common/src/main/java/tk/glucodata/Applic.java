@@ -583,7 +583,8 @@ public class Applic extends Application implements androidx.work.Configuration.P
         SensorBluetooth.start(usebluetooth);
 
         if (!isWearable) {
-            BluetoothGlucoseMeter.startDevices();
+            var meters = BluetoothMeterAccess.get();
+            if (meters != null) meters.startDevices();
         }
     }
 

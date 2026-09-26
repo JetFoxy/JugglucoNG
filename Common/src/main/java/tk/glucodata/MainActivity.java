@@ -1025,9 +1025,12 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                             // intent (the background receiver handing a pen on) arrives on
                             // it, and a pen read is seconds of I/O — same split as below.
                             if (Thread.currentThread().equals(Looper.getMainLooper().getThread())) {
-                                new Thread(() -> tk.glucodata.NovoPen.Scan.onTag(this, tag)).start();
+                                new Thread(() -> {
+                                    var scan = NovoPenAccess.get();
+                                    if (scan != null) scan.onTag(this, tag); }).start();
                             } else {
-                                tk.glucodata.NovoPen.Scan.onTag(this, tag);
+                                var scan = NovoPenAccess.get();
+                                if (scan != null) scan.onTag(this, tag);
                             }
                             // A full pen read takes seconds. Taps that arrived while it
                             // was running are queued on this monitor and would each start

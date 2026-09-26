@@ -1012,11 +1012,14 @@ CheckBox ICE;
       staticnum.setOnCheckedChangeListener( (buttonView,  isChecked)-> {
         Natives.setstaticnum(isChecked);
         if(!isWearable) {
-            if(isChecked) {
-                BluetoothGlucoseMeter.stopDevices();
-                }
-            else {
-                BluetoothGlucoseMeter.startDevices();
+            var meters = BluetoothMeterAccess.get();
+            if(meters!=null) {
+                if(isChecked) {
+                    meters.stopDevices();
+                    }
+                else {
+                    meters.startDevices();
+                    }
                 }
             }
         });
