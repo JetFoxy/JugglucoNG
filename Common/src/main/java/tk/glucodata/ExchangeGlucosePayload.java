@@ -111,27 +111,9 @@ final class ExchangeGlucosePayload {
             long fallbackTimeMillis,
             int fallbackSensorGen,
             String fallbackPrimaryText) {
-        return resolve(preferredSensorId, fallbackDisplayValue, fallbackRate, fallbackTimeMillis,
-                fallbackSensorGen, fallbackPrimaryText, false);
-    }
-
-    /**
-     * @param liveLoopFeed true for outputs a closed loop doses from: the newest reading under its
-     *                     own timestamp, never collapsed into chunks.
-     */
-    static ExchangeGlucosePayload resolve(
-            String preferredSensorId,
-            double fallbackDisplayValue,
-            float fallbackRate,
-            long fallbackTimeMillis,
-            int fallbackSensorGen,
-            String fallbackPrimaryText,
-            boolean liveLoopFeed) {
         CurrentDisplaySource.Snapshot current = null;
         try {
-            current = liveLoopFeed
-                    ? CurrentDisplaySource.resolveCurrentForLoopFeed(Notify.glucosetimeout, preferredSensorId)
-                    : CurrentDisplaySource.resolveCurrentForExchange(Notify.glucosetimeout, preferredSensorId);
+            current = CurrentDisplaySource.resolveCurrentForExchange(Notify.glucosetimeout, preferredSensorId);
         } catch (Throwable th) {
             if (Log.doLog) {
                 Log.i("ExchangeGlucosePayload", "resolveCurrentForExchange failed " + th);

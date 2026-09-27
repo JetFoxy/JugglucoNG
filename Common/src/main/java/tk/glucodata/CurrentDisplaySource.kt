@@ -65,27 +65,7 @@ object CurrentDisplaySource {
             maxAgeMillis = maxAgeMillis,
             preferredSensorId = preferredSensorId,
             historyWindowMs = historyWindowMs,
-            smoothingMode = exchangeSmoothingMode(liveLoopFeed = false)
-        )
-    }
-
-    /**
-     * The exchange snapshot for outputs that feed a closed loop: same newest reading, but
-     * "graph only" is honoured (see [DataSmoothing.smoothExchangeSnapshot]) and the output is
-     * never thinned ([DataSmoothing.exchangeThrottleIntervalMinutes]).
-     */
-    @JvmStatic
-    @JvmOverloads
-    fun resolveCurrentForLoopFeed(
-        maxAgeMillis: Long = Notify.glucosetimeout,
-        preferredSensorId: String? = null,
-        historyWindowMs: Long = DEFAULT_HISTORY_WINDOW_MS
-    ): Snapshot? {
-        return resolveCurrentInternal(
-            maxAgeMillis = maxAgeMillis,
-            preferredSensorId = preferredSensorId,
-            historyWindowMs = historyWindowMs,
-            smoothingMode = exchangeSmoothingMode(liveLoopFeed = true)
+            smoothingMode = exchangeSmoothingMode()
         )
     }
 
@@ -303,14 +283,13 @@ object CurrentDisplaySource {
         )
     }
 
-    private fun exchangeSmoothingMode(liveLoopFeed: Boolean): SmoothingMode {
+    private fun exchangeSmoothingMode(): SmoothingMode {
         val context = Applic.app
         return exchangeSmoothingMode(
             smoothingMinutes = DataSmoothing.getMinutes(context),
             graphOnly = DataSmoothing.isGraphOnly(context),
             exchangeOutputsOnly = DataSmoothing.smoothOnlyExchangeOutputs(context),
-            collapseChunks = DataSmoothing.collapseChunks(context),
-            liveLoopFeed = liveLoopFeed
+            collapseChunks = DataSmoothing.collapseChunks(context)
         )
     }
 
@@ -318,17 +297,17 @@ object CurrentDisplaySource {
      * An exchange snapshot is smoothed per the exchange settings but never collapsed: it is the
      * newest reading under its own timestamp. "Collapse into chunks" is applied as a rate limit
      * on the way out ([DataSmoothing.exchangeThrottleIntervalMinutes]), not by resolving the
-     * snapshot at the last point of a completed chunk.
+     * snapshot at the last point of a completed chunk. Every exchange destination — including the
+     * xDrip/xInfuus loop feed — shares this one mode; there is no separate loop-feed variant.
      */
     internal fun exchangeSmoothingMode(
         smoothingMinutes: Int,
         graphOnly: Boolean,
         exchangeOutputsOnly: Boolean,
-        collapseChunks: Boolean,
-        liveLoopFeed: Boolean
+        collapseChunks: Boolean
     ): SmoothingMode = SmoothingMode(
-        smoothAllData = DataSmoothing.smoothExchangeSnapshot(
-            smoothingMinutes, graphOnly, exchangeOutputsOnly, collapseChunks, liveLoopFeed
+        smoothAllData = DataSmoothing.shouldSmoothExchangeOutputs(
+            smoothingMinutes, graphOnly, exchangeOutputsOnly, collapseChunks
         ),
         smoothingMinutes = smoothingMinutes,
         collapseChunks = false

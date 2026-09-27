@@ -872,7 +872,6 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="data_smoothing_collapse_desc_match">Hayso hal dhibic oo la simay %1$d daqiiqo kasta, oo waxsoosaarka isweydaarsiga u dir xawaare la mid ah</string>
     <string name="data_smoothing_collapse_desc_capped">Hayso hal dhibic oo la simay 5 daqiiqo kasta, oo waxsoosaarka isweydaarsiga u dir xawaare la mid ah, inta silcintu wali isticmaasho %1$d daqiiqo</string>
     <string name="data_smoothing_collapse_summary_format">Jajabyo %1$d daqiiqo kasta</string>
-    <string name="data_smoothing_collapse_loop_note">Baahinta xDrip iyo xInfuus (ee ay isticmaalaan codsiyada wareegga xiran) lama yareeyo: waxay helaan akhris kasta wakhtigiisa, iyada oo aan la silcin marka “Garaaf kaliya oo jilicsan” uu shidan yahay</string>
     <string name="preview_window_title">Daaqada horudhac</string>
     <string name="preview_window_desc">Tus navigator yar oo 24-saac ah hoosta jaantuska dashboardka adoon bedelin dabeecadda jaantuska</string>
     <string name="preview_window_expanded_only">Aragtida la fidiyay (default)</string>

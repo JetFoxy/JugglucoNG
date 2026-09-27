@@ -834,20 +834,21 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             return;
         final boolean shouldBroadcastMinuteUpdate = tim > nexttime;
         final boolean outboundApiEnabled = OutboundApiSettings.isEnabled(app);
+        final boolean loopFeedEnabled = Natives.getxbroadcast() || (!isWearable && Natives.getlibrelinkused());
         final boolean shouldResolveExchangePayload =
                 Natives.getJugglucobroadcast()
                 || outboundApiEnabled
                 || (shouldBroadcastMinuteUpdate && (
-                        Natives.getlibrelinkused()
-                        || Natives.getxbroadcast()
+                        loopFeedEnabled
                         || doWearInt
                         || doGadgetbridge));
         final ExchangeGlucosePayload exchangePayload = shouldResolveExchangePayload
                 ? ExchangeGlucosePayload.resolve(SerialNumber, gl, rate, timmsec, sensorgen, primaryText)
                 : null;
-        // "Collapse into chunks" only thins how often these are fed; the payload is always the newest
-        // reading under its own timestamp.
-        final int exchangeIntervalMinutes = DataSmoothing.exchangeThrottleIntervalMinutes(app, false);
+        // "Collapse into chunks" thins how often every exchange destination is fed, including the
+        // xDrip/xInfuus loop feed AAPS doses from. The payload is always the newest reading under
+        // its own timestamp, never the last point of a completed chunk (see ExchangeUpdateGate).
+        final int exchangeIntervalMinutes = DataSmoothing.exchangeThrottleIntervalMinutes(app);
         final ExchangeOutputPolicy.Decision exchangeOutputDecision = exchangeOutputPolicy.decide(
                 exchangePayload != null ? exchangePayload.getSensorId() : null,
                 exchangePayload != null ? exchangePayload.getTimeMillis() : 0L,
@@ -856,21 +857,13 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
                 Natives.getJugglucobroadcast(),
                 outboundApiEnabled,
                 !isWearable && doWearInt,
-                !isWearable && doGadgetbridge);
-        // xDrip broadcast and xInfuus are what closed loops (AAPS) dose from: every reading, never
-        // thinned. Only its smoothing can differ from the chunked outputs ("graph only" + collapse).
-        final boolean loopFeedWanted = shouldBroadcastMinuteUpdate
-                && (Natives.getxbroadcast() || (!isWearable && Natives.getlibrelinkused()));
-        // Reuse the shared payload only when the loop feed and the chunked output would send the
-        // same numbers; otherwise the loop feed resolves the newest reading itself (see
-        // LoopFeedPayload). The null-shared-payload path is the fallback when no exchange target
-        // needed a snapshot this time.
-        final ExchangeGlucosePayload loopFeedPayload = LoopFeedPayload.choose(
-                loopFeedWanted,
-                exchangePayload,
-                () -> DataSmoothing.shouldSmoothExchangeSnapshot(app, false),
-                () -> DataSmoothing.shouldSmoothExchangeSnapshot(app, true),
-                () -> ExchangeGlucosePayload.resolve(SerialNumber, gl, rate, timmsec, sensorgen, primaryText, true));
+                !isWearable && doGadgetbridge,
+                loopFeedEnabled);
+        // The loop feed shares the same payload JUGGLUCO/OUTBOUND_API get: it is resolved from the
+        // same gl/rate/timmsec this call received, so reusing it can never carry a stale timestamp.
+        final ExchangeGlucosePayload loopFeedPayload = exchangeOutputDecision.getSendLoopFeed()
+                ? exchangePayload
+                : null;
 
         if (exchangeOutputDecision.getSendJuggluco())
             JugglucoSend.broadcastglucose(SerialNumber, exchangePayload, alarm);
