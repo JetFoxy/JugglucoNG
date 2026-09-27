@@ -1112,6 +1112,25 @@ public class Notify {
 
     private volatile boolean notificationChartsDeferred;
 
+    /**
+     * Guard for the asynchronous startup restore (N1). Every foreground entry
+     * starts a new epoch; genuine reading posts are recorded so a late restore
+     * can neither post after stop/replacement nor overwrite newer content.
+     */
+    private final NotificationStartupPolicy.RestoreGuard startupRestoreGuard = new NotificationStartupPolicy.RestoreGuard();
+
+    private final Runnable startupRestoreRunnable = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                restoreStartupNotification(startupRestoreGuard.currentGeneration(),
+                        keeprunning.theservice);
+            } catch (Throwable th) {
+                Log.stack(LOG_ID, "startupRestoreRunnable", th);
+            }
+        }
+    };
+
     private boolean canRenderNotificationCharts(boolean chartsEnabled) {
         if (isWearable || !isScreenOffChartPauseEnabled()) {
             notificationChartsDeferred = false;
@@ -1243,6 +1262,10 @@ public class Notify {
             lastForegroundGlucoseRate = Float.NaN;
         }
         lastForegroundGlucoseValue = glvalue;
+        // A genuine reading display supersedes any queued startup restore.
+        if (glucose != null) {
+            startupRestoreGuard.markPosted(glucose.time);
+        }
         fornotify(makearrownotification(kind, glvalue, message, glucose, GLUCOSENOTIFICATION, true));
     }
 
@@ -3901,8 +3924,6 @@ public class Notify {
             GluNotBuilder.setContent(remoteViews);
         }
 
-        GluNotBuilder.setShowWhen(true);
-
         // Standard priority logic
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             GluNotBuilder.setTimeoutAfter(glucosetimeout);
@@ -3923,8 +3944,21 @@ public class Notify {
             }
         }
 
+        // Header timestamp is the reading actually displayed (the preferred resolved
+        // display, including its fallback), never render time and never the blindly
+        // passed incoming argument. Without a valid displayed reading no timestamp
+        // is fabricated: the header time is hidden instead.
+        final long displayedReadingMillis = fallbackDisplay != null ? fallbackDisplay.getTimeMillis() : 0L;
+        final long headerWhenMillis = NotificationStartupPolicy
+                .resolveHeaderWhenMillis(displayedReadingMillis);
+        if (NotificationStartupPolicy.showHeaderWhen(displayedReadingMillis)) {
+            GluNotBuilder.setWhen(headerWhenMillis);
+            GluNotBuilder.setShowWhen(true);
+        } else {
+            GluNotBuilder.setShowWhen(false);
+        }
+
         Notification notif = GluNotBuilder.build();
-        notif.when = System.currentTimeMillis();
 
         return notif;
     }
@@ -3976,6 +4010,7 @@ public class Notify {
 
         // Startup Text using the shared current-value resolver.
         CharSequence startupValue = "---";
+        long startupReadingMillis = current != null ? current.getTimeMillis() : 0L;
         if (current != null) {
             startupValue = current.getFullFormatted();
         } else if (!chartPoints.isEmpty()) {
@@ -3985,6 +4020,7 @@ public class Notify {
             // Also check staleness of history
             long now = System.currentTimeMillis();
             if (Math.abs(now - latest.timestamp) < 15 * 60 * 1000L) {
+                startupReadingMillis = latest.timestamp;
                 String vStr = format(usedlocale, pureglucoseformat, latest.value);
 
                 if (viewMode == 3 && latest.rawValue > 0.1f) {
@@ -4008,7 +4044,7 @@ public class Notify {
         Bitmap chartBitmapCollapsed = null;
         Bitmap chartBitmapExpanded = null;
 
-        if (showChart) {
+        if (showChart && (current != null || !chartPoints.isEmpty())) {
             chartPoints = DisplayTrendSource.augmentHistory(chartPoints, current, activeSensorSerial, startT);
             final NotificationPredictionBatch predictionBatch = new NotificationPredictionBatch();
             // Create Safe Context for Startup Notification too
@@ -4223,8 +4259,16 @@ public class Notify {
         } else {
             GluNotBuilder.setContent(remoteViews);
         }
-        GluNotBuilder.setSmallIcon(R.drawable.novalue).setOnlyAlertOnce(true).setContentTitle(message)
-                .setShowWhen(true);
+        GluNotBuilder.setSmallIcon(R.drawable.novalue).setOnlyAlertOnce(true).setContentTitle(message);
+        // The header carries the actual reading shown, if any. With no data no
+        // timestamp is fabricated and no empty chart is rendered as data.
+        if (NotificationStartupPolicy.showHeaderWhen(startupReadingMillis)) {
+            GluNotBuilder.setWhen(
+                    NotificationStartupPolicy.resolveHeaderWhenMillis(startupReadingMillis));
+            GluNotBuilder.setShowWhen(true);
+        } else {
+            GluNotBuilder.setShowWhen(false);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             GluNotBuilder.setVisibility(VISIBILITY_PUBLIC);
             GluNotBuilder.setCategory(Notification.CATEGORY_SERVICE);
@@ -4381,7 +4425,14 @@ public class Notify {
         // notificationManager.notify(glucosenotificationid,getforgroundnotification());
     }
     public void foregroundno(Service service) {
-        Notification not = getforgroundnotification();
+        // Promote the service immediately with a minimal standard-text placeholder:
+        // truthful loading state, no reading, no chart, no connection claim and no
+        // fabricated reading timestamp. The heavy Room/history/chart restore runs
+        // afterwards on the background glucoseRefreshHandler and never precedes
+        // service promotion. Wear attachment and startForeground rules are unchanged.
+        final Notification placeholder = makeRestoreStatusNotification(
+                app.getString(R.string.loading_data));
+        Notification not = placeholder;
         if (isWearable) {
             var ongoing = OngoingNotificationAccess.get();
             if (ongoing != null) not = ongoing.attach(service, not, glucosenotificationid);
@@ -4392,6 +4443,11 @@ public class Notify {
         } else {
             service.startForeground(glucosenotificationid, not);
         }
+        // A new epoch supersedes any queued restore; the guard (not cancellation
+        // alone) decides at post time whether this restore may still publish.
+        startupRestoreGuard.begin();
+        glucoseRefreshHandler.removeCallbacks(startupRestoreRunnable);
+        glucoseRefreshHandler.post(startupRestoreRunnable);
         {
             if (doLog) {
                 Log.i(LOG_ID, "startforeground");
@@ -4399,6 +4455,148 @@ public class Notify {
             ;
         }
         ;
+    }
+
+    /**
+     * Minimal standard-text ongoing notification for startup: loading state without
+     * a reading, chart, connection claim or fabricated timestamp. Used both as the
+     * immediate foreground placeholder and for restore outcomes that carry no
+     * current reading (waiting, no sensor).
+     */
+    private Notification makeRestoreStatusNotification(String message) {
+        var builder = mkbuilder(GLUCOSENOTIFICATION);
+        builder.setSmallIcon(R.drawable.novalue).setOnlyAlertOnce(true)
+                .setContentTitle(message).setShowWhen(false).setOngoing(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            builder.setVisibility(VISIBILITY_PUBLIC);
+            builder.setCategory(Notification.CATEGORY_SERVICE);
+        }
+        Notification not = builder.build();
+        not.flags |= FLAG_ONGOING_EVENT;
+        return not;
+    }
+
+    /**
+     * Asynchronous startup restore on the background handler. Resolves the actual
+     * reading timestamp, classifies it via the shared freshness policy (a null
+     * return and a stale history fallback are both handled honestly), and posts at
+     * most once through the visual path only: never alerts, never a second mirror
+     * of an already-posted reading, never a placeholder over newer content, and
+     * never anything after the service was destroyed, replaced or stopped.
+     */
+    private void restoreStartupNotification(long generation, Service activeAtStart) {
+        final String activeSensorSerial = NotificationHistorySource
+                .resolveSensorSerial(resolvePrimarySensorName());
+        final boolean sensorPresent = activeSensorSerial != null && !activeSensorSerial.isEmpty();
+        final CurrentDisplaySource.Snapshot current = resolveNotificationCurrentSnapshot(activeSensorSerial);
+        final long nowMillis = System.currentTimeMillis();
+        java.util.List<GlucosePoint> historyPoints;
+        try {
+            historyPoints = NotificationHistorySource.getDisplayHistory(
+                    nowMillis - DisplayTrendSource.TREND_WINDOW_MS, Applic.unit == 1,
+                    activeSensorSerial);
+        } catch (Exception e) {
+            historyPoints = new java.util.ArrayList<>();
+        }
+        final long currentMillis = current != null ? current.getTimeMillis() : 0L;
+        final NotificationStartupPolicy.RestoreOutcome outcome = NotificationStartupPolicy
+                .classifyRestore(sensorPresent, currentMillis,
+                        latestNotificationTimestamp(historyPoints), nowMillis, glucosetimeout);
+        switch (outcome) {
+            case FRESH_READING:
+                if (current != null && current.getPrimaryValue() >= 2.0f) {
+                    postStartupRestoreReading(generation, activeAtStart, current);
+                } else {
+                    postStartupRestoreStatus(generation, activeAtStart, 0L,
+                            app.getString(R.string.loading_data));
+                }
+                break;
+            case STALE_READING: {
+                // Honest stale status with the actual last-reading time in the text.
+                // No numeric value is presented as current; full last-reading
+                // retention stays a later PR.
+                final long actualMillis = Math.max(currentMillis,
+                        latestNotificationTimestamp(historyPoints));
+                final String message = Applic.getContext().getString(R.string.nonewvalue)
+                        + timef.format(actualMillis);
+                postStartupRestoreStatus(generation, activeAtStart, actualMillis, message);
+                break;
+            }
+            case NO_SENSOR:
+                postStartupRestoreStatus(generation, activeAtStart, 0L,
+                        app.getString(R.string.no_sensors_connected));
+                break;
+            case AWAITING_DATA:
+            default:
+                postStartupRestoreStatus(generation, activeAtStart, 0L,
+                        app.getString(R.string.loading_data));
+                break;
+        }
+    }
+
+    private boolean isStartupRestoreCurrent(Service activeAtStart) {
+        return activeAtStart != null && keeprunning.theservice == activeAtStart
+                && keeprunning.started;
+    }
+
+    /** Posts a freshly restored reading through the existing quiet visual path. */
+    private void postStartupRestoreReading(long generation, Service activeAtStart,
+            CurrentDisplaySource.Snapshot snapshot) {
+        final long candidateTime = snapshot.getTimeMillis();
+        synchronized (startupRestoreGuard) {
+            if (!startupRestoreGuard.shouldPost(generation, isStartupRestoreCurrent(activeAtStart),
+                    keeprunning.started, candidateTime)) {
+                return;
+            }
+        }
+        final float value = snapshot.getPrimaryValue();
+        final String message = format(usedlocale, glucoseformat, value);
+        final notGlucose legacy = toLegacyGlucose(snapshot);
+        final Notification notif = makearrownotification(FOREGROUND_GLUCOSE_NOTIFICATION_KIND,
+                value, message, legacy, GLUCOSENOTIFICATION, true);
+        // Re-check after the expensive render: a genuine reading may have posted
+        // while this restore was rendering. Bookkeeping happens only here, at
+        // actual post time.
+        synchronized (startupRestoreGuard) {
+            if (!startupRestoreGuard.shouldPost(generation, isStartupRestoreCurrent(activeAtStart),
+                    keeprunning.started, candidateTime)) {
+                return;
+            }
+            hasvalue = true;
+            glucoseRefreshHandler.removeCallbacks(glucoseRefreshRunnable);
+            if (legacy != null && legacy.time > 0L) {
+                lastForegroundGlucoseTimeMs = legacy.time;
+                lastForegroundGlucoseRate = legacy.rate;
+            } else {
+                lastForegroundGlucoseTimeMs = 0L;
+                lastForegroundGlucoseRate = Float.NaN;
+            }
+            lastForegroundGlucoseValue = value;
+            startupRestoreGuard.markPosted(candidateTime);
+        }
+        fornotify(notif);
+    }
+
+    /** Posts a truthful no-current-reading restore status (waiting/no-sensor/stale). */
+    private void postStartupRestoreStatus(long generation, Service activeAtStart,
+            long candidateTime, String message) {
+        synchronized (startupRestoreGuard) {
+            if (!startupRestoreGuard.shouldPost(generation, isStartupRestoreCurrent(activeAtStart),
+                    keeprunning.started, candidateTime)) {
+                return;
+            }
+        }
+        final Notification notif = makeRestoreStatusNotification(message);
+        synchronized (startupRestoreGuard) {
+            if (!startupRestoreGuard.shouldPost(generation, isStartupRestoreCurrent(activeAtStart),
+                    keeprunning.started, candidateTime)) {
+                return;
+            }
+            if (candidateTime > 0L) {
+                startupRestoreGuard.markPosted(candidateTime);
+            }
+        }
+        fornotify(notif);
     }
 
     static public void foregroundnot(Service service) {
@@ -4440,6 +4638,10 @@ public class Notify {
     public void arrowplacelargenotification(int kind, float glvalue, String message, notGlucose glucose, String type,
             boolean once) {
         hasvalue = true;
+        // A genuine reading display supersedes any queued startup restore.
+        if (glucose != null) {
+            startupRestoreGuard.markPosted(glucose.time);
+        }
         fornotify(makearrownotification(kind, glvalue, message, glucose, type, once));
         if (once && GLUCOSENOTIFICATION.equals(type)) {
             scheduleInteractiveNotificationRefresh();
@@ -4467,6 +4669,11 @@ public class Notify {
             ;
         }
         ;
+        // A genuine reading display (including alertwatch mirroring) supersedes any
+        // queued startup restore.
+        if (glucose != null) {
+            startupRestoreGuard.markPosted(glucose.time);
+        }
         fornotify(makearrownotification(kind, glvalue, message, glucose, type, once));
         if (once && GLUCOSENOTIFICATION.equals(type)) {
             scheduleInteractiveNotificationRefresh();
