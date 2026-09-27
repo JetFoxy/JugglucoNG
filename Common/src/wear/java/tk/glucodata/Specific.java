@@ -75,6 +75,7 @@ static void registerBridges() {
     OngoingNotificationAccess.register(WearOngoingActivity.INSTANCE);
     if (!FloatingConfigScreenAccess.isRegistered())
         FloatingConfigScreenAccess.register(new WearFloatingConfig());
+    SetColorsScreenAccess.register(new tk.glucodata.settings.WearSetColors());
 }
 
 static void start(Object context) {

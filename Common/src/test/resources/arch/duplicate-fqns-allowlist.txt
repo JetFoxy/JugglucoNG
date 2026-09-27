@@ -30,6 +30,13 @@
 #   near-identical fork), so both are renamed -- MobileFloatingConfig and
 #   WearFloatingConfig -- and both register behind FloatingConfigScreenAccess. The contract
 #   is the one method the settings screen calls.
+#   tk.glucodata.settings.SetColors (category S): both sides are real -- 144 lines on the
+#   phone, 96 on the watch, and the watch's adjusts the light bars and opens its own colour
+#   dialog -- so both are renamed (MobileSetColors, WearSetColors) and both register behind
+#   SetColorsScreenAccess. The contract is the one method the settings screen calls.
+#   Worth writing down how this duplicate hid from the compiler: Settings is in the same
+#   package, and show was package-private on both sides, so shared code called a phone class
+#   by a name the watch happened to share as well.
 #   tk.glucodata.WearOngoingActivity (category S): the phone copy was two @JvmStatic no-ops
 #   and both shared callers sit inside if(isWearable), so it existed only to make the
 #   reference compile. Deleted, not renamed: the watch class was already named for the watch.
@@ -69,5 +76,4 @@
 tk.glucodata.GlucoseAlarms
 tk.glucodata.Meal
 tk.glucodata.Specific
-tk.glucodata.settings.SetColors
 tk.glucodata.ui.AlarmActivity

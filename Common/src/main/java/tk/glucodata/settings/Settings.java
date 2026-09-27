@@ -122,6 +122,7 @@ import tk.glucodata.Natives;
 import tk.glucodata.Notify;
 import tk.glucodata.NumAlarm;
 import tk.glucodata.R;
+import tk.glucodata.SetColorsScreenAccess;
 import tk.glucodata.Specific;
 import tk.glucodata.SuperGattCallback;
 
@@ -1130,7 +1131,8 @@ Scans.setOnCheckedChangeListener( (buttonView,  isChecked) -> { Natives.setshows
    colbut.setOnClickListener(v-> {
            MainActivity.doonback();
         settings.finish();
-        SetColors.show(context);
+        var colors = SetColorsScreenAccess.get();
+        if (colors != null) colors.show(context);
         });
 
 Runnable closerun= () -> {
