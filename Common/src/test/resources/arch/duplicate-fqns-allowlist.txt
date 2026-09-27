@@ -26,6 +26,10 @@
 #   export label, so those became openExport/setExportStatus on LegacyScreens and the
 #   GlucoseCurve field is gone. Its showdays was read by shared code, so it moved to
 #   LegacyScreensAccess.exportShowDays.
+#   tk.glucodata.glucosecomplication.ColorConfig (category S): the phone copy was a
+#   five-line shell and the only shared caller is the complications button, which is
+#   inside if(isWearable). So the phone class is deleted rather than renamed, and the
+#   watch's real one is WearColorConfig behind ComplicationConfigAccess.
 #   tk.glucodata.nums.AllData (category P): shared code held it as the public field
 #   Applic.numdata, so the field is typed as the NumberDataHub interface instead, the phone
 #   class implements it, and Specific supplies the instance. Its devices field is no longer
@@ -40,7 +44,6 @@ tk.glucodata.GlucoseAlarms
 tk.glucodata.Meal
 tk.glucodata.Specific
 tk.glucodata.WearOngoingActivity
-tk.glucodata.glucosecomplication.ColorConfig
 tk.glucodata.glucosecomplication.GlucoseValue
 tk.glucodata.settings.SetColors
 tk.glucodata.ui.AlarmActivity

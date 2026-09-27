@@ -68,6 +68,7 @@ static void registerBridges() {
     tk.glucodata.ui.ComposeHostAccess.register(tk.glucodata.ui.WearComposeHost.INSTANCE);
     CalibrationAccess.register(SyncedWearCalibrationProvider.INSTANCE);
     tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.WearAlarmActivityHost.INSTANCE);
+    ComplicationConfigAccess.register(new tk.glucodata.glucosecomplication.WearColorConfig());
 }
 
 static void start(Object context) {

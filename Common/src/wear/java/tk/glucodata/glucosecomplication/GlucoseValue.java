@@ -40,7 +40,7 @@ import static tk.glucodata.CommonCanvas.drawarrow;
 import static tk.glucodata.CommonCanvas.drawarrowcircle;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Notify.unitlabel;
-import static tk.glucodata.glucosecomplication.ColorConfig.defcol;
+import static tk.glucodata.glucosecomplication.WearColorConfig.defcol;
 
 import android.annotation.SuppressLint;
 import android.content.Context;

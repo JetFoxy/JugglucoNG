@@ -110,6 +110,7 @@ import tk.glucodata.BooleanSupplier;
 import tk.glucodata.BuildConfig;
 import tk.glucodata.Floating;
 import tk.glucodata.GlucoseCurve;
+import tk.glucodata.ComplicationConfigAccess;
 import tk.glucodata.HealthConnectAccess;
 import tk.glucodata.LegacyScreensAccess;
 import tk.glucodata.LabelAdapter;
@@ -1307,7 +1308,9 @@ private    void mksettings(MainActivity context) {
         Button complications;
         if(BuildConfig.minSDK>=26) {
             complications = getbutton(context, R.string.complications);
-            complications.setOnClickListener(v -> tk.glucodata.glucosecomplication.ColorConfig.show(context, thelayout[0]));
+            complications.setOnClickListener(v -> {
+                    var config = ComplicationConfigAccess.get();
+                    if (config != null) config.show(context, thelayout[0]); });
                         final var margins=getMargins(complications);
                         margins.topMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*3.0);
                         margins.bottomMargin= (int)(tk.glucodata.GlucoseCurve.metrics.density*4.0);

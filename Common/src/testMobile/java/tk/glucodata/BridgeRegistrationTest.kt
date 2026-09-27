@@ -1,5 +1,6 @@
 package tk.glucodata
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -36,6 +37,8 @@ class BridgeRegistrationTest {
         assertTrue("HealthConnectAccess", HealthConnectAccess.isRegistered())
         assertTrue("HealthPermissionsAccess", HealthPermissionsAccess.isRegistered())
         assertTrue("NumberDataAccess", NumberDataAccess.isRegistered())
+        // The complication colour screen is watch-only: the phone copy was a shell.
+        assertFalse("ComplicationConfigAccess", ComplicationConfigAccess.isRegistered())
         assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
         assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())
         assertTrue("HistorySyncBridgeAccess", HistorySyncBridgeAccess.isRegistered())

@@ -64,7 +64,7 @@ import tk.glucodata.MainActivity;
 import tk.glucodata.R;
 import yuku.ambilwarna.AmbilWarnaDialog;
 
-public class ColorConfig {
+public class WearColorConfig implements tk.glucodata.ComplicationConfig {
 //   static private final int[] names=new int[]{R.string.arrow,R.string.text,R.string.textborder, R.string.background};
    static private final int[] names=new int[]{R.string.arrow,R.string.text, R.string.background};
    private static final String LOG_ID="ColorConfig";
@@ -129,7 +129,9 @@ public class ColorConfig {
          }
         }
 static private int radiosel=0;
-static public   void show(MainActivity context, View view) {
+    /** The whole body used to be the static show(...); the interface method is that body. */
+    @Override
+    public void show(MainActivity context, View view) {
 	   view.setVisibility(INVISIBLE);
       var allradio=new RadioButton[names.length];
         for(int i=0;i<names.length;++i) 
