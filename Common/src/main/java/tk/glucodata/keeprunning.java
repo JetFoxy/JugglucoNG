@@ -129,8 +129,9 @@ static PowerManager.WakeLock wakeLock =null;
   }
 
   @Override
-  public void onDestroy() {
-    logLifecycleState("onDestroy",null);
+   public void onDestroy() {
+     logLifecycleState("onDestroy",null);
+     Notify.invalidateStartupRestore();
     CloneBackgroundLiveness.release();
     CloneRecoveryWake.releaseAll();
     if(theservice==this) {
@@ -156,9 +157,10 @@ static boolean start(Context context) {
       }
    return false;
    }
-void stopper() {
-   logLifecycleState("stopper",null);
-   stopForeground(true);
+ void stopper() {
+    logLifecycleState("stopper",null);
+    Notify.invalidateStartupRestore();
+    stopForeground(true);
    stopSelf();
 //   turnoffwakelock();
    {if(doLog) {Log.i(LOG_ID,"Stopped");};};

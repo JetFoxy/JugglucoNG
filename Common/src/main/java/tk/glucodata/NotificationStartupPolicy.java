@@ -5,13 +5,13 @@ package tk.glucodata;
  *
  * <p>Pure Java with no Android dependencies so the rules can be exercised on the JVM:
  * the notification header must show the timestamp of the reading actually displayed
- * (never render time, never a fabricated value), startup restoration classifies the
- * actual resolved timestamp without relabelling stale history as fresh, and a queued
- * asynchronous restore must not post after the service was destroyed, replaced or
- * stopped, nor overwrite a newer genuine reading.
+ * (never render time, never a fabricated value), and startup restoration classifies
+ * the actual resolved timestamp without relabelling stale history as fresh.
  *
- * <p>Shared resolver semantics, units, calibration and alert delivery are untouched;
- * this class only classifies and guards.
+ * <p>Restore lifecycle (ticket epochs, atomic check-and-publish, stop invalidation)
+ * lives in {@code Notify} so the real publication paths can be harnessed; this class
+ * only classifies and selects timestamps. Shared resolver semantics, units,
+ * calibration and alert delivery are untouched.
  */
 public final class NotificationStartupPolicy {
     private NotificationStartupPolicy() {
@@ -27,10 +27,10 @@ public final class NotificationStartupPolicy {
 
     /**
      * Classify the restore outcome from the actual resolved timestamps via the shared
-     * {@link DisplayDataState} policy. A null resolution flattens failures, and a
-     * non-null snapshot does not imply freshness (history fallback), so both the
-     * current and the latest history timestamps are considered. All arguments are
-     * explicit so loading this class never touches Android or native initializers.
+     * {@link DisplayDataState} policy. Callers pass the timestamp of the reading that
+     * will actually be rendered (or 0 when nothing renderable was resolved), never a
+     * max over sources that are not displayed. All arguments are explicit so loading
+     * this class never touches Android or native initializers.
      */
     public static RestoreOutcome classifyRestore(boolean sensorPresent, long currentMillis,
             long historyMillis, long nowMillis, long freshnessWindowMillis) {
@@ -63,72 +63,5 @@ public final class NotificationStartupPolicy {
     /** Whether a header timestamp may be shown for the displayed reading. */
     public static boolean showHeaderWhen(long displayedReadingMillis) {
         return displayedReadingMillis > 0L;
-    }
-
-    /**
-     * Lifecycle guard for the asynchronous startup restore.
-     *
-     * <p>Every foreground entry starts a new epoch; a queued restore carries the
-     * epoch and service identity it was queued under. Cancellation alone is not
-     * relied upon across the worker/main boundary: a restore that is already
-     * resolving re-checks the guard after the expensive render, immediately before
-     * posting. Genuine reading posts are recorded so a late restore can neither
-     * overwrite newer content nor mirror an already-posted reading a second time.
-     * Bookkeeping happens only at actual post time, never speculatively.
-     */
-    public static final class RestoreGuard {
-        private long generation = 0L;
-        private long newestPostedReadingMillis = 0L;
-
-        /** Starts a new restore epoch, superseding any previously queued restore. */
-        public synchronized long begin() {
-            return ++generation;
-        }
-
-        /** The current epoch, read by a restore when it starts resolving. */
-        public synchronized long currentGeneration() {
-            return generation;
-        }
-
-        /** Records a genuine reading post; non-positive values never count as data. */
-        public synchronized void markPosted(long readingMillis) {
-            if (readingMillis > newestPostedReadingMillis) {
-                newestPostedReadingMillis = readingMillis;
-            }
-        }
-
-        public synchronized long newestPosted() {
-            return newestPostedReadingMillis;
-        }
-
-        /**
-         * Whether a queued restore may still post.
-         *
-         * @param generation generation captured when the restore was queued
-         * @param serviceCurrent the queuing service instance is still the active one
-         * @param serviceStarted the service is still required/started
-         * @param candidateReadingMillis reading the restore resolved, or 0 when the
-         *                               restore found no data
-         */
-        public synchronized boolean shouldPost(long generation, boolean serviceCurrent,
-                boolean serviceStarted, long candidateReadingMillis) {
-            if (generation != this.generation) {
-                return false;
-            }
-            if (!serviceCurrent || !serviceStarted) {
-                return false;
-            }
-            if (newestPostedReadingMillis > 0L) {
-                if (candidateReadingMillis <= 0L) {
-                    // No data must not replace genuine content.
-                    return false;
-                }
-                if (candidateReadingMillis <= newestPostedReadingMillis) {
-                    // A newer genuine reading wins; an equal one is already mirrored.
-                    return false;
-                }
-            }
-            return true;
-        }
     }
 }
