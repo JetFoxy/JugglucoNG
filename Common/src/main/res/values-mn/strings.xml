@@ -802,7 +802,6 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="data_smoothing_collapse_desc_match">%1$d минут тутамд нэг жигдэрсэн цэгийг үлдээж, солилцооны гаралтыг мөн ижил хурдаар илгээнэ</string>
     <string name="data_smoothing_collapse_desc_capped">5 минут тутамд нэг жигдэрсэн цэгийг үлдээж, солилцооны гаралтыг мөн ижил хурдаар илгээнэ, харин жигдрүүлэлт одоо ч %1$d минут ашиглана</string>
     <string name="data_smoothing_collapse_summary_format">Хэсэг бүр %1$d мин тутамд</string>
-    <string name="data_smoothing_collapse_loop_note">xDrip-ийн дамжуулалт болон xInfuus (хаалттай гогцооны аппууд ашигладаг) сийрэгждэггүй: тэд хэмжилт бүрийг өөрийнх нь цагтай хүлээн авна; «Зөвхөн графикийг жигдлэх» асаалттай үед жигдлэлтгүй</string>
     <string name="preview_window_title">Урьдчилан харах цонх</string>
     <string name="preview_window_desc">Үндсэн графикийн үйл ажиллагааг өөрчлөхгүйгээр хянах самбарын графикийн доор 24 цагийн мини навигаторыг харуулах</string>
     <string name="preview_window_expanded_only">Дэлгэсэн харагдац (үндсэн)</string>

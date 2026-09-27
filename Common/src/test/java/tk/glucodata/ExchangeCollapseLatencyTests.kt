@@ -12,7 +12,12 @@ import org.junit.Test
  * resolveFromLive -> ExchangeUpdateGate.
  *
  * "Collapse into chunks" thins how OFTEN an exchange output is fed. It must never change WHAT
- * is sent: the newest reading, under its own timestamp.
+ * is sent: the newest reading, under its own timestamp. This applies uniformly to every exchange
+ * destination, including the xDrip/xInfuus loop feed AAPS doses from — it used to be exempted
+ * from collapse because the old design sent a stale chunk point instead of the newest reading;
+ * now that ExchangeUpdateGate always carries the newest reading's own timestamp, there is no
+ * reason left to keep it uncollapsed (see [tk.glucodata.ExchangeOutputPolicy]'s LOOP_FEED
+ * destination).
  *
  * Shape taken from the field trace: readings every 60 s, each one reaching the callback ~4 s
  * before its own timestamp, smoothing window 3 min.
@@ -31,8 +36,7 @@ class ExchangeCollapseLatencyTests {
         val smoothingMinutes: Int = 3,
         val graphOnly: Boolean = false,
         val exchangeOnly: Boolean = true,
-        val collapse: Boolean = true,
-        val liveLoopFeed: Boolean = false
+        val collapse: Boolean = true
     )
 
     private data class Emission(
@@ -48,12 +52,10 @@ class ExchangeCollapseLatencyTests {
         valueAt: (Int) -> Float = { 100f + it }
     ): List<Emission> {
         val mode = CurrentDisplaySource.exchangeSmoothingMode(
-            settings.smoothingMinutes, settings.graphOnly, settings.exchangeOnly,
-            settings.collapse, settings.liveLoopFeed
+            settings.smoothingMinutes, settings.graphOnly, settings.exchangeOnly, settings.collapse
         )
         val intervalMinutes = DataSmoothing.exchangeThrottleIntervalMinutes(
-            settings.smoothingMinutes, settings.graphOnly, settings.exchangeOnly,
-            settings.collapse, settings.liveLoopFeed
+            settings.smoothingMinutes, settings.graphOnly, settings.exchangeOnly, settings.collapse
         )
         val gate = ExchangeUpdateGate()
         val history = ArrayList<GlucosePoint>()
@@ -162,14 +164,6 @@ class ExchangeCollapseLatencyTests {
     }
 
     @Test
-    fun loopFeed_receivesEveryReadingWithItsOwnTimestamp() {
-        val run = replay(Settings(liveLoopFeed = true)).drop(steadyState)
-
-        assertEquals(12, run.count { it.emitted })
-        run.forEach { assertEquals(it.readingTimeMs, it.payloadTimeMs) }
-    }
-
-    @Test
     fun collapseOff_sendsEveryReadingWithItsOwnTimestamp() {
         val run = replay(Settings(collapse = false)).drop(steadyState)
 
@@ -181,7 +175,7 @@ class ExchangeCollapseLatencyTests {
     fun valueIsSmoothedFromTheWindowBehindTheReading() {
         val noisy = { k: Int -> 100f + k + if (k % 2 == 0) 4f else -4f }
 
-        val run = replay(Settings(liveLoopFeed = true), valueAt = noisy).drop(steadyState)
+        val run = replay(Settings(), valueAt = noisy).drop(steadyState)
 
         run.forEachIndexed { i, e ->
             val k = steadyState + i
@@ -198,41 +192,22 @@ class ExchangeCollapseLatencyTests {
     @Test
     fun theExchangeSnapshotIsNeverCollapsed() {
         for (graphOnly in listOf(false, true)) for (exchangeOnly in listOf(false, true))
-            for (collapse in listOf(false, true)) for (loop in listOf(false, true)) {
-                val mode = CurrentDisplaySource.exchangeSmoothingMode(3, graphOnly, exchangeOnly, collapse, loop)
-                assertFalse("graphOnly=$graphOnly exchangeOnly=$exchangeOnly collapse=$collapse loop=$loop", mode.collapseChunks)
+            for (collapse in listOf(false, true)) {
+                val mode = CurrentDisplaySource.exchangeSmoothingMode(3, graphOnly, exchangeOnly, collapse)
+                assertFalse("graphOnly=$graphOnly exchangeOnly=$exchangeOnly collapse=$collapse", mode.collapseChunks)
             }
     }
 
     @Test
-    fun throttleInterval_followsTheCollapseSettingForChunkedTargets() {
+    fun throttleInterval_followsTheCollapseSetting() {
         fun interval(min: Int, graphOnly: Boolean, exchangeOnly: Boolean, collapse: Boolean) =
-            DataSmoothing.exchangeThrottleIntervalMinutes(min, graphOnly, exchangeOnly, collapse, liveLoopFeed = false)
+            DataSmoothing.exchangeThrottleIntervalMinutes(min, graphOnly, exchangeOnly, collapse)
 
         assertEquals(3, interval(3, graphOnly = false, exchangeOnly = true, collapse = true))
         assertEquals(5, interval(13, graphOnly = false, exchangeOnly = true, collapse = true)) // MAX_CHUNK_INTERVAL_MINUTES
         assertEquals(3, interval(3, graphOnly = true, exchangeOnly = false, collapse = true)) // d7f827240 kept
         assertEquals(0, interval(3, graphOnly = false, exchangeOnly = true, collapse = false))
         assertEquals(0, interval(0, graphOnly = false, exchangeOnly = true, collapse = true))
-    }
-
-    @Test
-    fun throttleInterval_isZeroForALoopFeedWhateverTheSettingsSay() {
-        for (graphOnly in listOf(false, true)) for (exchangeOnly in listOf(false, true))
-            assertEquals(
-                0,
-                DataSmoothing.exchangeThrottleIntervalMinutes(3, graphOnly, exchangeOnly, true, liveLoopFeed = true)
-            )
-    }
-
-    @Test
-    fun loopFeed_underGraphOnly_goesOutAsMeasuredEvenWithCollapseOn() {
-        // d7f827240 pulls exchange smoothing back on under "graph only" so collapse has a smoothed
-        // reading to keep. A loop feed is not thinned, so it has no such reason.
-        assertFalse(DataSmoothing.smoothExchangeSnapshot(3, true, false, true, liveLoopFeed = true))
-        assertTrue(DataSmoothing.smoothExchangeSnapshot(3, true, false, true, liveLoopFeed = false))
-        assertTrue(DataSmoothing.smoothExchangeSnapshot(3, false, true, true, liveLoopFeed = true))
-        assertFalse(DataSmoothing.smoothExchangeSnapshot(0, false, false, true, liveLoopFeed = true))
     }
 
     // --- the gate -------------------------------------------------------------------------------
@@ -334,7 +309,8 @@ class ExchangeCollapseLatencyTests {
             jugglucoEnabled = false,
             outboundApiEnabled = true,
             wearIntEnabled = true,
-            gadgetbridgeEnabled = true
+            gadgetbridgeEnabled = true,
+            loopFeedEnabled = false
         )
         assertTrue("outbound API is eligible on every reading", early.sendOutboundApi)
         assertTrue("WearInt sends in the previous bucket", early.sendWearInt)
@@ -348,7 +324,8 @@ class ExchangeCollapseLatencyTests {
             jugglucoEnabled = false,
             outboundApiEnabled = true,
             wearIntEnabled = true,
-            gadgetbridgeEnabled = true
+            gadgetbridgeEnabled = true,
+            loopFeedEnabled = false
         )
         assertTrue("the fast destination uses the new bucket", fastDestinationUsesCurrentBucket.sendOutboundApi)
         assertFalse("the slow destinations are still behind the minute gate", fastDestinationUsesCurrentBucket.sendWearInt)
@@ -362,7 +339,8 @@ class ExchangeCollapseLatencyTests {
             jugglucoEnabled = false,
             outboundApiEnabled = true,
             wearIntEnabled = true,
-            gadgetbridgeEnabled = true
+            gadgetbridgeEnabled = true,
+            loopFeedEnabled = false
         )
         assertFalse("API already used its own bucket", sameBucketAfterJitter.sendOutboundApi)
         assertTrue("WearInt gets the first eligible callback in its bucket", sameBucketAfterJitter.sendWearInt)
@@ -381,7 +359,8 @@ class ExchangeCollapseLatencyTests {
             jugglucoEnabled = false,
             outboundApiEnabled = true,
             wearIntEnabled = false,
-            gadgetbridgeEnabled = false
+            gadgetbridgeEnabled = false,
+            loopFeedEnabled = false
         )
         assertTrue("the enabled API may consume its own bucket", disabled.sendOutboundApi)
         assertFalse(disabled.sendGadgetbridge)
@@ -394,7 +373,8 @@ class ExchangeCollapseLatencyTests {
             jugglucoEnabled = false,
             outboundApiEnabled = true,
             wearIntEnabled = false,
-            gadgetbridgeEnabled = true
+            gadgetbridgeEnabled = true,
+            loopFeedEnabled = false
         )
         assertTrue("the first enabled reading starts Gadgetbridge's bucket", enabled.sendGadgetbridge)
     }
@@ -404,19 +384,71 @@ class ExchangeCollapseLatencyTests {
         val policy = ExchangeOutputPolicy()
 
         assertTrue(
-            policy.decide(sensorId, base, 3, true, false, true, false, false).sendOutboundApi
+            policy.decide(sensorId, base, 3, true, false, true, false, false, false).sendOutboundApi
         )
         assertFalse(
             "an older reading cannot reopen a sent interval",
-            policy.decide(sensorId, base - minute, 3, true, false, true, false, false).sendOutboundApi
+            policy.decide(sensorId, base - minute, 3, true, false, true, false, false, false).sendOutboundApi
         )
         assertFalse(
             "the same interval remains closed",
-            policy.decide(sensorId, base + minute, 3, true, false, true, false, false).sendOutboundApi
+            policy.decide(sensorId, base + minute, 3, true, false, true, false, false, false).sendOutboundApi
         )
         assertTrue(
             "changing the interval starts its count afresh",
-            policy.decide(sensorId, base + minute, 5, true, false, true, false, false).sendOutboundApi
+            policy.decide(sensorId, base + minute, 5, true, false, true, false, false, false).sendOutboundApi
         )
+    }
+
+    // --- loop feed as a destination: collapses like everything else, opt-out removed -----------
+
+    @Test
+    fun loopFeedDestinationCollapsesLikeOutboundApi() {
+        val policy = ExchangeOutputPolicy()
+
+        val first = policy.decide(
+            sensorId = sensorId, payloadTimeMs = base, intervalMinutes = 3,
+            shouldBroadcastMinuteUpdate = true, jugglucoEnabled = false, outboundApiEnabled = false,
+            wearIntEnabled = false, gadgetbridgeEnabled = false, loopFeedEnabled = true
+        )
+        assertTrue("first reading of the interval sends", first.sendLoopFeed)
+
+        val sameInterval = policy.decide(
+            sensorId = sensorId, payloadTimeMs = base + minute, intervalMinutes = 3,
+            shouldBroadcastMinuteUpdate = true, jugglucoEnabled = false, outboundApiEnabled = false,
+            wearIntEnabled = false, gadgetbridgeEnabled = false, loopFeedEnabled = true
+        )
+        assertFalse("same interval stays closed, same as every other destination", sameInterval.sendLoopFeed)
+
+        val nextInterval = policy.decide(
+            sensorId = sensorId, payloadTimeMs = base + 3 * minute, intervalMinutes = 3,
+            shouldBroadcastMinuteUpdate = true, jugglucoEnabled = false, outboundApiEnabled = false,
+            wearIntEnabled = false, gadgetbridgeEnabled = false, loopFeedEnabled = true
+        )
+        assertTrue("next interval sends", nextInterval.sendLoopFeed)
+    }
+
+    @Test
+    fun loopFeedDestinationDisabledNeverSends() {
+        val policy = ExchangeOutputPolicy()
+
+        val decision = policy.decide(
+            sensorId = sensorId, payloadTimeMs = base, intervalMinutes = 3,
+            shouldBroadcastMinuteUpdate = true, jugglucoEnabled = false, outboundApiEnabled = false,
+            wearIntEnabled = false, gadgetbridgeEnabled = false, loopFeedEnabled = false
+        )
+        assertFalse(decision.sendLoopFeed)
+    }
+
+    @Test
+    fun loopFeedDestinationRespectsTheMinuteGateLikeWearIntAndGadgetbridge() {
+        val policy = ExchangeOutputPolicy()
+
+        val behindTheMinuteGate = policy.decide(
+            sensorId = sensorId, payloadTimeMs = base + 30_000L, intervalMinutes = 3,
+            shouldBroadcastMinuteUpdate = false, jugglucoEnabled = false, outboundApiEnabled = false,
+            wearIntEnabled = false, gadgetbridgeEnabled = false, loopFeedEnabled = true
+        )
+        assertFalse("not eligible this callback", behindTheMinuteGate.sendLoopFeed)
     }
 }

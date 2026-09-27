@@ -140,31 +140,17 @@ object DataSmoothing {
      * "Collapse into chunks" thins the *rate* of what leaves the phone; it never changes what is
      * sent. Whatever is sent is the newest reading under its own timestamp — the payload is not
      * built from the last point of a completed chunk, which would be up to two intervals old.
-     * Outputs a closed loop doses from (xDrip broadcast, xInfuus) are never thinned.
+     * This applies uniformly to every exchange destination, including the xDrip/xInfuus loop feed
+     * AAPS doses from: it used to be exempt from collapse because the old design broke the "own
+     * timestamp" guarantee for it, not because thinning it was unsafe on its own.
      */
     @JvmStatic
-    fun exchangeThrottleIntervalMinutes(context: Context, liveLoopFeed: Boolean): Int =
+    fun exchangeThrottleIntervalMinutes(context: Context): Int =
         exchangeThrottleIntervalMinutes(
             smoothingMinutes = getMinutes(context),
             graphOnly = isGraphOnly(context),
             exchangeOutputsOnly = smoothOnlyExchangeOutputs(context),
-            collapseChunks = collapseChunks(context),
-            liveLoopFeed = liveLoopFeed
-        )
-
-    /**
-     * Whether the reading handed to an exchange output is smoothed at all. A loop feed is not
-     * thinned, so there is nothing to pull smoothing back on under "graph only" for (see
-     * [shouldSmoothExchangeOutputs]): it honours "graph only" and goes out as measured.
-     */
-    @JvmStatic
-    fun shouldSmoothExchangeSnapshot(context: Context, liveLoopFeed: Boolean): Boolean =
-        smoothExchangeSnapshot(
-            smoothingMinutes = getMinutes(context),
-            graphOnly = isGraphOnly(context),
-            exchangeOutputsOnly = smoothOnlyExchangeOutputs(context),
-            collapseChunks = collapseChunks(context),
-            liveLoopFeed = liveLoopFeed
+            collapseChunks = collapseChunks(context)
         )
 
     @JvmStatic
@@ -371,29 +357,12 @@ object DataSmoothing {
         smoothingMinutes: Int,
         graphOnly: Boolean,
         exchangeOutputsOnly: Boolean,
-        collapseChunks: Boolean,
-        liveLoopFeed: Boolean
-    ): Int = if (
-        !liveLoopFeed &&
-        shouldCollapseExchangeOutputs(smoothingMinutes, graphOnly, exchangeOutputsOnly, collapseChunks)
-    ) {
+        collapseChunks: Boolean
+    ): Int = if (shouldCollapseExchangeOutputs(smoothingMinutes, graphOnly, exchangeOutputsOnly, collapseChunks)) {
         collapseIntervalMinutes(smoothingMinutes)
     } else {
         0
     }
-
-    internal fun smoothExchangeSnapshot(
-        smoothingMinutes: Int,
-        graphOnly: Boolean,
-        exchangeOutputsOnly: Boolean,
-        collapseChunks: Boolean,
-        liveLoopFeed: Boolean
-    ): Boolean = shouldSmoothExchangeOutputs(
-        smoothingMinutes = smoothingMinutes,
-        graphOnly = graphOnly,
-        exchangeOutputsOnly = exchangeOutputsOnly,
-        collapseChunks = collapseChunks && !liveLoopFeed
-    )
 
     private fun setLastEnabledMinutes(context: Context, minutes: Int) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
