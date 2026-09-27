@@ -118,11 +118,11 @@ import tk.glucodata.LabelAdapter;
 import tk.glucodata.Layout;
 import tk.glucodata.Log;
 import tk.glucodata.MainActivity;
-import tk.glucodata.SetColorsScreenAccess;
 import tk.glucodata.Natives;
 import tk.glucodata.Notify;
 import tk.glucodata.NumAlarm;
 import tk.glucodata.R;
+import tk.glucodata.SetColorsScreenAccess;
 import tk.glucodata.Specific;
 import tk.glucodata.SuperGattCallback;
 

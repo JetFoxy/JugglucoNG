@@ -73,7 +73,13 @@
 #   Worth writing down how this duplicate hid from the compiler: Settings is in the same
 #   package, and show was package-private on both sides, so shared code called a phone class
 #   by a name the watch happened to share as well.
-tk.glucodata.GlucoseAlarms
+#   tk.glucodata.GlucoseAlarms (category S): the alert path, so it was characterised before
+#   being changed (GlucoseAlarmsAsymmetryTests pins the phone/watch differences). The shape
+#   was a held reference, not a call: shared code held SuperGattCallback.glucosealarms as
+#   the concrete class and both construction sites were in src/main. The field is now typed
+#   to GlucoseAlarmHandler (src/main; SuperGlucoseAlarms implements it and handlealarm() is
+#   the flavour override), and the instance comes from a factory each flavour registers in
+#   GlucoseAlarmsAccess. The classes are MobileGlucoseAlarms and WearGlucoseAlarms.
 tk.glucodata.Meal
 tk.glucodata.Specific
 tk.glucodata.ui.AlarmActivity

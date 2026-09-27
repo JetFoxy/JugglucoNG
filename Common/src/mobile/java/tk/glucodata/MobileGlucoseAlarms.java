@@ -26,12 +26,13 @@ import android.app.Application;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.hasalarmloss;
 
-public class GlucoseAlarms extends SuperGlucoseAlarms {
+public class MobileGlucoseAlarms extends SuperGlucoseAlarms {
     final private static String LOG_ID="GlucoseAlarms";
-public GlucoseAlarms(Application context) {
+public MobileGlucoseAlarms(Application context) {
     super(context);
     }
 
+    @Override
 public    void handlealarm() {
     SensorBluetooth.reconnectall();
     SensorBluetooth.ensureCurrentSensorSelection();
