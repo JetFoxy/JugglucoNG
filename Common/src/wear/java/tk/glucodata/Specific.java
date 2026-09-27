@@ -76,6 +76,12 @@ static void registerBridges() {
     if (!FloatingConfigScreenAccess.isRegistered())
         FloatingConfigScreenAccess.register(new WearFloatingConfig());
     SetColorsScreenAccess.register(new tk.glucodata.settings.WearSetColors());
+    GlucoseAlarmsAccess.register(new tk.glucodata.GlucoseAlarmsAccess.Factory() {
+        @Override
+        public tk.glucodata.GlucoseAlarmHandler create(android.app.Application application) {
+            return new tk.glucodata.WearGlucoseAlarms(application);
+        }
+    });
 }
 
 static void start(Object context) {

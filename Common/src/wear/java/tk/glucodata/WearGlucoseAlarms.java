@@ -27,12 +27,13 @@ import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.hasalarmloss;
 
-public class GlucoseAlarms extends SuperGlucoseAlarms {
+public class WearGlucoseAlarms extends SuperGlucoseAlarms {
     final private static String LOG_ID="GlucoseAlarms";
-public GlucoseAlarms(Application context) {
+public WearGlucoseAlarms(Application context) {
     super(context);
     }
 
+    @Override
 public    void handlealarm() {
         SensorBluetooth.reconnectall();
         final long nu = System.currentTimeMillis();

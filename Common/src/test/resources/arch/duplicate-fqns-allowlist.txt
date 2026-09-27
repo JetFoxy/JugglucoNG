@@ -30,6 +30,14 @@
 #   near-identical fork), so both are renamed -- MobileFloatingConfig and
 #   WearFloatingConfig -- and both register behind FloatingConfigScreenAccess. The contract
 #   is the one method the settings screen calls.
+#   tk.glucodata.GlucoseAlarms (category S): the alert path, so it was characterised before
+#   being changed (GlucoseAlarmsAsymmetryTests pins the phone/watch differences). The shape
+#   was a held reference, not a call: shared code held SuperGattCallback.glucosealarms as
+#   the concrete class and both construction sites were in src/main. The contract is an
+#   interface rather than SuperGlucoseAlarms, because handlealarm() is the flavour override
+#   and the base does not declare it; the base implements the interface and is now abstract,
+#   so a flavour that forgets handlealarm() is a compile error. The instance comes from
+#   GlucoseAlarmsAccess, a factory per flavour. MobileGlucoseAlarms, WearGlucoseAlarms.
 #   tk.glucodata.settings.SetColors (category S): both sides are real -- 144 lines on the
 #   phone, 96 on the watch, and the watch's adjusts the light bars and opens its own colour
 #   dialog -- so both are renamed (MobileSetColors, WearSetColors) and both register behind
@@ -73,7 +81,6 @@
 #   on/off flag -- read by shared code in about a dozen places, written by ScanNfcV and by
 #   show() itself -- became LegacyScreensAccess.menusOn. The watch copy held the flag and an
 #   empty show(), and both moved, so nothing was left of it.
-tk.glucodata.GlucoseAlarms
 tk.glucodata.Meal
 tk.glucodata.Specific
 tk.glucodata.ui.AlarmActivity
