@@ -36,7 +36,7 @@ import static tk.glucodata.Natives.setComplicationArrowColor;
 import static tk.glucodata.Natives.setComplicationBackgroundColor;
 import static tk.glucodata.Natives.setComplicationTextBorderColor;
 import static tk.glucodata.Natives.setComplicationTextColor;
-import static tk.glucodata.Specific.useclose;
+import static tk.glucodata.VariantBootstrapAccess.useCloseButton;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getcheckbox;
@@ -170,7 +170,7 @@ static private int radiosel=0;
    var space4=new Space(context);
 //      Layout layout=new Layout(context,(l, w, h)-> { return new int[] {w,h}; },new View[]{head},new View[]{new Space(context),allradio[1],allradio[2]},new View[]{allradio[0],allradio[3]},new View[]{defaultbox,select},  new View[]{close});
 
-	if(!useclose) close.setVisibility(INVISIBLE);
+	if(!useCloseButton()) close.setVisibility(INVISIBLE);
       Layout layout=new Layout(context,(l, w, h)-> { return new int[] {w,h}; },new View[]{allradio[2]},new View[]{space1,allradio[0],allradio[1],space2},new View[]{space3,defaultbox,select,space4},  new View[]{close});
       layout.setBackgroundColor(Applic.backgroundcolor);
    var density=tk.glucodata.GlucoseCurve.metrics.density;
@@ -252,7 +252,7 @@ else {
    fontsizeview=null;
 	}
 
-	if(!useclose) close.setVisibility(GONE);
+	if(!useCloseButton()) close.setVisibility(GONE);
     else {
         var margins=getMargins(close);
         margins.topMargin= (int)(density*2.0);

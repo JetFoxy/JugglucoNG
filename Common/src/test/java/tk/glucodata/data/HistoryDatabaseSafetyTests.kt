@@ -65,7 +65,7 @@ class HistoryDatabaseSafetyTests {
         assertTrue(
             "MainActivity must stop before normal startup when the history database is incompatible",
             source("src/main/java/tk/glucodata/MainActivity.java")
-                .contains("if (!Specific.historyDatabaseCompatible(this))")
+                .contains("if (!VariantBootstrapAccess.create().historyDatabaseCompatible(this))")
         )
     }
 

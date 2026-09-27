@@ -52,7 +52,7 @@ import static tk.glucodata.Natives.removeScheduleProfile;
 import static tk.glucodata.Natives.setthreshold;
 import static tk.glucodata.NumberView.avoidSpinnerDropdownFocus;
 import static tk.glucodata.RingTones.EnableControls;
-import static tk.glucodata.Specific.useclose;
+import static tk.glucodata.VariantBootstrapAccess.useCloseButton;
 import static tk.glucodata.help.help;
 import static tk.glucodata.util.getbutton;
 import static tk.glucodata.util.getcheckbox;
@@ -1040,15 +1040,14 @@ static private void displaysettings(MainActivity context,Settings settings) {
                     }
                 }
             ); 
-    if(!useclose)
+    if(!useCloseButton())
           close.setVisibility(GONE);
     targetlabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),0,0,0);
     graphlabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*8.0),0,0,0);
     //colbut.setPadding(0,0,0,0);
     threslabel.setPadding((int)(tk.glucodata.GlucoseCurve.metrics.density*7.0),0,0,0);
-     var setuseclose=getcheckbox(context,R.string.useclose,useclose) ;
+     var setuseclose=getcheckbox(context,R.string.useclose,useCloseButton()) ;
     setuseclose.setOnCheckedChangeListener( (buttonView,  isChecked) -> { 
-         Specific.setclose(isChecked);
          Natives.setdontuseclose(!isChecked); 
          context.finish();
          context.startActivity(context.getIntent());
@@ -1213,7 +1212,7 @@ private    void mksettings(MainActivity context) {
              }
 
 
-      if(!useclose)
+      if(!useCloseButton())
      close.setVisibility(GONE);
 //    CheckBox bluetooth= new CheckBox(context);
    CheckBox globalscan = new CheckBox(context);
@@ -1509,7 +1508,7 @@ static private void exchanges(MainActivity context, View parent) {
                 }
         );
    var ok = getbutton(context, R.string.closename);
-    if(!useclose)
+    if(!useCloseButton())
         ok.setVisibility(GONE);
     ok.setOnClickListener(
         v->{

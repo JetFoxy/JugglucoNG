@@ -26,7 +26,7 @@ import tk.glucodata.GlucoseCurve;
 import tk.glucodata.Log;
 
 import static tk.glucodata.Log.doLog;
-import static tk.glucodata.Specific.useclose;
+import static tk.glucodata.VariantBootstrapAccess.useCloseButton;
 
 import android.view.View;
 import android.view.ViewGroup;
@@ -74,7 +74,7 @@ private static final String LOG_ID="SetColors";
     View view=dialog.getview();
     view.setBackgroundColor(Applic.backgroundcolor);
     act.addContentView(view, new ViewGroup.LayoutParams((int)(width*0.65), (int)(height*0.65)));
-    var ok=useclose?getbutton(act,"Ok"):null;
+    var ok=useCloseButton()?getbutton(act,"Ok"):null;
     if(ok!=null) {
         ok.setOnClickListener(v->MainActivity.doonback());
         act.addContentView(ok, new ViewGroup.LayoutParams(WRAP_CONTENT,WRAP_CONTENT));

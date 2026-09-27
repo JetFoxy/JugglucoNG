@@ -1065,7 +1065,7 @@ public class Applic extends Application implements androidx.work.Configuration.P
             } else if (useWearos()) {
                 MessageSender.sendnetinfo();
             }
-            Specific.start(this);
+            VariantBootstrapAccess.create().start(this);
             SensorOwnershipRuntime.start();
             if (isWearable) {
                 var refresh = GlucoseValueRefreshAccess.get();
@@ -1118,7 +1118,7 @@ public class Applic extends Application implements androidx.work.Configuration.P
         // Before anything else: Application.onCreate precedes every component
         // (boot receiver, restarted service, activity), so this is the only
         // place that guarantees the trend/alert bridges exist before the first
-        // reading is evaluated. Waiting for Specific.start() at the end of
+        // reading is evaluated. Waiting for the variant start() at the end of
         // initproc() left a post-reboot window where forecast alerts fired on
         // the degraded two-point slope.
         Specific.registerBridges();
@@ -1420,7 +1420,6 @@ public class Applic extends Application implements androidx.work.Configuration.P
 
     private static void initbroadcasts() {
         if (isWearable) {
-            Specific.setclose(!Natives.getdontuseclose());
         }
 
         Floating.init();
@@ -1513,14 +1512,14 @@ public class Applic extends Application implements androidx.work.Configuration.P
     @Keep
     static void setinittext(String str) {
         RunOnUiThread(() -> {
-            Specific.settext(str);
+            VariantBootstrapAccess.create().settext(str);
         });
     }
 
     @Keep
     static void rminitlayout() {
         RunOnUiThread(() -> {
-            Specific.rmlayout();
+            VariantBootstrapAccess.create().rmlayout();
         });
     }
 

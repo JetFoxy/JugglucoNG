@@ -91,7 +91,7 @@ import static tk.glucodata.Natives.getbackupHasHostname;
 import static tk.glucodata.Natives.isWearOS;
 import static tk.glucodata.Natives.mirrorStatus;
 import static tk.glucodata.RingTones.EnableControls;
-import static tk.glucodata.Specific.useclose;
+import static tk.glucodata.VariantBootstrapAccess.useCloseButton;
 import static tk.glucodata.UseWifi.usewifi;
 import static tk.glucodata.help.help;
 import static tk.glucodata.help.hidekeyboard;
@@ -880,7 +880,7 @@ CheckBox ICE;
       ViewGroup layall;
 
       if(isWearable) {
-          if(!useclose) close.setVisibility(GONE);
+          if(!useCloseButton()) close.setVisibility(GONE);
          var space1=new Space(act);
          var space2=getlabel(act,"      ");
           Layout layout=new Layout(act,new View[]{space1,deactive,modify,space2}, new View[]{info},new View[]{close});
@@ -1048,7 +1048,7 @@ CheckBox ICE;
             else
                UseWifi.stopusewifi();
             });
-         if(!useclose) Cancel.setVisibility(INVISIBLE);
+         if(!useCloseButton()) Cancel.setVisibility(INVISIBLE);
          final var width=GlucoseCurve.getwidth();
          getMargins(labport).leftMargin=(int)(width*0.12);
          getMargins(Save).rightMargin=(int)(width*0.12);

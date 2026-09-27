@@ -32,7 +32,7 @@ import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.Floating.rewritefloating;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.screenheight;
-import static tk.glucodata.Specific.useclose;
+import static tk.glucodata.VariantBootstrapAccess.useCloseButton;
 import static tk.glucodata.settings.Settings.editoptions;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
@@ -203,7 +203,7 @@ static public int    getcolor() {
     getMargins(backgroundview).rightMargin=sidemargin;
     getMargins(timeshow).leftMargin=(int)(GlucoseCurve.getwidth()*0.05f);
 //    getMargins(hide).rightMargin=(int)(GlucoseCurve.getwidth()*0.08f);
-   if(!useclose)
+   if(!useCloseButton())
       close.setVisibility(GONE);
     Layout layout=new Layout(act,(l,w,h)-> { return new int[] {w,h}; },new View[]{touchable},new View[]{sizelabel},new View[]{ fontsizeview}, new View[]{foreground,backgroundview},new View[]{timeshow,hide},new View[]{transparentview},new View[]{close});
    int pad3=(int)(tk.glucodata.GlucoseCurve.metrics.density*5.0);
@@ -278,7 +278,7 @@ static public void showcolors(MainActivity act) {
     act.addContentView(layout,  new ViewGroup.LayoutParams(MATCH_PARENT,MATCH_PARENT));
     layout.setBackgroundColor(Applic.backgroundcolor);
     layout.setOnTouchListener(new BackGesture(act));
-    var ok=useclose?getbutton(act,"Ok"):null;
+    var ok=useCloseButton()?getbutton(act,"Ok"):null;
     if(ok!=null) {
         ok.setOnClickListener(v->MainActivity.doonback());
         act.addContentView(ok, new ViewGroup.LayoutParams(WRAP_CONTENT,WRAP_CONTENT));

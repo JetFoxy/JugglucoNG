@@ -21,7 +21,6 @@
 
 package tk.glucodata;
 
-import android.app.Application;
 import android.content.IntentFilter;
 
 public class Specific {
@@ -71,40 +70,11 @@ public class Specific {
 			FloatingConfigScreenAccess.register(new tk.glucodata.MobileFloatingConfig());
 		if (!NumberDataAccess.isRegistered())
 			NumberDataAccess.register(new tk.glucodata.nums.AllData());
+		VariantBootstrapAccess.register(new VariantBootstrapAccess.Factory() {
+			@Override
+			public VariantBootstrap create() {
+				return new MobileVariantBootstrap();
+			}
+		});
 	}
-
-	static void start(Application context) {
-		// Idempotent safety net; the real registration happens in onCreate.
-		registerBridges();
-		watchdrip.set(Natives.getwatchdrip());
-		SuperGattCallback.doGadgetbridge = Natives.getgadgetbridge();
-		// Re-arm the nightly backup chain from process start, not only from the
-		// settings screen: a chain that died stays dead until someone re-enqueues it.
-		tk.glucodata.data.ScheduledBackupWorker.initialize(context);
-	}
-
-	static void splash(Object act) {
-	}
-
-	static boolean historyDatabaseCompatible(android.content.Context context) {
-		return tk.glucodata.data.HistoryDatabase.isCompatibleAtStartup(context);
-	}
-
-	static void settext(String str) {
-	}
-
-	static void rmlayout() {
-	}
-
-	static void initScreen(Object act) {
-	}
-
-	static void blockedNum(Object act) {
-	}
-
-	static public final boolean useclose = true;
-
-	static public  void setclose(boolean c) { }
-
-static void wearnosensors(Object act) { };
-};
+}
