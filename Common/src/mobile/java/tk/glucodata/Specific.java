@@ -57,8 +57,12 @@ public class Specific {
 		LibreNumbersAccess.register(tk.glucodata.settings.MobileLibreNumbersLayout.INSTANCE);
 		HealthConnectAccess.register(tk.glucodata.MobileHealthConnect.INSTANCE);
 		HealthPermissionsAccess.register(tk.glucodata.MobileHealthPermissions.INSTANCE);
-		FloatingConfigScreenAccess.register(new tk.glucodata.MobileFloatingConfig());
-		NumberDataAccess.register(new tk.glucodata.nums.AllData());
+		// start() calls this again as a safety net, so anything built here must be built
+		// once: a second AllData would split the ConnectIQ state between two hubs.
+		if (!FloatingConfigScreenAccess.isRegistered())
+			FloatingConfigScreenAccess.register(new tk.glucodata.MobileFloatingConfig());
+		if (!NumberDataAccess.isRegistered())
+			NumberDataAccess.register(new tk.glucodata.nums.AllData());
 	}
 
 	static void start(Application context) {

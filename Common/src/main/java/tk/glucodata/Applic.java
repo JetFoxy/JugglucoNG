@@ -1122,6 +1122,9 @@ public class Applic extends Application implements androidx.work.Configuration.P
         // initproc() left a post-reboot window where forecast alerts fired on
         // the degraded two-point slope.
         Specific.registerBridges();
+        // The field was filled when this object was constructed, before any bridge
+        // existed, so on the phone it still holds the no-op. Take the registered hub.
+        numdata = NumberDataAccess.get();
         enlargeCursorWindow();
         updateWearMessageReceiverComponent();
         if (DiskSpace.check(this)) {
