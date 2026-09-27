@@ -52,6 +52,17 @@ public class Specific {
 		CloneRecoveryAccessBridge.register(tk.glucodata.data.MobileCloneRecoveryBridge.INSTANCE);
 		CloneOutgoingRecoveryAccessBridge.register(tk.glucodata.data.MobileCloneOutgoingRecoveryBridge.INSTANCE);
 		LegacyScreensAccess.register(tk.glucodata.settings.MobileLegacyScreens.INSTANCE);
+		BluetoothMeterAccess.register(tk.glucodata.MobileBluetoothMeters.INSTANCE);
+		NovoPenAccess.register(tk.glucodata.MobileNovoPenScan.INSTANCE);
+		LibreNumbersAccess.register(tk.glucodata.settings.MobileLibreNumbersLayout.INSTANCE);
+		HealthConnectAccess.register(tk.glucodata.MobileHealthConnect.INSTANCE);
+		HealthPermissionsAccess.register(tk.glucodata.MobileHealthPermissions.INSTANCE);
+		// start() calls this again as a safety net, so anything built here must be built
+		// once: a second AllData would split the ConnectIQ state between two hubs.
+		if (!FloatingConfigScreenAccess.isRegistered())
+			FloatingConfigScreenAccess.register(new tk.glucodata.MobileFloatingConfig());
+		if (!NumberDataAccess.isRegistered())
+			NumberDataAccess.register(new tk.glucodata.nums.AllData());
 	}
 
 	static void start(Application context) {

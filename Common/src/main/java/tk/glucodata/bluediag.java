@@ -971,8 +971,8 @@ public class bluediag {
             scheduled.cancel(false);
             act.setfineres(null);
             removeContentView(showview);
-            if (Menus.on) {
-                Menus.show(act);
+            if (LegacyScreensAccess.getMenusOn()) {
+                LegacyScreensAccess.get().openMenus(act);
             }
 
         });

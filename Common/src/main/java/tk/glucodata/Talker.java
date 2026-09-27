@@ -739,8 +739,8 @@ private static void cleanupConfigOverlay(MainActivity context, View layout) {
     tk.glucodata.help.hidekeyboard(context);
     removeContentView(layout);
     spinner=null;
-    if(Menus.on)
-        Menus.show(context);
+    if(LegacyScreensAccess.getMenusOn())
+        LegacyScreensAccess.get().openMenus(context);
     context.lightBars(!getInvertColors( ));
     }
 

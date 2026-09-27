@@ -120,9 +120,9 @@ private suspend fun checkPermissionsAndRun(act:MainActivity?) {
         } else {
             hasPermission = false
             if(act?.permHealth!=null) {
-                val launch=act.permHealth
+                val request=act.permHealth
                 withContext(Dispatchers.Main) {
-                    launch.permissionsLauncher.launch(PERMISSIONS)
+                    request.request(PERMISSIONS)
                 }
                 Log.i(LOG_ID,"requested")
                 }

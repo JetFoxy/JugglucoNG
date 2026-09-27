@@ -1,5 +1,7 @@
 package tk.glucodata
 
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,10 +32,45 @@ class BridgeRegistrationTest {
         assertTrue("CalibrationAccess", CalibrationAccess.isRegistered())
         assertTrue("AlarmActivityAccess", tk.glucodata.ui.AlarmActivityAccess.isRegistered())
         assertTrue("LegacyScreensAccess", LegacyScreensAccess.isRegistered())
+        assertTrue("BluetoothMeterAccess", BluetoothMeterAccess.isRegistered())
+        assertTrue("NovoPenAccess", NovoPenAccess.isRegistered())
+        assertTrue("LibreNumbersAccess", LibreNumbersAccess.isRegistered())
+        assertTrue("HealthConnectAccess", HealthConnectAccess.isRegistered())
+        assertTrue("HealthPermissionsAccess", HealthPermissionsAccess.isRegistered())
+        assertTrue("NumberDataAccess", NumberDataAccess.isRegistered())
+        // The complication colour screen is watch-only: the phone copy was a shell.
+        assertFalse("ComplicationConfigAccess", ComplicationConfigAccess.isRegistered())
+        assertFalse("GlucoseValueRefreshAccess", GlucoseValueRefreshAccess.isRegistered())
+        assertFalse("OngoingNotificationAccess", OngoingNotificationAccess.isRegistered())
+        // This one is real on both flavours, unlike the shells above.
+        assertTrue("FloatingConfigScreenAccess", FloatingConfigScreenAccess.isRegistered())
         assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
         assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())
         assertTrue("HistorySyncBridgeAccess", HistorySyncBridgeAccess.isRegistered())
         assertTrue("CloneRecoveryAccessBridge", CloneRecoveryAccessBridge.isRegistered())
         assertTrue("CloneOutgoingRecoveryAccessBridge", CloneOutgoingRecoveryAccessBridge.isRegistered())
+    }
+
+    @Test
+    fun registeringTwiceKeepsTheSameNumbersHub() {
+        // Specific.start() calls registerBridges() again after Applic.onCreate did. A second
+        // AllData would leave Applic.numdata and AllDataAccess.phone() on different hubs.
+        Specific.registerBridges()
+        val first = NumberDataAccess.get()
+        Specific.registerBridges()
+        assertSame(first, NumberDataAccess.get())
+    }
+
+    @Test
+    fun applicTakesTheRegisteredNumbersHubAfterRegistering() {
+        // Applic.numdata is initialised when the Application is constructed, before onCreate
+        // registers anything, so it starts as the no-op. onCreate must take the registered hub
+        // right after registerBridges(), or every numdata call on the phone does nothing.
+        val source = java.io.File("src/main/java/tk/glucodata/Applic.java").readText()
+        val register = source.indexOf("Specific.registerBridges();")
+        assertTrue("registerBridges() is called", register >= 0)
+        // Within the next few lines of onCreate, not the field declaration further up.
+        val next = source.substring(register, minOf(source.length, register + 400))
+        assertTrue("numdata is taken after registerBridges()", next.contains("numdata = NumberDataAccess.get();"))
     }
 }

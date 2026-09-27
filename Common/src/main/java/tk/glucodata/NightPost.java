@@ -78,7 +78,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.ssl.SSLContext;
 
-import tk.glucodata.settings.LibreNumbers;
 
 public class NightPost  {
     private static final String LOG_ID="NightPost";
@@ -882,7 +881,8 @@ public static void  config(MainActivity act, View settingsview) {
                     case 0: {
                         ++nochangeamounts[0];
                         treatments.setChecked(!isChecked);
-                        LibreNumbers.mklayout(act,1,treatments,nochangeamounts,layout);
+                        var numbers = LibreNumbersAccess.get();
+                        if (numbers != null) numbers.configureNightNumbers(act,1,treatments,nochangeamounts,layout);
                         };break;
                     case  2: Natives.setpostTreatments(isChecked);break;
 

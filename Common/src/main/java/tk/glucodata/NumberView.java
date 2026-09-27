@@ -58,7 +58,6 @@ import java.util.Date;
 import java.util.Locale;
 
 
-import tk.glucodata.nums.AllData;
 import tk.glucodata.nums.numio;
 
 import static android.widget.LinearLayout.VERTICAL;
@@ -403,9 +402,9 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
             ((Applic) act.getApplication()). redraw();
               MainActivity.poponback();
 
-             if(Menus.on) {
+             if(LegacyScreensAccess.getMenusOn()) {
                 if(deletebutton.getVisibility()==GONE) {
-                        Menus.show(context);
+                        LegacyScreensAccess.get().openMenus(context);
                         }
                 }
             } 
@@ -501,8 +500,8 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
             currentnum=0L;
             }
         else {
-             if(Menus.on) {
-                Menus.show(context);
+             if(LegacyScreensAccess.getMenusOn()) {
+                LegacyScreensAccess.get().openMenus(context);
                 }
             }
 
@@ -566,7 +565,7 @@ void deletedialog(View v,int[] mealptr) {
                     int pos=Natives.hitremove(currentnum);
                     int last=numio.getlastnum(index);
                     if(!isWearable) {
-                        AllData alldata=((Applic) ((Activity) v.getContext()).getApplication()).numdata;
+                        NumberDataHub alldata=((Applic) ((Activity) v.getContext()).getApplication()).numdata;
                         alldata.deletelast(index,last,waslast);
                         if(pos<last)
                              alldata.changedback(index);
@@ -578,8 +577,8 @@ void deletedialog(View v,int[] mealptr) {
                 }
                 /*
             else  {
-             if(Menus.on) {
-                Menus.show(context);
+             if(LegacyScreensAccess.getMenusOn()) {
+                LegacyScreensAccess.get().openMenus(context);
                 }
                 } */
          newnumview.setVisibility(GONE);
@@ -679,7 +678,7 @@ private boolean saveamount(Activity activity,TextView timeview,TextView value,in
         Natives.hitchange(currentnum,dat/1000L,val,labelsel,mealptr);
         int index=Natives.gethitindex(currentnum);
         if(!isWearable) {
-            tk.glucodata.nums.AllData  alldata=Applic.app.numdata;
+            NumberDataHub alldata=Applic.app.numdata;
             alldata.changedback(index);
             }
         Natives.freehitptr(currentnum);
@@ -700,7 +699,7 @@ private boolean saveamount(Activity activity,TextView timeview,TextView value,in
         final int index=1;
         Natives.saveNum(numio.numptrs[index],dat/1000,val,labelsel,mealptr);
         if(!isWearable) {
-           tk.glucodata.nums.AllData  alldata=Applic.app.numdata;
+           NumberDataHub alldata=Applic.app.numdata;
             alldata.changedback(index);
             }
         }
@@ -803,8 +802,8 @@ activity.setonback(()->{
     if(newnumview!=null)
         EnableControls(newnumview,true);
     else {
-        if(Menus.on)
-                    Menus.show(activity);
+        if(LegacyScreensAccess.getMenusOn())
+                    LegacyScreensAccess.get().openMenus(activity);
         }
         });
 
