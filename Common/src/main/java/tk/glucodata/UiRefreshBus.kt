@@ -52,7 +52,7 @@ object UiRefreshBus {
         val now = System.currentTimeMillis()
         if (now - lastComplicationUpdateMs < COMPLICATION_MIN_INTERVAL_MS) return
         lastComplicationUpdateMs = now
-        runCatching { tk.glucodata.glucosecomplication.GlucoseValue.updateall() }
+        runCatching { tk.glucodata.GlucoseValueRefreshAccess.get()?.updateAll() }
     }
 
     @JvmStatic

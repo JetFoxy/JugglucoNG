@@ -20,6 +20,7 @@ class BridgeRegistrationTest {
         assertTrue("CalibrationAccess", CalibrationAccess.isRegistered())
         assertTrue("AlarmActivityAccess", tk.glucodata.ui.AlarmActivityAccess.isRegistered())
         assertTrue("ComplicationConfigAccess", ComplicationConfigAccess.isRegistered())
+        assertTrue("GlucoseValueRefreshAccess", GlucoseValueRefreshAccess.isRegistered())
         // The phone-only legacy screens are absent, not a silent no-op (plan P2).
         assertFalse("LegacyScreensAccess", LegacyScreensAccess.isRegistered())
         assertFalse("BluetoothMeterAccess", BluetoothMeterAccess.isRegistered())

@@ -61,8 +61,8 @@ import tk.glucodata.Natives;
 import tk.glucodata.Notify;
 import tk.glucodata.R;
 
-public class GlucoseValue {
-final private static String LOG_ID="GlucoseValue";
+public class WearComplicationValue {
+final private static String LOG_ID="WearComplicationValue";
 //64 good
 //final static float mapwidth=512,mapheight=512;
 //final static float mapwidth=100,mapheight=100;
@@ -85,7 +85,7 @@ final  private float density;
 void clear() {
    glucoseBitmap.eraseColor(Color.TRANSPARENT);
    }
-GlucoseValue(int w,int h) {
+WearComplicationValue(int w,int h) {
 	mapwidth=w;
 	mapheight=h;
     half=0.5f*mapwidth;

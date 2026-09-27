@@ -147,7 +147,7 @@ static private int radiosel=0;
          final int curcol=radiosel;
 			setcolor(curcol,0);
           if(curcol==2) {
-             GlucoseValue.newbackground=0;
+             WearComplicationValue.newbackground=0;
              }
 			}
 		});
@@ -179,7 +179,7 @@ static private int radiosel=0;
       MainActivity.setonback(()-> {
          removeContentView(layout); 
          view.setVisibility(VISIBLE);
-         tk.glucodata.glucosecomplication.GlucoseValue.updateall();
+         tk.glucodata.glucosecomplication.WearComplicationValue.updateall();
          });
       close.setOnClickListener(v->{
          MainActivity.doonback();
@@ -188,7 +188,7 @@ static private int radiosel=0;
       };
 
 static public void showcolors(MainActivity act,CheckBox def) {
-      var glview=new GlucoseValue(150,150);
+      var glview=new WearComplicationValue(150,150);
       int coltype=radiosel;
       int initialColor=getcolordef(coltype);
       int height= GlucoseCurve.getheight();
@@ -199,7 +199,7 @@ static public void showcolors(MainActivity act,CheckBox def) {
          setcolor(coltype,c);
          def.setChecked(false);
 	  if(coltype==2) {
-	     GlucoseValue.newbackground=c;
+	     WearComplicationValue.newbackground=c;
 	     }
 	 preview.setImageBitmap(glview.previewbitmap());
        }, v-> {
@@ -218,8 +218,8 @@ static public void showcolors(MainActivity act,CheckBox def) {
    if(radiosel==1) {
       fontsizeview=new SeekBar(act);
 //      float maxfont=glview.fontsize;
-//      float currentfont= Math.min(maxfont, GlucoseValue.upperboundfontsize);
-      int currentfont= (int)(GlucoseValue.fontFraction*1000);
+//      float currentfont= Math.min(maxfont, WearComplicationValue.upperboundfontsize);
+      int currentfont= (int)(WearComplicationValue.fontFraction*1000);
       fontsizeview.setMax(1000);
       fontsizeview.setProgress(currentfont);
       final int fwidth=(int)(0.9f*width);
@@ -230,8 +230,8 @@ static public void showcolors(MainActivity act,CheckBox def) {
 		@Override
 		public  void onProgressChanged (SeekBar seekBar, int progress, boolean fromUser) {
 			var newup=(float)(progress/1000.0);
-		//	GlucoseValue.upperboundfontsize =(newup>0.99f)?1000.0f:(newup*glview.fontsize);
-            GlucoseValue.fontFraction=newup;
+		//	WearComplicationValue.upperboundfontsize =(newup>0.99f)?1000.0f:(newup*glview.fontsize);
+            WearComplicationValue.fontFraction=newup;
 			{if(doLog) {Log.i(LOG_ID,"onProgressChanged "+progress+" "+glview.fontFraction);};};
 			}
 		@Override

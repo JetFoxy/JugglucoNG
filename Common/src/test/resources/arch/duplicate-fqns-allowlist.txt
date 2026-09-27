@@ -26,6 +26,11 @@
 #   export label, so those became openExport/setExportStatus on LegacyScreens and the
 #   GlucoseCurve field is gone. Its showdays was read by shared code, so it moved to
 #   LegacyScreensAccess.exportShowDays.
+#   tk.glucodata.glucosecomplication.GlucoseValue (category S): the phone copy was two
+#   lines, the shared contract is the single updateall(), and the phone registers nothing.
+#   The watch class is WearComplicationValue -- not WearGlucoseValue, which is a composable
+#   in ui/screens -- behind GlucoseValueRefreshAccess. Its static updateall() stays, because
+#   wear code calls it directly.
 #   tk.glucodata.glucosecomplication.ColorConfig (category S): the phone copy was a
 #   five-line shell and the only shared caller is the complications button, which is
 #   inside if(isWearable). So the phone class is deleted rather than renamed, and the
@@ -44,6 +49,5 @@ tk.glucodata.GlucoseAlarms
 tk.glucodata.Meal
 tk.glucodata.Specific
 tk.glucodata.WearOngoingActivity
-tk.glucodata.glucosecomplication.GlucoseValue
 tk.glucodata.settings.SetColors
 tk.glucodata.ui.AlarmActivity
