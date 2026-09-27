@@ -79,7 +79,7 @@ import static tk.glucodata.Log.doLog;
 import static tk.glucodata.MainActivity.systembarLeft;
 import static tk.glucodata.MainActivity.systembarRight;
 import static tk.glucodata.RingTones.EnableControls;
-import static tk.glucodata.Specific.useclose;
+import static tk.glucodata.VariantBootstrapAccess.useCloseButton;
 import static tk.glucodata.settings.Settings.editoptions;
 import static tk.glucodata.settings.Settings.getGenSpin;
 import static tk.glucodata.settings.Settings.removeContentView;
@@ -246,7 +246,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
         helpbutton.setOnClickListener(v-> help.helplight(R.string.newamount,context));
         }
     else {
-       if(!useclose) cancelbutton.setVisibility(GONE);
+       if(!useCloseButton()) cancelbutton.setVisibility(GONE);
         }
       Layout layout;
 
@@ -255,7 +255,7 @@ public   View addnumberview(MainActivity context,final int bron,final long time,
         int width=GlucoseCurve.getwidth();
       getMargins(timebutton).rightMargin= getMargins(datebutton).leftMargin =(int)(width*0.08f);
 //      getMargins(timebutton).rightMargin=(int)(width*0.10f);
-      if(useclose)  {
+      if(useCloseButton())  {
    //      getMargins(deletebutton).rightMargin=getMargins(savebutton).leftMargin =(int)(width*0.05f);
 //      getMargins(deletebutton).rightMargin=getMargins(savebutton).leftMargin =(int)(width*0.12f);
           layout = new Layout(context, (lay,w,h) -> { 
@@ -605,7 +605,7 @@ private void seedelete() {
     deletebutton.setVisibility(VISIBLE);
     if(isWearable) {
         int width=GlucoseCurve.getwidth();
-         if(useclose)  {
+         if(useCloseButton())  {
              getMargins(deletebutton).rightMargin=getMargins(savebutton).leftMargin =(int)(width*0.05f);
              }
          else {
@@ -754,7 +754,7 @@ public Layout getdateviewal(MainActivity activity, long date, Dater erdate) {
         });
     int laypar;
     if(isWearable) {
-         if(!useclose)
+         if(!useCloseButton())
             cancel.setVisibility(GONE);
         datepicker=new Layout(activity,
                 (lay, w, h)->{
@@ -882,7 +882,7 @@ final  boolean buttonsunder=false;
     View[][] views;
      int layparwidth,layparheight;
 if(isWearable) {
-      if(!useclose) cancel.setVisibility(GONE);
+      if(!useCloseButton()) cancel.setVisibility(GONE);
            views=new View[][]{new View[]{cancel},new View[]{pick},new View[]{ok}};
          layparheight=layparwidth=MATCH_PARENT;
 

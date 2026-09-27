@@ -80,6 +80,19 @@
 #   to GlucoseAlarmHandler (src/main; SuperGlucoseAlarms implements it and handlealarm() is
 #   the flavour override), and the instance comes from a factory each flavour registers in
 #   GlucoseAlarmsAccess. The classes are MobileGlucoseAlarms and WearGlucoseAlarms.
+#   tk.glucodata.Specific (category S): the per-variant composition root, and this duplicate is
+#   the design rather than an accident. src/main cannot name a class in src/mobile or
+#   src/wear, so the two flavours keep a class of the same name for shared code to have
+#   anything to call. Each is now a shim with exactly one member, registerBridges(), which
+#   also registers the VariantBootstrap (src/main; MobileVariantBootstrap and
+#   WearVariantBootstrap implement it) that the other eight members moved behind. The
+#   alternative was a per-variant Application subclass, which needs android:name repointed in
+#   two flavour manifests plus tools:replace, and moves the registration out of
+#   Applic.onCreate() -- the ordering that closed the post-reboot window where forecast alerts
+#   fired on the two-point slope. A mistake there only shows at runtime. Same reason
+#   ui.AlarmActivity stays.
+#   Pinned by SpecificCompositionRootTests.theShimDeclaresOnlyRegisterBridges, because
+#   BridgeRegistrationTest covers what the shim registers and not what the class declares.
 tk.glucodata.Meal
 tk.glucodata.Specific
 tk.glucodata.ui.AlarmActivity

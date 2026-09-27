@@ -137,7 +137,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         Applic.postDelayed(() -> tk.glucodata.settings.Settings.set(this), 1000L);
                     }
                 } else {
-                    Specific.initScreen(this);
+                    VariantBootstrapAccess.create().initScreen(this);
                 }
             }
         }
@@ -499,7 +499,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
 
         if (isWearable) {
-            Specific.splash(this);
+            VariantBootstrapAccess.create().splash(this);
         }
         if (Applic.stopprogram > 0) {
             Log.e(LOG_ID, "Stop program");
@@ -510,7 +510,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             }
             return;
         }
-        if (!Specific.historyDatabaseCompatible(this)) {
+        if (!VariantBootstrapAccess.create().historyDatabaseCompatible(this)) {
             showHistoryDatabaseIncompatible();
             return;
         }

@@ -83,57 +83,12 @@ static void registerBridges() {
             return new tk.glucodata.WearGlucoseAlarms(application);
         }
     });
+
+	VariantBootstrapAccess.register(new VariantBootstrapAccess.Factory() {
+		@Override
+		public VariantBootstrap create() {
+			return new WearVariantBootstrap();
+		}
+	});
 }
-
-static void start(Object context) {
-    registerBridges();
 }
-
-static    void splash(AppCompatActivity act) {
-       SplashScreen.installSplashScreen(act);
-      }
-static boolean historyDatabaseCompatible(Context context) {
-    return true;
-}
-@SuppressLint("StaticFieldLeak")
-static ViewGroup layout=null;
-@SuppressLint("StaticFieldLeak")
-static TextView text=null;
-
-static boolean settext(String str) {
-   var t=text;
-   if(t!=null) {
-       t.setText(str);
-       return true;
-    }
-   return false;
-   }
-static void rmlayout() {
-   var lay=layout;
-   if(lay!=null) {
-      text=null;
-      layout=null;
-      removeContentView(lay); 
-      }
-   }
-static void initScreen(MainActivity act) {
-    LayoutInflater flater= LayoutInflater.from(act);
-    ViewGroup layout = (ViewGroup) flater.inflate(R.layout.startview ,null, false);
-    text=layout.findViewById(R.id.text2);
-    Specific.layout=layout;
-    act.addContentView(layout, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
-   }
-
-static void   blockedNum(MainActivity  act) {
-    help.basehelp(R.string.staticnum,act,xzy->{ });
-    }
-
-static public boolean useclose=false;
-static public void setclose(boolean val) {
-   useclose=val;
-   }
-
-static void wearnosensors(MainActivity act) {
-    Switch.wearnosensors(act);
-    }
-};
