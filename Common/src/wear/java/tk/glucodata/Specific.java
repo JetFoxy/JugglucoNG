@@ -69,6 +69,12 @@ static void registerBridges() {
     CalibrationAccess.register(SyncedWearCalibrationProvider.INSTANCE);
     tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.WearAlarmActivityHost.INSTANCE);
     SetColorsScreenAccess.register(new tk.glucodata.settings.WearSetColors());
+    GlucoseAlarmsAccess.register(new tk.glucodata.GlucoseAlarmsAccess.Factory() {
+        @Override
+        public tk.glucodata.GlucoseAlarmHandler create(android.app.Application application) {
+            return new tk.glucodata.WearGlucoseAlarms(application);
+        }
+    });
 }
 
 static void start(Object context) {

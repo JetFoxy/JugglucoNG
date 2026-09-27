@@ -30,6 +30,7 @@ class BridgeRegistrationTest {
         assertTrue("CalibrationAccess", CalibrationAccess.isRegistered())
         assertTrue("AlarmActivityAccess", tk.glucodata.ui.AlarmActivityAccess.isRegistered())
         assertTrue("SetColorsScreenAccess", SetColorsScreenAccess.isRegistered())
+        assertTrue("GlucoseAlarmsAccess", GlucoseAlarmsAccess.isRegistered())
         assertTrue("LegacyScreensAccess", LegacyScreensAccess.isRegistered())
         assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
         assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())

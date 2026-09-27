@@ -412,7 +412,12 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
     static final int mininterval = 55;
     static long nexttime = 0L; // secs
-    public static tk.glucodata.GlucoseAlarms glucosealarms = null;
+    /**
+     * The alarm handler, typed to the shared base class so nothing in src/main names a
+     * flavour class. The instance comes from GlucoseAlarmsAccess; null before the first
+     * call site asks for it, and on a flavour that registered none.
+     */
+    public static tk.glucodata.GlucoseAlarmHandler glucosealarms = null;
     public static notGlucose previousglucose = null;
     static float previousglucosevalue = 0.0f;
     /** What {@link #previousglucosevalue} was made of; see {@link LiveReadingLanes}. */
@@ -422,7 +427,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
 
     static public void initAlarmTalk() {
         if (glucosealarms == null)
-            glucosealarms = new tk.glucodata.GlucoseAlarms(Applic.app);
+            glucosealarms = GlucoseAlarmsAccess.create(Applic.app);
         if (!DontTalk) {
             Talker.getvalues();
             // Only (re)create the shared Talker/TextToSpeech if none exists yet, or if the
@@ -518,7 +523,7 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
             return;
         }
         if (glucosealarms == null) {
-            glucosealarms = new tk.glucodata.GlucoseAlarms(Applic.app);
+            glucosealarms = GlucoseAlarmsAccess.create(Applic.app);
         }
         final String resolvedSensorSerial = (sensorSerial != null && !sensorSerial.isEmpty())
                 ? sensorSerial

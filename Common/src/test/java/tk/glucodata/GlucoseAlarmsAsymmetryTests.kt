@@ -43,9 +43,9 @@ class GlucoseAlarmsAsymmetryTests {
     }
 
     private val phone: String
-        get() = source("Common/src/mobile/java/tk/glucodata/GlucoseAlarms.java")
+        get() = source("Common/src/mobile/java/tk/glucodata/MobileGlucoseAlarms.java")
     private val watch: String
-        get() = source("Common/src/wear/java/tk/glucodata/GlucoseAlarms.java")
+        get() = source("Common/src/wear/java/tk/glucodata/WearGlucoseAlarms.java")
 
     @Test
     fun onlyTheWatchRecomputesTheComplicationViews() {

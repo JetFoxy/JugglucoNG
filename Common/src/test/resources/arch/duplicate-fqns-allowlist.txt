@@ -10,6 +10,13 @@
 # Removed so far: tk.glucodata.receivers.AlarmLaunchReceiver (T5.1).
 #   tk.glucodata.Stats, tk.glucodata.Watch (category P): their watch stubs had no
 #   caller anywhere in src/main or src/wear, so they were deleted.
+#   tk.glucodata.GlucoseAlarms (category S): the alert path, so it was characterised before
+#   being changed (GlucoseAlarmsAsymmetryTests pins the phone/watch differences). The shape
+#   was a held reference, not a call: shared code held SuperGattCallback.glucosealarms as
+#   the concrete class and both construction sites were in src/main. No interface was added,
+#   because the contract already exists in src/main as SuperGlucoseAlarms; the field is typed
+#   to that and the instance comes from GlucoseAlarmsAccess, which registers a factory per
+#   flavour. The classes are MobileGlucoseAlarms and WearGlucoseAlarms.
 #   tk.glucodata.settings.SetColors (category S): both sides are real -- 144 lines on the
 #   phone, 96 on the watch, and the watch's adjusts the light bars and opens its own colour
 #   dialog -- so both are renamed (MobileSetColors, WearSetColors) and both register behind
@@ -22,7 +29,6 @@
 tk.glucodata.BluetoothGlucoseMeter
 tk.glucodata.Dialogs
 tk.glucodata.FloatingConfig
-tk.glucodata.GlucoseAlarms
 tk.glucodata.HealthConnection
 tk.glucodata.IOB
 tk.glucodata.LaunchShit

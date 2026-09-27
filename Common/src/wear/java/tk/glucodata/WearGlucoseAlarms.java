@@ -16,76 +16,64 @@
 /*      You should have received a copy of the GNU General Public License            */
 /*      along with Juggluco. If not, see <https://www.gnu.org/licenses/>.            */
 /*                                                                                   */
-/*      Fri Jan 27 15:32:11 CET 2023                                                 */
+/*      Fri Jan 27 15:32:56 CET 2023                                                 */
 
 
 package tk.glucodata;
 
 import android.app.Application;
 
+import static tk.glucodata.Applic.isWearable;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.Natives.hasalarmloss;
 
-public class GlucoseAlarms extends SuperGlucoseAlarms {
+public class WearGlucoseAlarms extends SuperGlucoseAlarms {
     final private static String LOG_ID="GlucoseAlarms";
-public GlucoseAlarms(Application context) {
+public WearGlucoseAlarms(Application context) {
     super(context);
     }
 
+    @Override
 public    void handlealarm() {
-    SensorBluetooth.reconnectall();
-    SensorBluetooth.ensureCurrentSensorSelection();
-    final var view=Floating.floatview;
-    if(view!=null) {
-        view.postInvalidate();
-        }
-    final boolean haslossalarm=hasalarmloss();
-    long wastime = SuperGattCallback.lastfoundL;
-    if(wastime==0L) {
-        wastime=Natives.lastglucosetime();
-        }
-
-    final long nu = System.currentTimeMillis();
-        boolean shouldwake = Natives.shouldwakesender();
-        final long tryagain = nu + Notify.glucosetimeout;
-
-    long nexttime=tryagain;
-        if(!haslossalarm) {
-            Notify.onenot.oldnotification(wastime);
+        SensorBluetooth.reconnectall();
+        final long nu = System.currentTimeMillis();
+        final var view=Floating.floatview;
+        if(view!=null) {
+            view.postInvalidate();
             }
-        else  {
+        tk.glucodata.glucosecomplication.GlucoseValue.updateall();
+
+        long wastime = SuperGattCallback.lastfoundL;
+        if(wastime==0L) {
+            wastime=Natives.lastglucosetime();
+            }
+        final long tryagain = nu + Notify.glucosetimeout;
+        long nexttime=tryagain;
+
+        if(hasalarmloss())  {
             final long afterwait = waitmmsec() + wastime;
             if(afterwait > nu) {
-                if(doLog) {Log.i(LOG_ID, "handlealarm notify");};;
-                Notify.onenot.oldnotification(wastime);
-                SuperGattCallback.previousglucose=null;
+                if(doLog) {Log.i(LOG_ID, "handlealarm notify");};
                 nexttime = (afterwait < tryagain)  ? afterwait : tryagain;
             } else {
                 if(!saidloss) {
-                    if(doLog) {Log.i(LOG_ID, "handlealarm alarm");};;
+                    if(doLog) {Log.i(LOG_ID, "handlealarm alarm");};
                     long lasttime=Natives.lastglucosetime( );
                     if(lasttime!=0L)
                         wastime=lasttime;
                     Notify.onenot.lossalarm(wastime);
-                     if(SuperGattCallback.doWearInt)  {
-                        WearInt.missingalarm(nu /*SIC, that what xDrip is doing*/);
-                        }
                     saidloss = true;
                     }
-                 else {
-                    Notify.onenot.oldnotification(wastime);
-                    if(doLog) {Log.i(LOG_ID, "handlealarm saidloss");};;
-                    }
+               else {
+                    if(doLog) {Log.i(LOG_ID, "handlealarm saidloss==true");};
+                  }
                }
             }
         LossOfSensorAlarm.setalarm(Applic.app, nexttime);
-        if (shouldwake) {
-            MessageSender.sendwakestream();
-            Natives.wakestreamsender();
-            }
-        GlucoseWidget.oldvalue(wastime);
+        MessageSender.sendwakestream();
+        Natives.wakestreamsender();
+        WearSync2.requestSync();
     }
-
 
 
 }
