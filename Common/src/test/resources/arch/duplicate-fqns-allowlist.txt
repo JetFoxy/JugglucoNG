@@ -26,6 +26,10 @@
 #   export label, so those became openExport/setExportStatus on LegacyScreens and the
 #   GlucoseCurve field is gone. Its showdays was read by shared code, so it moved to
 #   LegacyScreensAccess.exportShowDays.
+#   tk.glucodata.FloatingConfig (category S): both sides are real (298 and 305 lines of
+#   near-identical fork), so both are renamed -- MobileFloatingConfig and
+#   WearFloatingConfig -- and both register behind FloatingConfigScreenAccess. The contract
+#   is the one method the settings screen calls.
 #   tk.glucodata.WearOngoingActivity (category S): the phone copy was two @JvmStatic no-ops
 #   and both shared callers sit inside if(isWearable), so it existed only to make the
 #   reference compile. Deleted, not renamed: the watch class was already named for the watch.
@@ -47,7 +51,6 @@
 #   on/off flag -- read by shared code in about a dozen places, written by ScanNfcV and by
 #   show() itself -- became LegacyScreensAccess.menusOn. The watch copy held the flag and an
 #   empty show(), and both moved, so nothing was left of it.
-tk.glucodata.FloatingConfig
 tk.glucodata.GlucoseAlarms
 tk.glucodata.Meal
 tk.glucodata.Specific

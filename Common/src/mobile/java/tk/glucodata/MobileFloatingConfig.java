@@ -58,7 +58,16 @@ import android.widget.Toast;
 
 import yuku.ambilwarna.AmbilWarnaDialog;
 
-public class FloatingConfig {
+public class MobileFloatingConfig implements FloatingConfigScreen {
+    /**
+     * The dialog reopens itself from its own listeners, so the body is static and the
+     * interface method is the entry point shared code uses.
+     */
+    @Override
+    public void show(MainActivity act,View parent) {
+        showImpl(act,parent);
+        }
+
 private static final String LOG_ID="FloatingConfig";
 //   AmbilWarnaDialog(Context context, int color, boolean supportsAlpha, OnAmbilWarnaListener listener)
 static private boolean background=true;
@@ -77,7 +86,7 @@ static public int    getcolor() {
 
 
 
-static public void show(MainActivity act,View parent) {
+static private void showImpl(MainActivity act,View parent) {
     parent.setVisibility(INVISIBLE);
     int initialColor= getcolor();
 
@@ -240,7 +249,7 @@ static public void show(MainActivity act,View parent) {
         Floating.invalidatefloat();
         removeContentView(layout);
         act.poponback();
-        show(act,parent);
+        showImpl(act,parent);
     });
     touchable.setOnCheckedChangeListener( (buttonView,  isChecked) -> {
         Floating.setTouchable(isChecked);
@@ -250,7 +259,7 @@ static public void show(MainActivity act,View parent) {
         background=isChecked;
         removeContentView(layout);
         act.poponback();
-        show(act,parent);
+        showImpl(act,parent);
 
     });*/
 
@@ -261,7 +270,7 @@ static public void show(MainActivity act,View parent) {
             background=!isChecked;
             removeContentView(layout);
             act.poponback();
-            show(act,parent);
+            showImpl(act,parent);
             });
 
         backgroundbutton.setOnCheckedChangeListener( (buttonView,  isChecked) -> {

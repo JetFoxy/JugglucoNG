@@ -109,6 +109,7 @@ import tk.glucodata.Backup;
 import tk.glucodata.BooleanSupplier;
 import tk.glucodata.BuildConfig;
 import tk.glucodata.Floating;
+import tk.glucodata.FloatingConfigScreenAccess;
 import tk.glucodata.GlucoseCurve;
 import tk.glucodata.ComplicationConfigAccess;
 import tk.glucodata.HealthConnectAccess;
@@ -1325,7 +1326,8 @@ private    void mksettings(MainActivity context) {
 
         CheckBox floatglucose=new CheckBox(context);
       floatconfig.setOnClickListener(v-> {
-         tk.glucodata.FloatingConfig.show(context,thelayout[0]);
+         var floating = FloatingConfigScreenAccess.get();
+         if (floating != null) floating.show(context,thelayout[0]);
          });
         floatglucose.setText("   " );
      View[] talkrow;
@@ -1383,7 +1385,9 @@ private    void mksettings(MainActivity context) {
           else {
                 numdis= new View[]{changelabels,displayview};
                 }
-        floatconfig.setOnClickListener(v-> tk.glucodata.FloatingConfig.show(context,thelayout[0]));
+        floatconfig.setOnClickListener(v-> {
+                var floating = FloatingConfigScreenAccess.get();
+                if (floating != null) floating.show(context,thelayout[0]); });
 
         View[] rowglu=new View[]{floatconfig,calibration,glucosenotify};
 //        View[] rowglu=new View[]{floatconfig,glucosenotify};

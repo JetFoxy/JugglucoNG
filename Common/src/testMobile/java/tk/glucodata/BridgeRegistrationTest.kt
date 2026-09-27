@@ -41,6 +41,8 @@ class BridgeRegistrationTest {
         assertFalse("ComplicationConfigAccess", ComplicationConfigAccess.isRegistered())
         assertFalse("GlucoseValueRefreshAccess", GlucoseValueRefreshAccess.isRegistered())
         assertFalse("OngoingNotificationAccess", OngoingNotificationAccess.isRegistered())
+        // This one is real on both flavours, unlike the shells above.
+        assertTrue("FloatingConfigScreenAccess", FloatingConfigScreenAccess.isRegistered())
         assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
         assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())
         assertTrue("HistorySyncBridgeAccess", HistorySyncBridgeAccess.isRegistered())
