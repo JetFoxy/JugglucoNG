@@ -46,6 +46,8 @@ public class Specific {
 		CalibrationProfileAccess.register(tk.glucodata.data.calibration.MobileCalibrationProfileBridge.INSTANCE);
 		CalibrationAccess.register(tk.glucodata.data.calibration.MobileCalibrationProvider.INSTANCE);
 		tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.MobileAlarmActivityHost.INSTANCE);
+		if (!SetColorsScreenAccess.isRegistered())
+			SetColorsScreenAccess.register(new tk.glucodata.settings.MobileSetColors());
 		LibreviewJournalEntriesAccess.register(tk.glucodata.data.journal.LibreviewJournalEntries.INSTANCE);
 		HistoryRepositoryAccess.register(tk.glucodata.data.MobileHistoryRepositoryBridge.INSTANCE);
 		HistorySyncBridgeAccess.register(tk.glucodata.data.MobileHistorySyncBridge.INSTANCE);

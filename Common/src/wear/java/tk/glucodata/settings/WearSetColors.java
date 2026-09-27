@@ -41,9 +41,10 @@ import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.settings.Settings.removeContentView;
 import static tk.glucodata.util.getbutton;
 
-public class SetColors {
+public class WearSetColors implements tk.glucodata.SetColorsScreen {
 private static final String LOG_ID="SetColors";
-static void show(MainActivity act) {
+    @Override
+    public void show(MainActivity act) {
 
    act.lightBars(!Natives.getInvertColors( ));
     int initialColor= 0xfff7f022;
