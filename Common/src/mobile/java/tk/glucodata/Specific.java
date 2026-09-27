@@ -48,6 +48,12 @@ public class Specific {
 		tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.MobileAlarmActivityHost.INSTANCE);
 		if (!SetColorsScreenAccess.isRegistered())
 			SetColorsScreenAccess.register(new tk.glucodata.settings.MobileSetColors());
+		GlucoseAlarmsAccess.register(new tk.glucodata.GlucoseAlarmsAccess.Factory() {
+		    @Override
+		    public tk.glucodata.GlucoseAlarmHandler create(android.app.Application application) {
+		        return new tk.glucodata.MobileGlucoseAlarms(application);
+		    }
+		});
 		LibreviewJournalEntriesAccess.register(tk.glucodata.data.journal.LibreviewJournalEntries.INSTANCE);
 		HistoryRepositoryAccess.register(tk.glucodata.data.MobileHistoryRepositoryBridge.INSTANCE);
 		HistorySyncBridgeAccess.register(tk.glucodata.data.MobileHistorySyncBridge.INSTANCE);

@@ -32,6 +32,7 @@ class BridgeRegistrationTest {
         assertTrue("CalibrationAccess", CalibrationAccess.isRegistered())
         assertTrue("AlarmActivityAccess", tk.glucodata.ui.AlarmActivityAccess.isRegistered())
         assertTrue("SetColorsScreenAccess", SetColorsScreenAccess.isRegistered())
+        assertTrue("GlucoseAlarmsAccess", GlucoseAlarmsAccess.isRegistered())
         assertTrue("LegacyScreensAccess", LegacyScreensAccess.isRegistered())
         assertTrue("BluetoothMeterAccess", BluetoothMeterAccess.isRegistered())
         assertTrue("NovoPenAccess", NovoPenAccess.isRegistered())

@@ -24,6 +24,7 @@ class BridgeRegistrationTest {
         assertTrue("OngoingNotificationAccess", OngoingNotificationAccess.isRegistered())
         assertTrue("FloatingConfigScreenAccess", FloatingConfigScreenAccess.isRegistered())
         assertTrue("SetColorsScreenAccess", SetColorsScreenAccess.isRegistered())
+        assertTrue("GlucoseAlarmsAccess", GlucoseAlarmsAccess.isRegistered())
         // The phone-only legacy screens are absent, not a silent no-op (plan P2).
         assertFalse("LegacyScreensAccess", LegacyScreensAccess.isRegistered())
         assertFalse("BluetoothMeterAccess", BluetoothMeterAccess.isRegistered())
