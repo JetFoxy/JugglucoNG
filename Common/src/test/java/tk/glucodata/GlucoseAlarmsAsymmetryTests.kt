@@ -49,8 +49,12 @@ class GlucoseAlarmsAsymmetryTests {
 
     @Test
     fun onlyTheWatchRecomputesTheComplicationViews() {
-        assertTrue(phone, watch.contains("GlucoseValue.updateall()"))
-        assertFalse(phone, phone.contains("GlucoseValue.updateall()"))
+        // Spelled as the watch spells it today. This assertion encoded the old name
+        // GlucoseValue and went red on rebase, because #469 renamed that class to
+        // WearComplicationValue -- which is the property of source checks worth remembering:
+        // they are only as stable as the names they quote.
+        assertTrue(phone, watch.contains("WearComplicationValue.updateall()"))
+        assertFalse(phone, phone.contains("ComplicationValue.updateall()"))
     }
 
     @Test
