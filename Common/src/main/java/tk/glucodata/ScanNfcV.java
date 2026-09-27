@@ -286,10 +286,10 @@ public class ScanNfcV {
         askpermission = false;
         MainActivity main = (MainActivity) (curve.getContext());
         if (!isWearable) {
-            if (Menus.on) {
+            if (LegacyScreensAccess.getMenusOn()) {
                 Applic.RunOnUiThread(() -> {
                     main.doonback();
-                    Menus.on = true;
+                    LegacyScreensAccess.setMenusOn(true);
                 });
             }
         }

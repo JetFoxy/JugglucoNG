@@ -68,6 +68,10 @@ static void registerBridges() {
     tk.glucodata.ui.ComposeHostAccess.register(tk.glucodata.ui.WearComposeHost.INSTANCE);
     CalibrationAccess.register(SyncedWearCalibrationProvider.INSTANCE);
     tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.WearAlarmActivityHost.INSTANCE);
+    ComplicationConfigAccess.register(new tk.glucodata.glucosecomplication.WearColorConfig());
+    GlucoseValueRefreshAccess.register(tk.glucodata.glucosecomplication.WearGlucoseValueRefresh.INSTANCE);
+    OngoingNotificationAccess.register(WearOngoingActivity.INSTANCE);
+    FloatingConfigScreenAccess.register(new WearFloatingConfig());
 }
 
 static void start(Object context) {

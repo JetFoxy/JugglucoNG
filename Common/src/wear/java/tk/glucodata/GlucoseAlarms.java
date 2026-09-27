@@ -40,7 +40,7 @@ public    void handlealarm() {
         if(view!=null) {
             view.postInvalidate();
             }
-        tk.glucodata.glucosecomplication.GlucoseValue.updateall();
+        tk.glucodata.glucosecomplication.WearComplicationValue.updateall();
 
         long wastime = SuperGattCallback.lastfoundL;
         if(wastime==0L) {

@@ -59,7 +59,7 @@ class HealthConnectNullSensorptrTests {
         assertEquals(
             "every export in SuperGattCallback goes through exportToHealthConnect()",
             1,
-            Regex("HealthConnection\\.Companion\\.writeAll\\(").findAll(callback).count(),
+            Regex("[.]writeAll[(]").findAll(callback).count(),
         )
         val export = callback.substring(callback.indexOf("private void exportToHealthConnect()"))
             .substringBefore("protected void handleGlucoseResult(")
@@ -70,7 +70,9 @@ class HealthConnectNullSensorptrTests {
             "dohealth() sets stopHealth on every other callback, so a sensor with nothing to export must not reach it",
             check < claim,
         )
-        assertTrue(export.contains("HealthConnection.Companion.writeAll(sensorptr, SerialNumber)"))
+        // The export goes through the HealthConnect registry now; the pointer this
+        // method guards is still what the payload is built from.
+        assertTrue(export.contains("health.writeAll(sensorptr, SerialNumber)"))
     }
 
     @Test

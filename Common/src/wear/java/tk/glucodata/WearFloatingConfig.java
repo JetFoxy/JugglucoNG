@@ -59,7 +59,7 @@ import android.widget.Toast;
 
 import yuku.ambilwarna.AmbilWarnaDialog;
 
-public class FloatingConfig {
+public class WearFloatingConfig implements FloatingConfigScreen {
 private static final String LOG_ID="FloatingConfig";
 //   AmbilWarnaDialog(Context context, int color, boolean supportsAlpha, OnAmbilWarnaListener listener)
 static private boolean background=true;
@@ -77,7 +77,8 @@ static public int    getcolor() {
         }
 
 
-static public void show(MainActivity act,View view) {
+    @Override
+    public void show(MainActivity act,View view) {
   final boolean  wasfloating=Natives.getfloatglucose();
   view.setVisibility(INVISIBLE);
   int height=GlucoseCurve.getheight();
