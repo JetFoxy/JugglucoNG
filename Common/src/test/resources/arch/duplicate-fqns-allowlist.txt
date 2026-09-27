@@ -10,6 +10,13 @@
 # Removed so far: tk.glucodata.receivers.AlarmLaunchReceiver (T5.1).
 #   tk.glucodata.Stats, tk.glucodata.Watch (category P): their watch stubs had no
 #   caller anywhere in src/main or src/wear, so they were deleted.
+#   tk.glucodata.settings.SetColors (category S): both sides are real -- 144 lines on the
+#   phone, 96 on the watch, and the watch's adjusts the light bars and opens its own colour
+#   dialog -- so both are renamed (MobileSetColors, WearSetColors) and both register behind
+#   SetColorsScreenAccess. The contract is the one method the settings screen calls.
+#   Worth writing down how this duplicate hid from the compiler: Settings is in the same
+#   package, and show was package-private on both sides, so shared code called a phone class
+#   by a name the watch happened to share as well.
 #   tk.glucodata.settings.LabelsClass (category P): the shared Settings.java now opens
 #   it through the LegacyScreens registry, so its watch stub was deleted.
 tk.glucodata.BluetoothGlucoseMeter
@@ -31,5 +38,4 @@ tk.glucodata.glucosecomplication.ColorConfig
 tk.glucodata.glucosecomplication.GlucoseValue
 tk.glucodata.nums.AllData
 tk.glucodata.settings.LibreNumbers
-tk.glucodata.settings.SetColors
 tk.glucodata.ui.AlarmActivity

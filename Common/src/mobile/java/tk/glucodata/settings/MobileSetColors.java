@@ -45,7 +45,7 @@ import static tk.glucodata.Applic.usedlocale;
 import static tk.glucodata.Log.doLog;
 import static tk.glucodata.settings.Settings.removeContentView;
 
-public class SetColors {
+public class MobileSetColors implements tk.glucodata.SetColorsScreen {
 private static final String LOG_ID="SetColors";
 //   AmbilWarnaDialog(Context context, int color, boolean supportsAlpha, OnAmbilWarnaListener listener)
 /*
@@ -58,7 +58,8 @@ public static void endcolors(MainActivity act) {
         act.poponback();
         }
     } */
-static void show(MainActivity act) {
+    @Override
+    public void show(MainActivity act) {
 
    act.lightBars(!Natives.getInvertColors( ));
     int initialColor= 0xfff7f022;
