@@ -49,7 +49,9 @@ class GlucoseAlarmsAsymmetryTests {
 
     @Test
     fun onlyTheWatchRecomputesTheComplicationViews() {
-        assertTrue(phone, watch.contains("GlucoseValue.updateall()"))
+        // The watch class is WearComplicationValue since #469 (it was GlucoseValue).
+        assertTrue(watch, watch.contains("ComplicationValue.updateall()"))
+        assertFalse(phone, phone.contains("ComplicationValue.updateall()"))
         assertFalse(phone, phone.contains("GlucoseValue.updateall()"))
     }
 
