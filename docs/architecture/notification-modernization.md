@@ -22,20 +22,30 @@ surfaces; they are not implicitly migrated by N1.
 This plan does not add a journal action. Journal interaction needs its own
 serious design review. It does not add a lock-screen privacy preference.
 
+### Maintainer decisions and recommendations
+
+| Choice | Status and scope |
+| --- | --- |
+| Replace bitmap IBM Plex values | Conditionally supported for N4 where accessibility, scaling or rendering measurements justify it. M3 does not mandate a different font. List the effect on each `notification_font_*` preference before migration. |
+| Lock-screen privacy option | Rejected for this work; preserve existing visibility choices. |
+| Journal action | Deferred to a separate interaction design proposal. |
+| No-sensor notification | Tentatively supported only as required by actual service and existing display modes; never stop the service implicitly. |
+| Replace `setTimeoutAfter` for ongoing phone content | Recommendation below, not a previously approved global timeout change. Preserve alert and Wear lifetime rules; isolate the phone lifetime patch from the safe timestamp/startup subset. |
+
 ## Evidence in current source
 
 Paths below are relative to Common/src/.
 
 | Finding | Evidence | Planning consequence |
 | --- | --- | --- |
-| Freshness is 330 seconds | Notify.glucosetimeout is 30 * 11 seconds; CurrentDisplaySource.resolveCurrent uses it as max age. | N1 schedules an explicit stale transition at this boundary; freshness is not notification lifetime. |
+| A non-null snapshot does not establish freshness | Notify.glucosetimeout is 330 seconds. CurrentDisplaySource.resolveCurrentInternal passes it to CurrentGlucoseSource.getFresh, but can then construct a non-null snapshot with source="history" from the 25-minute DisplayTrendSource window. | Apply the shared freshness policy to the resolved reading timestamp after all fallbacks. Test 6–25-minute-old history with no fresh live reading; do not assume stale always means null. |
 | Startup has a longer history fallback | getforgroundnotification resolves current, then calls NotificationHistorySource.getDisplayHistory. On phone, HistoryRepository.getHistoryForNotificationForSensor reaches Room through runBlocking before foregroundno calls startForeground. A latest history point may be used when it is within 15 minutes. | Show a short FGS “Restoring readings” placeholder first and restore asynchronously. Do not confuse a stale history fallback with a fresh reading. |
-| Restore failure and no current are collapsed at one boundary | resolveNotificationCurrentSnapshot catches any Throwable, logs and returns null. showoldglucose, glucoseRefreshRunnable and dataChangedGlucoseRefreshRunnable return when the snapshot is null or below the valid-value guard. | N1 must distinguish restore/query failure, no reading and stale reading, and publish a truthful state without inventing a value. |
+| Restore errors and missing data are collapsed | resolveNotificationCurrentSnapshot catches any Throwable, logs and returns null; CurrentDisplaySource also converts history-query failures to an empty list. showoldglucose and both refresh runnables return for a null/invalid snapshot, but accept a non-null historical one. | Cover both failure modes: a stale historical snapshot accepted as current, and a silent return leaving prior content untouched. Preserve error information in the narrow startup restore path; do not claim null identifies the cause. |
 | Ordinary builder lifetime and timestamp are different from alarm behavior | makearrownotification calls setTimeoutAfter(glucosetimeout), then stamps ordinary notif.when with System.currentTimeMillis(). The alarm builder stamps notif.when with glucose.time and posts glucosealarmid. | Record the lifetime change as a recommendation pending device evidence; do not change alarm timeout or Wear auto-cancel as a side effect. |
 | Publish target depends on service and variant | fornotify sends glucosealarmid on Wear; on phone it calls startForeground(glucosenotificationid, notif) when keeprunning.theservice exists and otherwise calls notificationManager.notify(glucosenotificationid, notif). foregroundno builds history-backed content before startForeground. | Preserve service readiness, ordinary notify and Wear paths as separate acceptance cases. Never stop a required service implicitly. |
-| Status-only refresh does not schedule notification work | UiRefreshBus.requestDataRefresh schedules the bounded refresh; requestStatusRefresh emits StatusOnly and invalidates Floating only. | N1 may add a contained status-to-notification invalidation and tests; do not invent a new state architecture. |
+| Status-only refresh does not schedule notification work | UiRefreshBus.requestDataRefresh schedules a debounced refresh; requestStatusRefresh emits StatusOnly and invalidates Floating only. | N1 may add a contained status-to-notification invalidation and tests; do not invent a new state architecture. |
 | Data refresh is a resettable trailing debounce | scheduleDataChangedNotificationRefresh removes and reposts a 1,000 ms callback. isSameForegroundGlucose compares only time, primary value and rate. | Bound the refresh policy and expand the render/update reason only when N0 reproduces the gap. |
-| Text and charts have separate accessibility constraints | makearrownotification uses RemoteViews text for the current path, while startup and chart/arrow paths still rasterize selected content. | Native TextView replacement is acceptable where it materially improves accessibility, font scaling or allocation cost. M3 does not require abandoning IBM Plex; retain it where it works and measure the tradeoff. |
+| Live glucose text is always rasterized | makearrownotification calls drawMultiGlucoseText for both collapsed and expanded values, hides their TextViews and shows bitmaps even when useSystemFont is true. Status labels remain native text. | Native TextView replacement is acceptable where it materially improves accessibility, font scaling or allocation cost. M3 does not require abandoning IBM Plex; retain it where it works and measure the tradeoff. |
 
 The seven synchronous showoldglucose callers are:
 
@@ -54,8 +64,8 @@ The seven synchronous showoldglucose callers are:
 7. [Applic.java:1373](../../Common/src/main/java/tk/glucodata/Applic.java#L1373),
    sensor/settings resume path.
 
-The two Notify-internal calls are separate from those seven. Moving all of
-these calls off the main thread is an N3 extraction/behavior boundary; N1 does
+The two Notify-internal calls are separate from those seven. Some callers already
+run on workers. Guaranteeing off-main rendering for all seven belongs to N3; N1 does
 not edit drivers or perform a broad caller migration.
 
 Relevant source links: [Notify.java](../../Common/src/main/java/tk/glucodata/Notify.java),
@@ -73,7 +83,7 @@ Reading freshness, transport status, service readiness and history-loading
 status are independent. A reconnecting sensor can still have a fresh reading;
 a Room exception is not an empty history result.
 
-N1 recommendation, pending maintainer confirmation and device/OEM evidence:
+N1 recommendation for review, with device/OEM evidence required before rollout:
 the ordinary phone notification should publish a stale state at the 330-second
 freshness deadline, retaining the last reading with an explicit age/timestamp
 and no current arrow or prediction. Its lifetime should be governed by the
@@ -89,7 +99,7 @@ The current mode gates are evidence, not a guessed truth table:
 | Mode | Current source behavior to preserve during N1 |
 | --- | --- |
 | Phone showalways=true | normal readings use the ordinary glucose notification; keep it while existing service/display rules require it. |
-| Phone showalways=false | Notify.glucosestatus(false) calls novalue, replacing/canceling the ordinary display; a normal reading path cancels the ordinary ID when no service is running, while a running service receives its service notification. N1 must preserve this choice. |
+| Phone showalways=false | Toggling Notify.glucosestatus(false) calls novalue(), which publishes getforgroundnotification() through fornotify; it does not immediately cancel. On a later normalglucose call with waiting=false, alertwatch=false and hasvalue=true, keeprunning.started selects novalue(); otherwise the ordinary ID is canceled. Preserve these distinct transitions, including required FGS attachment. |
 | Phone alertwatch=true | a genuine per-reading delivery uses once=false, high priority and alarm category through arrowglucosenotification; preserve its mirroring intent. An age/settings/chart redraw is visual-only and must not create a duplicate alarm-style delivery. |
 | No sensor | A service-only ongoing placeholder is tentatively supported when the service is actually required. No notification change may stop that service implicitly. |
 | Wear | fornotify uses glucosealarmid, OngoingNotificationAccess and Wear's existing auto-cancel behavior. Do not reuse phone lifetime assumptions. |
@@ -101,8 +111,8 @@ mirroring intent. Rendering must not store, invent or rebroadcast a glucose
 reading. GlucoseUpdateBroadcaster remains a compatibility consumer until a
 separate migration proves otherwise.
 
-Android 16 AOSP currently excludes FLAG_FOREGROUND_SERVICE from the timeout
-cancellation mask in NotificationManagerService
+Android 16 AOSP passes FLAG_FOREGROUND_SERVICE in the mustNotHaveFlags mask,
+excluding notifications carrying that flag from timeout cancellation in NotificationManagerService
 [source](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android16-release/services/core/java/com/android/server/notification/NotificationManagerService.java#2158).
 That is useful evidence for the FGS path, not a blanket Android/OEM product
 guarantee; device testing is still required.
@@ -140,21 +150,27 @@ N1 may include only these behavior fixes and their focused tests:
    Room/history asynchronously. Replace it with current, stale, waiting,
    no-sensor or temporary-unavailable text after restore. The header must not
    claim a sensor connection or display an empty grid as data.
-2. Add an explicit reading timestamp/age to the high-value header early in the
-   update. At 330 seconds, schedule/reconcile a stale state even without a new
-   reading. Retain stale content only while the existing showalways,
-   alertwatch, hasvalue or required-service mode says the notification belongs;
-   cancellation remains an explicit mode/service result.
-3. Reconcile on service restart, screen-on/resume and available time-change
+2. Set Notification.when from the actual resolved reading timestamp using
+   setWhen(reading.timeMillis) and setShowWhen(true) for both fresh and stale
+   reading-bearing notifications; remove the later render-time overwrite.
+   Restoring/waiting/no-sensor content without a reading must not fabricate a
+   reading timestamp. Test builder metadata separately from custom labels.
+3. Classify freshness from that timestamp after live and history fallbacks,
+   including non-null historical snapshots. Schedule/reconcile the transition
+   at the shared 330-second freshness boundary even without a new event. Retain
+   truthful last-reading content only under the existing mode/service rules
+   above; hasvalue alone is not authorization to retain a disabled display.
+4. Reconcile on service restart, screen-on/resume and available time-change
    events. Do not promise exact Doze timing. A bounded eventual update is the
    acceptance target.
-4. Make status-only refresh schedule the same bounded notification invalidation
+5. Make status-only refresh schedule the same bounded notification invalidation
    when the existing mode requires it. Keep the current 1-second trailing rate
    limit, but prevent an unbounded reset loop when N0 demonstrates starvation.
-5. Deduplicate by a complete visible/update identity, including sensor/source,
-   reading timestamp/value/rate, freshness/status and relevant display revision.
-   Do not let age, settings or chart refresh invoke alertwatch delivery.
-6. Keep normal phone notify versus startForeground, Wear glucosealarmid,
+6. Fix identity omissions demonstrated by N0 with contained tests. If a complete
+   render identity needs the new coordinator, defer that part to N2/N3 rather
+   than widening N1. Age, settings and chart redraws must not invoke alertwatch
+   new-reading delivery.
+7. Keep normal phone notify versus startForeground, Wear glucosealarmid,
    alert timeout and Wear auto-cancel as explicit test cases. Do not touch
    glucose drivers or perform the seven-caller off-main extraction here.
 
@@ -162,7 +178,11 @@ N1 acceptance includes fresh-to-stale with no new input, stale-to-fresh
 recovery, a service-only no-sensor case, showalways=false, alertwatch genuine
 new-reading versus visual-only refresh, ordinary notify versus startForeground,
 Wear timeout/auto-cancel, Doze timestamp handling and resume reconciliation.
-OS and OEM timing claims require device evidence.
+OS and OEM timing claims require device evidence. The truthful early FGS header
+and reading-time metadata are an independently shippable N1 subset. Pending
+lifetime decisions or device evidence must not block that subset; deliver the
+phone timeout/lifetime change separately. Test stale historical snapshots at
+6, 15 and just under 25 minutes as well as null-current/no-history cases.
 
 ## Deferred work under D4 and P5
 
@@ -181,6 +201,12 @@ installed API 37 SDK contains Notification.MetricStyle (javap inspection of
 $ANDROID_HOME/platforms/android-37.0/android.jar on 2026-09-27 showed
 addMetric, setCriticalMetric and setMetrics). Runtime availability, layout,
 locale/decimal behavior and supported-device behavior remain untested.
+See the [MetricStyle reference](https://developer.android.com/reference/android/app/Notification.MetricStyle).
+Ordinary RemoteViews cannot host the Compose animation system; use System UI
+transitions and avoid frame-by-frame reposting. Live Update promotion remains
+an optional eligibility investigation: it prohibits custom RemoteViews and is
+subject to user/OEM control. Do not assume CGM qualifies or change alert delivery
+to obtain promotion. [Live Update requirements](https://developer.android.com/develop/ui/views/notifications/live-update).
 
 ## Validation and evidence gaps
 
