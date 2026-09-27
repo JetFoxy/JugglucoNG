@@ -70,6 +70,7 @@ static void registerBridges() {
     tk.glucodata.ui.AlarmActivityAccess.register(tk.glucodata.ui.WearAlarmActivityHost.INSTANCE);
     ComplicationConfigAccess.register(new tk.glucodata.glucosecomplication.WearColorConfig());
     GlucoseValueRefreshAccess.register(tk.glucodata.glucosecomplication.WearGlucoseValueRefresh.INSTANCE);
+    OngoingNotificationAccess.register(WearOngoingActivity.INSTANCE);
 }
 
 static void start(Object context) {

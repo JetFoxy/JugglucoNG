@@ -40,6 +40,7 @@ class BridgeRegistrationTest {
         // The complication colour screen is watch-only: the phone copy was a shell.
         assertFalse("ComplicationConfigAccess", ComplicationConfigAccess.isRegistered())
         assertFalse("GlucoseValueRefreshAccess", GlucoseValueRefreshAccess.isRegistered())
+        assertFalse("OngoingNotificationAccess", OngoingNotificationAccess.isRegistered())
         assertTrue("LibreviewJournalEntriesAccess", LibreviewJournalEntriesAccess.isRegistered())
         assertTrue("HistoryRepositoryAccess", HistoryRepositoryAccess.isRegistered())
         assertTrue("HistorySyncBridgeAccess", HistorySyncBridgeAccess.isRegistered())
