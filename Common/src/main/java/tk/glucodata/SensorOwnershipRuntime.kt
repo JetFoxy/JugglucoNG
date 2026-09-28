@@ -433,7 +433,7 @@ object SensorOwnershipRuntime {
             if (autoSwitch && !probed) {
                 probed = true
                 val delivered = MessageSender.sendSyncMessageAwait(
-                    MessageSender.SYNC2_OWN_PATH,
+                    WearMessagePath.SYNC2_OWN,
                     payload,
                 )
                 if (delivered != peerDeliverable) {
@@ -441,7 +441,7 @@ object SensorOwnershipRuntime {
                     peerDeliverable = delivered
                 }
             } else {
-                MessageSender.sendSyncMessage(MessageSender.SYNC2_OWN_PATH, payload)
+                MessageSender.sendSyncMessage(WearMessagePath.SYNC2_OWN, payload)
             }
             lastAnnounced[id] = owns
             lastAnnouncedAt[id] = now

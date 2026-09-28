@@ -50,31 +50,31 @@ class MessageReceiver: WearableListenerService() {
             return
         }
         Log.i(LOG_ID,"onMessageReceived start $path"  )
-        when(path) {
-            MessageSender.DEFAULTS_PATH ->  {
+        when(WearMessagePath.fromWire(path)) {
+            WearMessagePath.DEFAULTS ->  {
                 val sender = tk.glucodata.MessageSender.getMessageSender()
                 if (sender == null) {
                     Log.d(LOG_ID, "messagesender==null")
                     return
                     }
                 val source=  sender.localnode
-                 if(doLog) {Log.i(LOG_ID,"path==MessageSender.DEFAULTS_PATH "+source );}
+                 if(doLog) {Log.i(LOG_ID,"path==WearMessagePath.DEFAULTS "+source );}
                   setWearosdefaults(source,true);
                    val context=if(MainActivity.thisone==null)Applic.app;else MainActivity.thisone;
                    Applic.setbluetooth(context,false)
                  }
-            MessageSender.WAKE_PATH -> {
+            WearMessagePath.WAKE -> {
                 Natives.wakehereonly()
                 }
-            MessageSender.WAKESTREAM_PATH -> {
+            WearMessagePath.WAKESTREAM -> {
                 Natives.wakestreamhereonly()
                 }
-            MessageSender.PROTOCOL_PATH -> {
+            WearMessagePath.PROTOCOL -> {
                 // Each side advertises its protocol version on the handshake; a mismatch is logged
                 // here instead of the peers silently disagreeing about message shapes.
                 WearProtocol.onPeerVersionReport(data)
                 }
-            MessageSender.DATA_PATH   -> {
+            WearMessagePath.DATA   -> {
                 // Phone-to-phone mirroring only. On the watch this legacy
                 // stream wrote the sensor's uncalibrated values into the same
                 // minute slots WearSync2 fills with calibrated ones, so the
@@ -86,7 +86,7 @@ class MessageReceiver: WearableListenerService() {
                     Natives.message(data);
                 }
             }
-            MessageSender.SYNC2_REQ_PATH -> {
+            WearMessagePath.SYNC2_REQ -> {
                 if (!isWearable) {
                     WearSync2.onRequest(data)
                     // Rides along with the sync the watch already asks for, and
@@ -100,21 +100,21 @@ class MessageReceiver: WearableListenerService() {
                     MessageSender.sendProtocol(messageEvent.sourceNodeId)
                 }
             }
-            MessageSender.SYNC2_CHUNK_PATH -> {
+            WearMessagePath.SYNC2_CHUNK -> {
                 // Either device may be the one holding the sensor, so both accept
                 // readings; WearSync2 drops any for a sensor it reads itself.
                 WearSync2.onChunk(data)
             }
-            MessageSender.SYNC2_CAL_PATH -> {
+            WearMessagePath.SYNC2_CAL -> {
                 if (isWearable) WearSync2.onCalibration(data)
             }
-            MessageSender.SYNC2_CALCMD_PATH -> {
+            WearMessagePath.SYNC2_CALCMD -> {
                 if (!isWearable) WearCalibrationCommand.onCommand(data)
             }
-            MessageSender.SYNC2_REMOVE_PATH -> {
+            WearMessagePath.SYNC2_REMOVE -> {
                 if (isWearable) WearSync2.onRemove(data)
             }
-            MessageSender.SYNC2_JOURNAL_REQ_PATH -> {
+            WearMessagePath.SYNC2_JOURNAL_REQ -> {
                 if (!isWearable) WearJournalSync.onRequest(
                     if (data != null && data.size >= 9) {
                         java.nio.ByteBuffer.wrap(data, 1, 8).long
@@ -123,17 +123,17 @@ class MessageReceiver: WearableListenerService() {
                     }
                 )
             }
-            MessageSender.SYNC2_JOURNAL_DATA_PATH -> {
+            WearMessagePath.SYNC2_JOURNAL_DATA -> {
                 if (isWearable) WearJournalSync.onServed(data)
             }
-            MessageSender.SYNC2_OWN_PATH -> {
+            WearMessagePath.SYNC2_OWN -> {
                 // Both devices arbitrate, so neither side is gated here.
                 SensorOwnershipRuntime.onPeerReport(data)
             }
-            MessageSender.SYNC2_JOURNAL_CMD_PATH -> {
+            WearMessagePath.SYNC2_JOURNAL_CMD -> {
                 if (!isWearable) WearJournalSync.onCommand(data)
             }
-            MessageSender.SENSOR_HANDOFF_PATH -> {
+            WearMessagePath.SENSOR_HANDOFF -> {
                 if (isWearable) {
                     // Persist the identity only. Do NOT flip the watch into
                     // "I own the sensor" here: the watch advertises that in
@@ -147,12 +147,12 @@ class MessageReceiver: WearableListenerService() {
                     Log.i(LOG_ID, "sensor handoff stored=$ok")
                 }
             }
-            MessageSender.SENSOR_CLAIM_STATUS_PATH -> {
+            WearMessagePath.SENSOR_CLAIM_STATUS -> {
                 if (!isWearable) {
                     WearSensorClaimStatus.onRemoteStatus(messageEvent.sourceNodeId, data)
                 }
             }
-            MessageSender.CALIBRATE_PATH -> {
+            WearMessagePath.CALIBRATE -> {
                 // Watch-relayed fingerstick calibration; applied to the local
                 // driver that owns the BLE connection.
                 if (data != null && data.size >= 4) {
@@ -162,7 +162,7 @@ class MessageReceiver: WearableListenerService() {
                     }
                 }
             }
-            MessageSender.NETINFO_PATH   -> {
+            WearMessagePath.NETINFO   -> {
                 // The switch may have changed after this callback entered. Do
                 // not let an in-flight /netinfo recreate the native Wear host
                 // after shutdown has just deactivated it.
@@ -205,7 +205,7 @@ class MessageReceiver: WearableListenerService() {
                     }
                 }
             }
-            MessageSender.START_PATH ->  {
+            WearMessagePath.START ->  {
                if(isWearable)
                   UseWifi.usewifi()
                val context=Applic.getContext()
@@ -214,23 +214,23 @@ class MessageReceiver: WearableListenerService() {
                Notify.mkunitstr(context,Natives.getunit())
                sendnetinfo(messageEvent.getSourceNodeId())
             }
-             MessageSender.SETTINGS_PATH   -> { //Never used
+             WearMessagePath.SETTINGS   -> { //Never used
                  Natives.ontbytesettings(data)
                     Notify.mkunitstr(Applic.app,Natives.getunit())
                 }
-             MessageSender.TOGGLES_REQ_PATH -> {
+             WearMessagePath.TOGGLES_REQ -> {
                  if (!isWearable) WearToggleSync.pushTo(messageEvent.sourceNodeId)
                 }
-             MessageSender.TOGGLES_SET_PATH -> {
+             WearMessagePath.TOGGLES_SET -> {
                  // The phone owns these; it applies and then reports back what
                  // it actually holds, so a refused switch snaps back on the
                  // watch rather than showing a state that is not real.
                  if (!isWearable) WearToggleSync.onCommand(data, messageEvent.sourceNodeId)
                 }
-             MessageSender.TOGGLES_PATH -> {
+             WearMessagePath.TOGGLES -> {
                  if (isWearable) WearToggleSync.onState(data)
                 }
-             MessageSender.DISPLAY_PREFS_REQ_PATH -> {
+             WearMessagePath.DISPLAY_PREFS_REQ -> {
                  // Pull, not push. Relying on the phone to push at the right
                  // moment meant a watch whose app opened outside that window
                  // kept the compiled-in defaults with no way to ask; the journal
@@ -242,13 +242,13 @@ class MessageReceiver: WearableListenerService() {
                      MessageSender.sendProtocol(messageEvent.sourceNodeId)
                  }
                 }
-             MessageSender.DISPLAY_PREFS_MAINSENSOR_PATH -> {
+             WearMessagePath.DISPLAY_PREFS_MAINSENSOR -> {
                  // The watch changed its sensor selection; the phone follows,
                  // and the preferences it pushes on the change carry the
                  // result back.
                  if (!isWearable) WearSensorSelectionSync.onCommand(data)
                 }
-             MessageSender.DISPLAY_PREFS_PATH -> {
+             WearMessagePath.DISPLAY_PREFS -> {
                  // The phone owns these settings; the watch only mirrors them,
                  // so smoothing and prediction behave the same on both.
                  // apply() raises UiRefreshBus, which is what the watch's history
@@ -258,7 +258,7 @@ class MessageReceiver: WearableListenerService() {
                      Log.w(LOG_ID, "unusable display-prefs payload; keeping current settings")
                  }
                 }
-             MessageSender.GLUCOSE_COLORS_PATH -> {
+             WearMessagePath.GLUCOSE_COLORS -> {
                  // The phone owns the palette; the watch only mirrors it, so a
                  // preset or custom band edit shows on both without a rebuild.
                  if (isWearable) {
@@ -267,7 +267,7 @@ class MessageReceiver: WearableListenerService() {
                      }
                  }
                 }
-             MessageSender.MESSAGES_PATH -> {
+             WearMessagePath.MESSAGES -> {
                  val sender=tk.glucodata.MessageSender.getMessageSender()
                  if(sender==null) {
                      Log.d(LOG_ID,"2: messagesender==null")
@@ -282,7 +282,7 @@ class MessageReceiver: WearableListenerService() {
                     }
                 Natives.setBlueMessage(name,on)
                 }
-             MessageSender.BLUETOOTH_PATH -> {
+             WearMessagePath.BLUETOOTH -> {
                 val context=if(MainActivity.thisone==null)Applic.app;else MainActivity.thisone;
                 val on=booldata(data)
                 if(on==null) {
@@ -306,7 +306,7 @@ class MessageReceiver: WearableListenerService() {
                     Applic.setbluetooth(context,on )
                 }
                 }
-             MessageSender.ASKFORSTART_PATH -> {
+             WearMessagePath.ASKFORSTART -> {
                  if(!isWearable) {
                      // Fresh watch: serve the full sync2 backfill alongside the
                      // legacy start flow.

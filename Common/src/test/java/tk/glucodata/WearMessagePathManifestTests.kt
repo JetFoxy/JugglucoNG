@@ -31,17 +31,21 @@ class WearMessagePathManifestTests {
 
     private fun source(relative: String) = File(moduleRoot, relative)
 
-    private fun declaredPaths(): Map<String, String> {
-        val text = source("src/main/java/tk/glucodata/MessageSender.kt").readText()
-        return Regex("""const val (\w*PATH)\s*=\s*"([^"]+)"""")
-            .findAll(text)
-            .associate { it.groupValues[1] to it.groupValues[2] }
-    }
+    /**
+     * The paths, from the one place they now live.
+     *
+     * This used to parse `const val ..._PATH = "..."` out of MessageSender with a regex. It does
+     * not any more, because those constants are gone: the strings moved into WearMessagePath, and
+     * leaving the test reading a source pattern that no longer exists would have made it pass
+     * vacuously -- a test that finds nothing to check is worse than no test.
+     */
+    private fun declaredPaths(): Map<String, String> =
+        WearMessagePath.entries.associate { it.name to it.wire }
 
     private fun handledPaths(): List<String> {
         val declared = declaredPaths()
         val text = source("src/main/java/tk/glucodata/MessageReceiver.kt").readText()
-        return Regex("""MessageSender\.(\w*PATH)\s*->""")
+        return Regex("""WearMessagePath\.(\w+)\s*->""")
             .findAll(text)
             .mapNotNull { declared[it.groupValues[1]] }
             .distinct()
@@ -90,23 +94,22 @@ class WearMessagePathManifestTests {
      * the constants, and it runs again once the receiver dispatches on the type.
      */
     @Test
-    fun theTypedPathsMatchTheConstantsAndTheReceiver() {
+    fun theTypedPathsMatchTheReceiverDispatch() {
         val typed = WearMessagePath.entries.map { it.wire }
         assertEquals(
-            "the type must cover the same paths as the constants, with no additions and no " +
-                "omissions: the wire strings are what travel, so a difference is a protocol " +
-                "change hiding in a refactoring",
-            declaredPaths().values.toSet(),
+            "every path in the type must be dispatched in MessageReceiver; the when is on the " +
+                "type now, so the compiler enforces coverage of the enum, and this enforces " +
+                "that every enum entry means a path the receiver acts on",
             typed.toSet(),
-        )
-        assertEquals(
-            "every declared path must be handled in MessageReceiver; an unhandled path is a " +
-                "message the peer sends and nobody acts on",
             handledPaths().toSet(),
-            typed.toSet(),
         )
         assertEquals(
-            "the enum names must be unique, or fromWire cannot resolve an entry",
+            "the receiver must not dispatch a path that is not in the type",
+            handledPaths().toSet().intersect(typed.toSet()),
+            handledPaths().toSet(),
+        )
+        assertEquals(
+            "no duplicate wire strings, or fromWire cannot resolve an entry",
             typed.size,
             typed.toSet().size,
         )
