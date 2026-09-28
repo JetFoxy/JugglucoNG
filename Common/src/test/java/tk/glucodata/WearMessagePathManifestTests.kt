@@ -19,6 +19,14 @@ import org.junit.Test
  * manifests. Requiring both rather than reasoning about which side handles what
  * keeps this check honest — a listed path the device never receives costs
  * nothing, and the receiver already ignores anything meant for the other side.
+ *
+ * Only these two files are read, because only these two are build inputs. `sourceSets`
+ * in `Common/build.gradle` adds no source set for `AndroidManifest.xml.debug`, `.release`,
+ * `.33`, `.pre33`, `.preflash`, `.convchange` or `.bak`, so no manifest merger sees them:
+ * the merged `wearDebug` filter has exactly the base file's prefixes. Those copies date from
+ * the initial import and still list `/settings`, so they are not per-variant overlays and a
+ * change does not have to be repeated in them — but reading one as if it were one is how
+ * half an hour goes missing.
  */
 class WearMessagePathManifestTests {
 
@@ -76,11 +84,42 @@ class WearMessagePathManifestTests {
         )
     }
 
+    /**
+     * The other direction: a prefix that names no path in the type.
+     *
+     * The coverage check above cannot see this, because a prefix matching nothing is not a
+     * path that fails to arrive. It is what dropping a path looks like when only the enum and
+     * the receiver are edited: the filter keeps delivering, and the receiver answers `null ->`
+     * with a log line, so the message is not dropped -- it is delivered and refused, which is
+     * a wider filter than the protocol has.
+     */
+    private fun assertNoDeadPrefix(manifest: String) {
+        val prefixes = receiverPrefixes(manifest)
+        val dead = prefixes.filterNot { prefix ->
+            WearMessagePath.entries.any { path ->
+                path.wire == prefix || path.wire.startsWith("$prefix/")
+            }
+        }
+        assertTrue(
+            "$manifest delivers ${dead.sorted()}, which is no path in WearMessagePath — " +
+                "delete the prefix with the path",
+            dead.isEmpty(),
+        )
+    }
+
     @Test
     fun everyHandledPathReachesTheWatch() = assertCovers("src/wear/AndroidManifest.xml")
 
     @Test
     fun everyHandledPathReachesThePhone() = assertCovers("src/mobile/AndroidManifest.xml")
+
+    @Test
+    fun theWatchFilterDeclaresNoPathThatIsNotInTheType() =
+        assertNoDeadPrefix("src/wear/AndroidManifest.xml")
+
+    @Test
+    fun thePhoneFilterDeclaresNoPathThatIsNotInTheType() =
+        assertNoDeadPrefix("src/mobile/AndroidManifest.xml")
 
     /**
      * The typed path set, the declared constants and the receiver's dispatch must be the same
