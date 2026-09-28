@@ -61,6 +61,7 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.delay
 import tk.glucodata.GlucoseMeterManager
 import tk.glucodata.GlucoseMeterSnapshot
+import tk.glucodata.Log
 import tk.glucodata.R
 import tk.glucodata.ui.components.CardPosition
 import tk.glucodata.ui.components.SectionLabel
@@ -82,12 +83,6 @@ private data class NearbyGlucoseMeter(
 
 private val satelliteMeterServiceUuid =
     UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
-
-private val glucoseMeterServiceUuids = listOf(
-    UUID.fromString("00001808-0000-1000-8000-00805f9b34fb"),
-    UUID.fromString("af9df7a1-e595-11e3-96b4-0002a5d5c51b"),
-    satelliteMeterServiceUuid,
-)
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -125,7 +120,12 @@ fun GlucoseMeterSettingsScreen(navController: NavController) {
         nearby = emptyList()
         scanning = true
         scanner.startScan(
-            serviceUuids = glucoseMeterServiceUuids,
+            // Unfiltered: not every meter advertises the glucose service (or the
+            // Verio one), and Android filters the advertisement away before the
+            // app ever sees it, so a filtered scan just reports nothing at all.
+            // This is a foreground, user-driven scan, so the screen-off limits
+            // on unfiltered scans do not apply here.
+            serviceUuids = emptyList(),
             onResult = { result ->
                 val device = result.device
                 val address = runCatching { device.address }.getOrNull() ?: return@startScan
@@ -156,6 +156,9 @@ fun GlucoseMeterSettingsScreen(navController: NavController) {
         delay(15_000L)
         scanner.stopScan()
         scanning = false
+        if (nearby.isEmpty()) {
+            Log.i("GlucoseMeterSettings", "no nearby devices found in 15s")
+        }
     }
 
     DisposableEffect(Unit) {

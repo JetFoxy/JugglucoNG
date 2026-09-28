@@ -88,7 +88,14 @@ class BleDeviceScanner(context: Context) {
 
         scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult?) {
-                result?.let { onResult(it) }
+                result?.let {
+                    val uuids = it.scanRecord?.serviceUuids?.map { s -> s.uuid.toString() }
+                    Log.i(LOG_ID, "scan result name=${runCatching { it.device.name }.getOrNull()}" +
+                        " recordName=${it.scanRecord?.deviceName}" +
+                        " addr=${runCatching { it.device.address }.getOrNull()}" +
+                        " rssi=${it.rssi} services=$uuids")
+                    onResult(it)
+                }
             }
 
             override fun onScanFailed(errorCode: Int) {
