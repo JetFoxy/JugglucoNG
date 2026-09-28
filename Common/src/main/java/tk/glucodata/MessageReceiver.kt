@@ -108,13 +108,13 @@ class MessageReceiver: WearableListenerService() {
             MessageSender.SYNC2_CAL_PATH -> {
                 if (isWearable) WearSync2.onCalibration(data)
             }
-            MessageSender.CALIBRATION_CMD_PATH -> {
+            MessageSender.SYNC2_CALCMD_PATH -> {
                 if (!isWearable) WearCalibrationCommand.onCommand(data)
             }
             MessageSender.SYNC2_REMOVE_PATH -> {
                 if (isWearable) WearSync2.onRemove(data)
             }
-            MessageSender.JOURNAL_REQ_PATH -> {
+            MessageSender.SYNC2_JOURNAL_REQ_PATH -> {
                 if (!isWearable) WearJournalSync.onRequest(
                     if (data != null && data.size >= 9) {
                         java.nio.ByteBuffer.wrap(data, 1, 8).long
@@ -123,14 +123,14 @@ class MessageReceiver: WearableListenerService() {
                     }
                 )
             }
-            MessageSender.JOURNAL_DATA_PATH -> {
+            MessageSender.SYNC2_JOURNAL_DATA_PATH -> {
                 if (isWearable) WearJournalSync.onServed(data)
             }
-            MessageSender.SENSOR_OWNERSHIP_PATH -> {
+            MessageSender.SYNC2_OWN_PATH -> {
                 // Both devices arbitrate, so neither side is gated here.
                 SensorOwnershipRuntime.onPeerReport(data)
             }
-            MessageSender.JOURNAL_CMD_PATH -> {
+            MessageSender.SYNC2_JOURNAL_CMD_PATH -> {
                 if (!isWearable) WearJournalSync.onCommand(data)
             }
             MessageSender.SENSOR_HANDOFF_PATH -> {
@@ -162,7 +162,7 @@ class MessageReceiver: WearableListenerService() {
                     }
                 }
             }
-            MessageSender.NET_PATH   -> {
+            MessageSender.NETINFO_PATH   -> {
                 // The switch may have changed after this callback entered. Do
                 // not let an in-flight /netinfo recreate the native Wear host
                 // after shutdown has just deactivated it.
@@ -218,19 +218,19 @@ class MessageReceiver: WearableListenerService() {
                  Natives.ontbytesettings(data)
                     Notify.mkunitstr(Applic.app,Natives.getunit())
                 }
-             MessageSender.TOGGLE_REQ_PATH -> {
+             MessageSender.TOGGLES_REQ_PATH -> {
                  if (!isWearable) WearToggleSync.pushTo(messageEvent.sourceNodeId)
                 }
-             MessageSender.TOGGLE_CMD_PATH -> {
+             MessageSender.TOGGLES_SET_PATH -> {
                  // The phone owns these; it applies and then reports back what
                  // it actually holds, so a refused switch snaps back on the
                  // watch rather than showing a state that is not real.
                  if (!isWearable) WearToggleSync.onCommand(data, messageEvent.sourceNodeId)
                 }
-             MessageSender.TOGGLE_STATE_PATH -> {
+             MessageSender.TOGGLES_PATH -> {
                  if (isWearable) WearToggleSync.onState(data)
                 }
-             MessageSender.WEAR_PREFS_REQ_PATH -> {
+             MessageSender.DISPLAY_PREFS_REQ_PATH -> {
                  // Pull, not push. Relying on the phone to push at the right
                  // moment meant a watch whose app opened outside that window
                  // kept the compiled-in defaults with no way to ask; the journal
@@ -242,13 +242,13 @@ class MessageReceiver: WearableListenerService() {
                      MessageSender.sendProtocol(messageEvent.sourceNodeId)
                  }
                 }
-             MessageSender.MAIN_SENSOR_CMD_PATH -> {
+             MessageSender.DISPLAY_PREFS_MAINSENSOR_PATH -> {
                  // The watch changed its sensor selection; the phone follows,
                  // and the preferences it pushes on the change carry the
                  // result back.
                  if (!isWearable) WearSensorSelectionSync.onCommand(data)
                 }
-             MessageSender.WEAR_PREFS_PATH -> {
+             MessageSender.DISPLAY_PREFS_PATH -> {
                  // The phone owns these settings; the watch only mirrors them,
                  // so smoothing and prediction behave the same on both.
                  // apply() raises UiRefreshBus, which is what the watch's history

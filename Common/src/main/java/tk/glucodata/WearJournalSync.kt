@@ -122,10 +122,10 @@ object WearJournalSync {
                 .putShort(0)
                 .putShort(0)
                 .array()
-            MessageSender.sendSyncMessage(MessageSender.JOURNAL_DATA_PATH, disabled)
+            MessageSender.sendSyncMessage(MessageSender.SYNC2_JOURNAL_DATA_PATH, disabled)
             return
         }
-        MessageSender.sendSyncMessage(MessageSender.JOURNAL_DATA_PATH, payload)
+        MessageSender.sendSyncMessage(MessageSender.SYNC2_JOURNAL_DATA_PATH, payload)
     }
 
     /** Phone: the watch added or removed an entry. */
@@ -157,7 +157,7 @@ object WearJournalSync {
             .put(VERSION.toByte())
             .putLong(System.currentTimeMillis() - HISTORY_MS)
             .array()
-        val sent = MessageSender.sendSyncMessage(MessageSender.JOURNAL_REQ_PATH, data)
+        val sent = MessageSender.sendSyncMessage(MessageSender.SYNC2_JOURNAL_REQ_PATH, data)
         Log.i(LOG_ID, "journal requested sent=$sent")
     }
 
@@ -207,7 +207,7 @@ object WearJournalSync {
             .putFloat(amount)
             .putLong(presetId)
             .array()
-        return MessageSender.sendSyncMessage(MessageSender.JOURNAL_CMD_PATH, data)
+        return MessageSender.sendSyncMessage(MessageSender.SYNC2_JOURNAL_CMD_PATH, data)
     }
 
     @Volatile private var cached: Journal? = null
