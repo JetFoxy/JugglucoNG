@@ -67,16 +67,36 @@ Per the table above. Two rows carry more structure than the others:
   (both `src/main`) between it and the drivers; which of the three writes for a given driver is
   **not established**.
 
-  One consequence worth watching: `storeSensorHistoryBatchAsync` is also called from a driver
-  directly (`drivers/ottai/OttaiBleManager.kt:3445`), so on the phone there are two entry points
-  into sensor history. Whether that is one writer reached two ways or a genuine second writer is
-  **not established**, and it is the first thing to settle here -- the take-over case is exactly
-  where a second writer would show up.
-- **Journal.** The plan says "the journal accessors, one per kind". The registry carries several
-  (`JournalAccess`, `JournalTreatmentUploadAccess`, `NightscoutTreatmentImportAccess`,
-  `LibreviewJournalEntriesAccess`, `JournalSnapshotAccess`) and the phone registers each. Whether
-  one of them is the writer or all of them are is **not established** -- `OutboundApiJournalSnapshot`
-  was looked up in three places before Q1, so "one writer" is a claim to check rather than assume.
+  History has **one writer with many producers**, and that is worth stating precisely because I
+  first got it wrong in the other direction. `HistorySyncAccess.store*` is called from
+  `SuperGattCallback` (native-backed sensors), from every managed driver -- `OttaiBleManager`,
+  `SibionicsBleManager`, `AiDexBleManager`, `ICanHealthBleManager` -- from
+  `VirtualGlucoseSensorBridge`, and from `WearSync2` for readings the watch took over. All of
+  them land in `HistoryRepository`, so the datum has an owner and the producers are not writers.
+
+  The open question here is not "how many producers" but **which device's producer is
+  live for a given sensor at a given moment**, which is what `SensorOwnershipRuntime` decides. A
+  take-over is the case worth naming, because two producers can briefly overlap, and what a double
+  write does is settled by the schema rather than by policy: `history_readings` carries a unique
+  index on `(timestamp, sensorSerial)` (`HistoryReading.kt:19`), and `HistoryDao` offers both
+  `OnConflictStrategy.REPLACE` (`insert`, `insertAll`) and `OnConflictStrategy.IGNORE`
+  (`insertAllIgnoring`, `insertDeletedReadings`).
+
+  **Traced, so the take-over case does not have to be guessed at.** Every one of the seven sensor
+  producers lands on `REPLACE`: they all enter through `HistorySyncAccess.store*`, which delegates
+  to `HistoryRepository.storeReading` / `storeReadings` / `storeReadingsReplacingSensorBuckets`,
+  and those call `dao.insert` / `dao.insertAll`. `IGNORE` is used in exactly one place,
+  `CloneGlucoseRecoveryStore` (`historyDao.insertAllIgnoring` and `uncertaintyDao.insertAllIgnoring`,
+  both guarded by a non-empty check), so clone recovery is deliberately first-write-wins while the
+  sensor path is last-write-wins.
+
+  The "last write wins" is not quite the whole story, and the part that matters was already
+  handled: before the batch insert, the code reads the existing row by `(sensorSerial, timestamp)`
+  and folds it in, via `HistorySourceProvenance.stableSource` and `stableFirstStoredAt`. So
+  `source` and `firstStoredAt` survive a take-over. The measurement columns do not: on one sensor
+  and one minute the later producer's `valueMgdl`, `rawValueMgdl` and `rate` replace the earlier
+  row's outright. So a take-over can change what a reading says, while its provenance stays
+  honest -- which is the correct split, and it is a property of the code rather than of a rule.
 
 ### What counts as a duplicate
 
@@ -179,6 +199,9 @@ recalled:
   `SyncedWearCalibrationProvider` and no history repository.
 - `dontuseclose` is `settings.hpp:315`; `javasettings.cpp:2272` writes it and 2276 reads it.
 - `DisplayDataState` takes `maxOf(current, latestHistory)` and clamps `ageMillis` at 0.
+- `history_readings` has a unique index on `(timestamp, sensorSerial)`, and `HistoryDao` mixes
+  `REPLACE` and `IGNORE` inserts, so a take-over's outcome depends on the insert chosen -- see the
+  live-reading row.
 - Clone recovery's file list is the `CloneRecovery*` / `CloneOutgoingRecovery*` set in `src/main`
   plus the mobile coordinators and bridges.
 - AiDex pairing material has its own file; iCan AES constants live under `drivers/icanhealth/`.
