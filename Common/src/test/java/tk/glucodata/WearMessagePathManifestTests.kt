@@ -19,6 +19,13 @@ import org.junit.Test
  * manifests. Requiring both rather than reasoning about which side handles what
  * keeps this check honest — a listed path the device never receives costs
  * nothing, and the receiver already ignores anything meant for the other side.
+ *
+ * Only these two files are read, because only these two are build inputs. One source set
+ * gets one manifest, and `sourceSets` in `Common/build.gradle` adds none for a per-variant
+ * copy, so `AndroidManifest.xml.debug` was never an overlay the merger applied — it was a
+ * snapshot. Seventeen of those were in the tree, untouched since the initial import and
+ * still listing `/settings`; reading one as an overlay is how half an hour goes missing,
+ * and the paragraph that used to say they were overlays is the mistake it caused.
  */
 class WearMessagePathManifestTests {
 
