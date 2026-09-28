@@ -1,6 +1,7 @@
 package tk.glucodata
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -76,6 +77,40 @@ class WearMessagePathManifestTests {
 
     @Test
     fun everyHandledPathReachesThePhone() = assertCovers("src/mobile/AndroidManifest.xml")
+
+    /**
+     * The typed path set, the declared constants and the receiver's dispatch must be the same
+     * set, today and after the constants are removed.
+     *
+     * This test is the reason the type can be introduced before anything uses it. The rest of
+     * this class reads the paths by regex out of two source files, so it would stop being a guard
+     * the moment the constants go away -- the `when` would then be reading a type that nothing
+     * cross-checks, and a wrong `wire` string would be green in a debug build and wrong on a
+     * device. So the comparison is anchored on whichever side still exists: this runs now, against
+     * the constants, and it runs again once the receiver dispatches on the type.
+     */
+    @Test
+    fun theTypedPathsMatchTheConstantsAndTheReceiver() {
+        val typed = WearMessagePath.entries.map { it.wire }
+        assertEquals(
+            "the type must cover the same paths as the constants, with no additions and no " +
+                "omissions: the wire strings are what travel, so a difference is a protocol " +
+                "change hiding in a refactoring",
+            declaredPaths().values.toSet(),
+            typed.toSet(),
+        )
+        assertEquals(
+            "every declared path must be handled in MessageReceiver; an unhandled path is a " +
+                "message the peer sends and nobody acts on",
+            handledPaths().toSet(),
+            typed.toSet(),
+        )
+        assertEquals(
+            "the enum names must be unique, or fromWire cannot resolve an entry",
+            typed.size,
+            typed.toSet().size,
+        )
+    }
 
     @Test
     fun thePathsThisTestReadsAreActuallyThere() {
