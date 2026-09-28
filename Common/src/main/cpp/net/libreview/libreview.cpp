@@ -750,12 +750,15 @@ bool sendlibreviewdata(const int newcurrent, const uint32_t nu) {
   }
   std::unique_ptr<char[]> bufdeleter(uitbuf);
 
-  static const bool mmolL = settings->data()->isLibreMmolL();
-  static const int country = settings->data()->getLibreCountry();
-  static constexpr const char unitlabel[][7] = {"mg/dL", "mmol/L"};
+  // The UOM tells LibreView which unit to display. It must follow the app's
+  // display unit (as the Libre3 uploader already does via getunitlabel()),
+  // not a cached value: function-local statics here froze the first upload's
+  // unit/country for the rest of the process, so changing the unit or the
+  // Russia toggle had no effect until restart.
+  const int country = settings->data()->getLibreCountry();
   char *uitptr = uitbuf;
   addstrview(uitptr, datastart);
-  addstrview(uitptr, unitlabel[mmolL]);
+  addstrview(uitptr, settings->getunitlabel());
   addstrview(uitptr, afterunit);
   SensorGlucoseData *currentsensor = sensors->getSensorData(newcurrent);
   if (!currentsensor || !currentsensor->pollcount()) {
