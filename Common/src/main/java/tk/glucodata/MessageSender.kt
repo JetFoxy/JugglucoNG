@@ -243,11 +243,6 @@ private fun nodeSendmessage(node:Node,messagePath: WearMessagePath,data:ByteArra
     public fun sendnetinfo( node:String,data:ByteArray) {
         nameSendMessage(node,WearMessagePath.NETINFO,data);
         }
-    /*
-    public fun sendsettings() {
-    val data=Natives.bytesettings()
-    sendmessage(WearMessagePath.SETTINGS,data)
-    } */
     /** Broadcasts the glucose colour scheme so the watch paints what the phone does. */
     public fun sendGlucoseColors(data:ByteArray) {
         sendmessage(WearMessagePath.GLUCOSE_COLORS,data)

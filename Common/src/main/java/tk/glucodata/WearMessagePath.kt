@@ -5,10 +5,10 @@ package tk.glucodata
  *
  * The wire strings are copied verbatim from the constants this replaces, so the protocol does
  * not move when these are adopted. Each name is the last path segment, upper-cased with
- * underscores: that is the rule the 30 constants did not follow and now do, so a name always
+ * underscores: that is the rule the path constants did not follow and now do, so a name always
  * says where the message goes.
  *
- * The point of a closed type rather than 30 strings is the dispatch in `MessageReceiver` is
+ * The point of a closed type rather than a list of strings is the dispatch in `MessageReceiver` is
  * currently a `when` on a `String`, which the compiler checks for nothing -- an unhandled path
  * is a log line at runtime. On this type the `when` is checked for exhaustiveness, which is the
  * plan §6 Q2 requirement to "define what happens with an unknown message" rather than to log
@@ -33,7 +33,6 @@ enum class WearMessagePath(val wire: String) {
     PROTOCOL("/protocol"),
     SENSOR_CLAIM_STATUS("/sensorclaimstatus"),
     SENSOR_HANDOFF("/sensorhandoff"),
-    SETTINGS("/settings"),
     START("/start"),
     SYNC2_CAL("/sync2/cal"),
     SYNC2_CALCMD("/sync2/calcmd"),
