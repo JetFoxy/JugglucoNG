@@ -563,7 +563,39 @@ private void setCareSenseTime(BluetoothGatt bluetoothGatt) {
     public void onServicesDiscovered(BluetoothGatt gatt, int status) {
         if(doLog)
             Log.i(LOG_ID,"onServicesDiscovered "+status);
+        if(status==GATT_SUCCESS && requestBond(gatt))
+            // bonded() calls discoverServices() again once BOND_BONDED arrives
+            return;
         discover(gatt);
+    }
+
+    // Classic BLE bonding, like xDrip does for the same meters. Glucose meters
+    // keep their glucose characteristic encrypted, so without a bond every read
+    // fails with GATT_INSUFFICIENT_AUTHENTICATION and the meter stays silent.
+    // A meter that is not in pairing mode simply never answers, so fall back to
+    // an unbonded attempt via bonded()'s BOND_NONE branch.
+    private boolean requestBond(BluetoothGatt gatt) {
+        if(hasNordicUartService(gatt))
+            return false; // Satellite does its own PIN authentication over NUS and rejects bonding
+        final var device=gatt.getDevice();
+        final int bondstate=device.getBondState();
+        if(bondstate==BOND_BONDED)
+            return false;
+        if(bondstate==BluetoothDevice.BOND_BONDING)
+            return true; // wait for BOND_BONDED
+        if(doLog) {Log.i(LOG_ID, "createBond(), the meter must be in pairing mode");};
+        return device.createBond();
+    }
+
+    private boolean hasNordicUartService(BluetoothGatt gatt) {
+        final var services=gatt.getServices();
+        if(services==null)
+            return false;
+        for(var service:services) {
+            if(service.getUuid().equals(SatelliteMeterProtocol.SERVICE_UUID))
+                return true;
+            }
+        return false;
     }
 
 
@@ -736,6 +768,12 @@ boolean askDevice() {
                          disconnect();
                         }    
                     } 
+                };break;
+            case BOND_NONE: {
+                // createBond() did not take, try the unbonded reads anyway
+                if(doLog) {Log.i(LOG_ID, "bonded: BOND_NONE");};
+                if(!discovered && mBluetoothGatt!=null)
+                    discover(mBluetoothGatt);
                 };break;
         }
     }
