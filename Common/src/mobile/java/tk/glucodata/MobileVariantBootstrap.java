@@ -56,11 +56,4 @@ public class MobileVariantBootstrap implements VariantBootstrap {
         return true;
     }
 
-    /**
-     * No caller in any compiled source set or in native code, and it differs between the
-     * flavours -- the watch's opens a help dialog. Kept out of the contract and deleted in a
-     * separate one-line PR, so this diff stays about the rename.
-     */
-    static void blockedNum(MainActivity activity) {
-    }
 }

@@ -90,12 +90,4 @@ public class WearVariantBootstrap implements VariantBootstrap {
         return !Natives.getdontuseclose();
     }
 
-    /**
-     * No caller in any compiled source set or in native code, and it differs between the
-     * flavours -- this one opens a help dialog. Kept out of the contract and deleted in a
-     * separate one-line PR, so this diff stays about the rename.
-     */
-    static void blockedNum(MainActivity activity) {
-        help.basehelp(R.string.staticnum, activity, xzy -> { });
-    }
 }
