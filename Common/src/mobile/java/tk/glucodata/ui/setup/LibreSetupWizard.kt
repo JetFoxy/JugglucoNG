@@ -148,7 +148,13 @@ fun LibreSetupWizard(
         if (includeUploadPreference) {
             Natives.setuselibreview(isActive)
         }
-        Natives.setLibreCountry(if (isRussia) 4 else (if (Natives.getunit() == 1) 0 else 1))
+        val currentCountry = Natives.getLibreCountry()
+        val unitCountry = if (Natives.getunit() == 1) 0 else 1
+        Natives.setLibreCountry(
+            if (isRussia) 4
+            else if (currentCountry in 0..3 && (currentCountry and 1) == (unitCountry and 1)) currentCountry
+            else unitCountry
+        )
         Libre3NfcSettings.setMode(nfcCommandMode)
     }
 
