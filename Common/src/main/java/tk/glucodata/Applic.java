@@ -667,20 +667,6 @@ public class Applic extends Application implements androidx.work.Configuration.P
                 break;
         }
     }
-    /*
-     * public static void sendsettings() {
-     * {if(doLog) {Log.i(LOG_ID,"sendsettings");};};
-     * if(!MessageSender.cansend()) {
-     * {if(doLog) {Log.i(LOG_ID,"!cansend()");};};
-     * return;
-     * }
-     * var sender=tk.glucodata.MessageSender.getMessageSender();
-     * if(sender!=null) {
-     * sender.sendsettings();
-     * }
-     * }
-     */
-
     static private boolean MessageReceiverEnabled() {
         if (!isWearable) {
             try {

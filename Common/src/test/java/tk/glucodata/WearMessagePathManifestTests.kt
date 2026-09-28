@@ -20,12 +20,11 @@ import org.junit.Test
  * keeps this check honest — a listed path the device never receives costs
  * nothing, and the receiver already ignores anything meant for the other side.
  *
- * Only these two files are read, because only these two are build inputs. One source set
- * gets one manifest, and `sourceSets` in `Common/build.gradle` adds none for a per-variant
- * copy, so `AndroidManifest.xml.debug` was never an overlay the merger applied — it was a
- * snapshot. Seventeen of those were in the tree, untouched since the initial import and
- * still listing `/settings`; reading one as an overlay is how half an hour goes missing,
- * and the paragraph that used to say they were overlays is the mistake it caused.
+ * Only these two files are read, because only these two are build inputs: one source set
+ * gets one manifest, and `sourceSets` in `Common/build.gradle` declares no per-variant one.
+ * Seventeen `AndroidManifest.xml.*` snapshots from the initial import (`.debug`, `.release`,
+ * `.33`, ...) were deleted in #496; they looked like per-variant overlays and still listed
+ * `/settings`, but no manifest merger ever read them.
  */
 class WearMessagePathManifestTests {
 
@@ -83,11 +82,42 @@ class WearMessagePathManifestTests {
         )
     }
 
+    /**
+     * The other direction: a prefix that names no path in the type.
+     *
+     * The coverage check above cannot see this, because a prefix matching nothing is not a
+     * path that fails to arrive. It is what dropping a path looks like when only the enum and
+     * the receiver are edited: the filter keeps delivering, and the receiver answers `null ->`
+     * with a log line, so the message is not dropped -- it is delivered and refused, which is
+     * a wider filter than the protocol has.
+     */
+    private fun assertNoDeadPrefix(manifest: String) {
+        val prefixes = receiverPrefixes(manifest)
+        val dead = prefixes.filterNot { prefix ->
+            WearMessagePath.entries.any { path ->
+                path.wire == prefix || path.wire.startsWith("$prefix/")
+            }
+        }
+        assertTrue(
+            "$manifest delivers ${dead.sorted()}, which is no path in WearMessagePath — " +
+                "delete the prefix with the path",
+            dead.isEmpty(),
+        )
+    }
+
     @Test
     fun everyHandledPathReachesTheWatch() = assertCovers("src/wear/AndroidManifest.xml")
 
     @Test
     fun everyHandledPathReachesThePhone() = assertCovers("src/mobile/AndroidManifest.xml")
+
+    @Test
+    fun theWatchFilterDeclaresNoPathThatIsNotInTheType() =
+        assertNoDeadPrefix("src/wear/AndroidManifest.xml")
+
+    @Test
+    fun thePhoneFilterDeclaresNoPathThatIsNotInTheType() =
+        assertNoDeadPrefix("src/mobile/AndroidManifest.xml")
 
     /**
      * The typed path set, the declared constants and the receiver's dispatch must be the same
@@ -131,6 +161,12 @@ class WearMessagePathManifestTests {
      * message. The two sides of a pair are updated separately, so the strings are pinned
      * literally, copied from the `_PATH` constants they replaced (#488). Changing one is a
      * protocol change and belongs with a `WearProtocol` version bump, not in a rename.
+     *
+     * `SETTINGS` to `/settings` was the one entry removed rather than frozen (#491): no NG build
+     * ever sent that path -- `sendsettings()` was commented out in the first commit and the
+     * settings bytes travel inside `/start` -- and the Wearable layer only pairs apps with the
+     * same package, so an upstream Juggluco cannot send it to `tk.glucodata.ng` either. Nothing
+     * ever spoke it, so nothing can be broken by dropping it.
      */
     @Test
     fun theWireStringsAreTheOnesOlderBuildsSpeak() {
@@ -149,7 +185,6 @@ class WearMessagePathManifestTests {
             "PROTOCOL" to "/protocol",
             "SENSOR_CLAIM_STATUS" to "/sensorclaimstatus",
             "SENSOR_HANDOFF" to "/sensorhandoff",
-            "SETTINGS" to "/settings",
             "START" to "/start",
             "SYNC2_CAL" to "/sync2/cal",
             "SYNC2_CALCMD" to "/sync2/calcmd",
