@@ -109,23 +109,57 @@ the newer of the two wins. That is a fact about the tie-break, not a proof of or
 
 ### Clock rollback
 
-**Not established, and with no concrete example yet.** One pressure is visible:
+There is a **forward** guard, and it is duplicated. `MIN_REASONABLE_TIMESTAMP_MS` and
+`MAX_FUTURE_TIMESTAMP_DRIFT_MS` are each declared twice with identical values --
+`946684800000` (2000-01-01T00:00:00Z) and 10 minutes -- once in `VirtualGlucoseSensorBridge`
+(lines 29 and 30) and once in `ApiGlucoseSourceManager` (lines 44 and 45). Each file then applies
+both bounds to its own acceptance check. So the timestamp-sanity policy is two copies of one rule,
+and changing one does not change the other. Worth recording as a policy fact rather than a code
+change: the rule itself is coherent, its placement is not.
 
-- `DisplayDataState` clamps `ageMillis` at 0 (`coerceAtLeast(0L)`), so a reading dated in the
-  future is treated as brand new rather than rejected. Whether that is the intended reading of a
-  forward clock jump is worth deciding explicitly, because "fresh" and "impossible" currently
-  produce the same answer.
+Past the bounds, there is no central handling. A reading is accepted when its timestamp falls
+inside the window, and a wall-clock rollback is not detected anywhere in shared code: the searches
+for rollback, clock-change and backward-time handling find nothing, and the only rollback logic in
+the tree is `AnytimeBleManager`'s `GLUCOSE_ID_ROLLBACK_RESET_THRESHOLD`, which is a **sensor
+glucose-id** counter rolling back, not the clock. #424 is the tracked instance of the general
+problem, for one driver.
 
-An earlier draft of this file claimed `dontuseclose` was a timestamp in the settings block. It is
-not: `settings.hpp:315` declares it as a one-bit boolean, `bool dontuseclose : 1`. It appears in
-this file only as an example of a cache being a second writer, under "what counts as a duplicate".
+The consequences follow from the guards rather than from a policy. A clock rolled **back** leaves
+timestamps inside the window and inside the past, so they are accepted and sort *before* existing
+rows, and `DisplayDataState` reports them as stale because `ageMillis` is large. A clock rolled
+**forward** is caught: beyond ten minutes the reading is rejected, and `pruneFutureHistory` plus
+`reportIfFutureTimestamp` remove and report rows past that point. So the asymmetric handling is
+currently *forward-drift-aware and backward-drift-blind*, and the residual question is what a
+rolled-back clock should do to readings taken during the affected window -- reject them, or accept
+and re-anchor them.
 
 ### Reconciliation
 
-`DisplayDataState` is the only reconciliation step I could point at in shared code, and it is a
-freshness classification, not a merge. For the watch, reconciliation is instead a *sync*: it
-receives data and has no writer (see the table). For clone recovery, reconciliation is the
-`CloneRecoveryImportLedger`, whose semantics are **not established**.
+Two mechanisms, and only one of them is a merge.
+
+**Tombstones are how history reconciles against re-imports.** `history_deleted_readings` holds
+(`timestamp`, `sensorSerial`, `deletedAt`) rows, and every batch write runs
+`filterDeletedReadings` before it writes, so a re-sync or a clone import cannot resurrect a reading
+that was deliberately deleted. `CloneGlucoseRecoveryStore` advances tombstones by comparing
+`afterDeletedAt` against the last one, tombstones travel in clone records and in the outbound
+journal snapshot, and `ExportPackageExporter` emits them. The point of the table is that deletion
+is itself data: without it, any source that still has the reading would put it back on the next
+import.
+
+**Provenance is reconciled before the write, not after.** On the batch path the existing row is read
+by (`sensorSerial`, `timestamp`) and folded in through `HistorySourceProvenance.stableSource` and
+`stableFirstStoredAt`, so `source` and `firstStoredAt` survive a `REPLACE` while the measurement
+columns are overwritten. This is the take-over behaviour described under the live-reading row.
+
+**A live-versus-history reconciliation exists but is a freshness rule, not a merge.**
+`DisplayDataState` takes `maxOf(currentTimestampMillis, latestHistoryTimestampMillis)` and classifies
+the result as no-sensor / awaiting / fresh / stale against `Notify.glucosetimeout`. The tie-break
+is "newest wins", which is a policy statement and not an averaging or a preference.
+
+The asymmetry worth recording: clone-imported deletions are **soft**, and a user-driven
+`HistoryDao.deleteForSensor` is a **hard** `DELETE` that writes no tombstone. So a deleted-by-user
+reading is protected from nothing on a later import, and only clone-sourced deletions carry the
+guarantee. Whether that is intended is open.
 
 ### Deletion
 
