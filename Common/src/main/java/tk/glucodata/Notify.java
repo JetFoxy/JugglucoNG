@@ -3485,6 +3485,11 @@ public class Notify {
     // UPDATE METHOD
     public Notification makearrownotification(int draw, float glvalue, String message, notGlucose glucose, String type,
             boolean once) {
+        return makearrownotification(draw, glvalue, message, glucose, type, once, null);
+    }
+
+    private Notification makearrownotification(int draw, float glvalue, String message, notGlucose glucose,
+            String type, boolean once, CurrentDisplaySource.Snapshot startupSnapshot) {
         // 1. Determine Arrow
         float rate = glucose.rate;
 
@@ -3493,10 +3498,12 @@ public class Notify {
         // 2. Build Chart
         long endT = System.currentTimeMillis();
         long startT = endT - 3 * 60 * 60 * 1000L;
-        boolean isMmol = Applic.unit == 1; // Check user unit preference
-        final String activeSensorSerial = NotificationHistorySource.resolveSensorSerial(resolvePrimarySensorName());
+        boolean isMmol = startupSnapshot != null ? startupSnapshot.isMmol() : Applic.unit == 1;
+        final String activeSensorSerial = startupSnapshot != null ? startupSnapshot.getSensorId()
+                : NotificationHistorySource.resolveSensorSerial(resolvePrimarySensorName());
 
-        final CurrentDisplaySource.Snapshot resolvedDisplay = GLUCOSENOTIFICATION.equals(type)
+        final CurrentDisplaySource.Snapshot resolvedDisplay = startupSnapshot != null ? startupSnapshot
+                : GLUCOSENOTIFICATION.equals(type)
                 ? resolveNotificationCurrentSnapshot(activeSensorSerial)
                 : null;
 
@@ -3520,7 +3527,7 @@ public class Notify {
 
         // Status Logic & ViewMode extraction
         String statusText = "";
-        int viewMode = 0; // Default
+        int viewMode = startupSnapshot != null ? startupSnapshot.getViewMode() : 0;
 
         if (activeSensorSerial != null && SensorBluetooth.blueone != null) {
             synchronized (SensorBluetooth.gattcallbacks) {
@@ -3532,7 +3539,7 @@ public class Notify {
                 }
             }
         }
-        if (viewMode == 0) {
+        if (startupSnapshot == null && viewMode == 0) {
             viewMode = resolveSensorViewMode(activeSensorSerial);
         }
 
@@ -4268,16 +4275,15 @@ public class Notify {
             if (ongoing != null) ongoing.updateStatus(Applic.app, glucosenotificationid);
             notificationManager.notify(glucosealarmid, notif);
         } else {
-            if (keeprunning.theservice != null) {
-                keeprunning.theservice.startForeground(glucosenotificationid, notif);
-            } else {
-                notificationManager.notify(glucosenotificationid, notif);
+            synchronized (foregroundPublicationLock) {
+                if (keeprunning.theservice != null) {
+                    keeprunning.theservice.startForeground(glucosenotificationid, notif);
+                } else {
+                    notificationManager.notify(glucosenotificationid, notif);
+                }
+                startupPendingTicket = 0L;
+                startupPendingService = null;
             }
-        }
-        // A successful foreground publication supersedes any pending startup
-        // restore; a new foreground entry issues a fresh ticket for its restore.
-        synchronized (foregroundPublicationLock) {
-            startupPendingTicket = 0L;
         }
     }
     // static final long glucosetimeout=1000*60*3;
@@ -4408,15 +4414,19 @@ public class Notify {
     private static final Object foregroundPublicationLock = new Object();
     private static long startupTicketCounter = 0L;
     private static long startupPendingTicket = 0L;
+    private static Service startupPendingService;
 
     /**
      * Invalidates any pending startup restore. keeprunning.stopper/onDestroy call
      * this under the publication gate before stopping, so a restore can never
      * publish after its service is gone.
      */
-    static void invalidateStartupRestore() {
+    static void invalidateStartupRestore(Service service) {
         synchronized (foregroundPublicationLock) {
-            startupPendingTicket = 0L;
+            if (startupPendingService == service) {
+                startupPendingTicket = 0L;
+                startupPendingService = null;
+            }
         }
     }
 
@@ -4441,13 +4451,14 @@ public class Notify {
         // placeholder (truthful loading state, no reading, no chart, no connection
         // claim, no fabricated timestamp). The heavy Room/history/chart restore is
         // enqueued afterwards and never precedes service promotion.
+        final Notification placeholder = makeRestoreStatusNotification(app.getString(R.string.loading_data));
         final long ticket;
         synchronized (foregroundPublicationLock) {
+            startForegroundService(service, glucosenotificationid, placeholder);
             ticket = ++startupTicketCounter;
             startupPendingTicket = ticket;
+            startupPendingService = service;
         }
-        startForegroundService(service, glucosenotificationid,
-                makeRestoreStatusNotification(app.getString(R.string.loading_data)));
         // The ticket and target service are captured immutably at enqueue time: an
         // old dequeued invocation can never adopt a newer epoch.
         final Service target = service;
@@ -4477,17 +4488,9 @@ public class Notify {
      * current reading (waiting, no sensor).
      */
     private Notification makeRestoreStatusNotification(String message) {
-        // Built directly (no content/delete intents): the placeholder is replaced
-        // by the restore or the next genuine update, and this keeps the startup
-        // region free of the pending-intent chain.
-        final Notification.Builder builder;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            builder = new Notification.Builder(app, GLUCOSENOTIFICATION);
-        } else {
-            builder = new Notification.Builder(app);
-        }
+        final Notification.Builder builder = mkbuilder(GLUCOSENOTIFICATION);
         builder.setSmallIcon(R.drawable.novalue).setOnlyAlertOnce(true)
-                .setContentTitle(message).setShowWhen(false).setOngoing(true);
+                .setContentTitle(message).setWhen(0L).setShowWhen(false).setOngoing(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             builder.setVisibility(VISIBILITY_PUBLIC);
             builder.setCategory(Notification.CATEGORY_SERVICE);
@@ -4534,7 +4537,7 @@ public class Notify {
                 final notGlucose legacy = toLegacyGlucose(snapshot);
                 final Notification notif = makearrownotification(
                         FOREGROUND_GLUCOSE_NOTIFICATION_KIND, value, message, legacy,
-                        GLUCOSENOTIFICATION, true);
+                        GLUCOSENOTIFICATION, true, snapshot);
                 // Final check and publication are atomic under the gate: a genuine
                 // foreground publication in between invalidates instead of being
                 // overwritten. No history or rendering happens under this lock.
@@ -4544,6 +4547,7 @@ public class Notify {
                     }
                     target.startForeground(glucosenotificationid, notif);
                     startupPendingTicket = 0L;
+                    startupPendingService = null;
                 }
                 return;
             }
@@ -4578,7 +4582,8 @@ public class Notify {
     }
 
     private String staleMessage(long actualMillis) {
-        return Applic.getContext().getString(R.string.nonewvalue) + timef.format(actualMillis);
+        return Applic.getContext().getString(R.string.nonewvalue)
+                + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT, usedlocale).format(actualMillis);
     }
 
     /** Visual-only status publication under the gate; never alerts or mirrors. */
@@ -4590,6 +4595,7 @@ public class Notify {
             }
             target.startForeground(glucosenotificationid, notif);
             startupPendingTicket = 0L;
+            startupPendingService = null;
         }
     }
 
@@ -4606,6 +4612,7 @@ public class Notify {
                     NotificationStartupPolicy.resolveHeaderWhenMillis(displayedReadingMillis));
             builder.setShowWhen(true);
         } else {
+            builder.setWhen(0L);
             builder.setShowWhen(false);
         }
     }

@@ -267,7 +267,7 @@ class NotificationStartupRestoreTests {
         val w = thread { drainOne(h) }
         poll(5000) { get(h, "resolverEntered") as Boolean }
         // Exactly what keeprunning.stopper/onDestroy call, under the same gate.
-        staticCall("invalidateStartupRestore")
+        staticCall("invalidateStartupRestore", svc)
         call(h, "openGate", "resolver")
         w.join(5000)
         assertFalse(w.isAlive)
@@ -288,6 +288,47 @@ class NotificationStartupRestoreTests {
         assertTrue(drainOne(h))
         assertEquals(2, serviceCalls(svc).size)
         assertEquals(1, get(h, "renderCalls") as Int)
+    }
+
+    @Test fun destroyingOldServiceDoesNotCancelReplacementRestore() {
+        val h = harness()
+        set(h, "cannedSnapshot", snapshotAt(System.currentTimeMillis() - 20_000L))
+        val old = newService(h)
+        val replacement = newService(h)
+        foregroundno(h, old)
+        foregroundno(h, replacement)
+        staticCall("invalidateStartupRestore", old)
+        assertTrue(drainOne(h))
+        assertTrue(drainOne(h))
+        assertEquals(1, serviceCalls(old).size)
+        assertEquals(2, serviceCalls(replacement).size)
+    }
+
+    @Test fun placeholderRestoreAndGenuinePostsSharePublicationGate() {
+        val h = harness()
+        set(h, "cannedSnapshot", snapshotAt(System.currentTimeMillis() - 20_000L))
+        val svc = newService(h)
+        foregroundno(h, svc)
+        assertTrue(drainOne(h))
+        call(h, "setCurrentService", svc)
+        fornotify(h, newNotification(h))
+        assertEquals(listOf(true, true, true), nestField(svc, "publicationLocks").get(svc))
+        call(h, "setCurrentService", null)
+        fornotify(h, newNotification(h))
+        val manager = get(h, "notificationManager")!!
+        assertTrue(nestField(manager, "publicationHeldLock").getBoolean(manager))
+    }
+
+    @Test fun startupRendererUsesClassifiedSnapshotWithoutResolvingAgain() {
+        val h = harness()
+        val readingTime = System.currentTimeMillis() - 20_000L
+        set(h, "cannedSnapshot", snapshotAt(readingTime, 110f))
+        set(h, "subsequentSnapshot", snapshotAt(readingTime - 600_000L, 180f))
+        val svc = newService(h)
+        foregroundno(h, svc)
+        assertTrue(drainOne(h))
+        assertEquals("the startup renderer must use the classified snapshot", 1, get(h, "resolverCalls"))
+        assertEquals(readingTime, get(h, "renderedSnapshotTime"))
     }
 
     @Test fun wearKeepsSynchronousPathWithoutPlaceholderOrQueue() {
@@ -409,6 +450,9 @@ class NotificationStartupRestoreTests {
             val fnClose = source.lastIndexOf("\n    }", fnEndAnchor)
             check(fnClose > fnStart) { "fornotify close brace missing" }
             val fornotifyBody = source.substring(fnStart + fnSig.length, fnClose)
+            val displayStart = source.indexOf("final CurrentDisplaySource.Snapshot resolvedDisplay =")
+            check(displayStart >= 0)
+            val displaySelection = source.substring(displayStart, source.indexOf(';', displayStart) + 1)
             val dir = java.nio.file.Files.createTempDirectory("notify-startup-restore-test").toFile()
             val file = File(dir, "NotifyStartupHarness.java")
             file.writeText("""
@@ -445,6 +489,8 @@ class NotificationStartupRestoreTests {
                     public int resolverCalls = 0;
                     public boolean resolverThrow = false;
                     public CurrentDisplaySource.Snapshot cannedSnapshot = null;
+                    public CurrentDisplaySource.Snapshot subsequentSnapshot = null;
+                    public long renderedSnapshotTime;
                     public List<GlucosePoint> history = new ArrayList<>();
                     public int historyCalls = 0;
                     public boolean historyThrow = false;
@@ -489,7 +535,9 @@ class NotificationStartupRestoreTests {
                         public static NotifyStartupHarness owner;
                         public List<String> calls = new ArrayList<>();
                         public Notification last;
+                        public List<Boolean> publicationLocks = new ArrayList<>();
                         public void startForeground(int id, Notification n) {
+                            publicationLocks.add(Thread.holdsLock(foregroundPublicationLock));
                             calls.add("fg:" + id);
                             owner.events.add("fg:" + id);
                             last = n;
@@ -508,7 +556,7 @@ class NotificationStartupRestoreTests {
                         public boolean startup = false;
                         public boolean rendered = false;
                         public String category;
-                        public long when = 0L;
+                        public long when = 123L;
                         public int flags = 0;
                         static class Builder {
                             Notification n = new Notification();
@@ -543,7 +591,11 @@ class NotificationStartupRestoreTests {
                     static class FakeManager {
                         public List<String> calls = new ArrayList<>();
                         public Notification last;
-                        void notify(int id, Notification n) { calls.add("notify:" + id); last = n; }
+                        public boolean publicationHeldLock;
+                        void notify(int id, Notification n) {
+                            publicationHeldLock = Thread.holdsLock(foregroundPublicationLock);
+                            calls.add("notify:" + id); last = n;
+                        }
                     }
                     static class GlucoseUpdateBroadcaster {
                         public static NotifyStartupHarness owner;
@@ -596,6 +648,7 @@ class NotificationStartupRestoreTests {
                     }
                     public void resetStatics() {
                         startupPendingTicket = 0L;
+                        startupPendingService = null;
                         startupTicketCounter = 0L;
                         broadcastSends = 0;
                         stackCalls = 0;
@@ -603,6 +656,7 @@ class NotificationStartupRestoreTests {
                         keeprunning.started = false;
                         Build.VERSION.SDK_INT = 34;
                     }
+                    public void setCurrentService(Service service) { keeprunning.theservice = service; }
                     public void openGate(String which) { setGate(which, true); }
                     public void closeGate(String which) { setGate(which, false); }
                     void setGate(String which, boolean open) {
@@ -632,7 +686,7 @@ class NotificationStartupRestoreTests {
                         events.add("resolve");
                         awaitGate("resolver");
                         if (resolverThrow) throw new RuntimeException("resolver down");
-                        return cannedSnapshot;
+                        return resolverCalls > 1 && subsequentSnapshot != null ? subsequentSnapshot : cannedSnapshot;
                     }
                     long latestNotificationTimestamp(List<GlucosePoint> points) {
                         long latest = 0L;
@@ -643,7 +697,11 @@ class NotificationStartupRestoreTests {
                         return s == null ? null : new notGlucose(s.getTimeMillis());
                     }
                     Notification makearrownotification(int kind, float value, String message,
-                            notGlucose glucose, String type, boolean once) {
+                            notGlucose glucose, String type, boolean once,
+                            CurrentDisplaySource.Snapshot startupSnapshot) {
+                        final String activeSensorSerial = sensorSerial;
+                        $displaySelection
+                        renderedSnapshotTime = resolvedDisplay == null ? 0L : resolvedDisplay.getTimeMillis();
                         renderCalls++;
                         renderEntered = true;
                         events.add("render");
@@ -668,6 +726,7 @@ class NotificationStartupRestoreTests {
                     void startForegroundService(Service s, int id, Notification n) {
                         s.startForeground(id, n);
                     }
+                    Notification.Builder mkbuilder(String type) { return new Notification.Builder(app, type); }
                     $region
                     public void fornotify(Notification notif) {
                         $fornotifyBody
