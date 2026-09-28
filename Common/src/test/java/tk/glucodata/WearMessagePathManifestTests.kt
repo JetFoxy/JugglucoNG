@@ -20,13 +20,11 @@ import org.junit.Test
  * keeps this check honest — a listed path the device never receives costs
  * nothing, and the receiver already ignores anything meant for the other side.
  *
- * Only these two files are read, because only these two are build inputs. `sourceSets`
- * in `Common/build.gradle` adds no source set for `AndroidManifest.xml.debug`, `.release`,
- * `.33`, `.pre33`, `.preflash`, `.convchange` or `.bak`, so no manifest merger sees them:
- * the merged `wearDebug` filter has exactly the base file's prefixes. Those copies date from
- * the initial import and still list `/settings`, so they are not per-variant overlays and a
- * change does not have to be repeated in them — but reading one as if it were one is how
- * half an hour goes missing.
+ * Only these two files are read, because only these two are build inputs: one source set
+ * gets one manifest, and `sourceSets` in `Common/build.gradle` declares no per-variant one.
+ * Seventeen `AndroidManifest.xml.*` snapshots from the initial import (`.debug`, `.release`,
+ * `.33`, ...) were deleted in #496; they looked like per-variant overlays and still listed
+ * `/settings`, but no manifest merger ever read them.
  */
 class WearMessagePathManifestTests {
 
