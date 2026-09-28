@@ -81,7 +81,7 @@ object WearSync2 {
                 buf.put(VERSION.toByte())
                 buf.put(serialBytes.size.toByte())
                 buf.put(serialBytes)
-                MessageSender.sendSyncMessage(MessageSender.SYNC2_REMOVE_PATH, buf.array())
+                MessageSender.sendSyncMessage(WearMessagePath.SYNC2_REMOVE, buf.array())
                 if (doLog) Log.i(LOG_ID, "pushed removal of $serial")
             }.onFailure { Log.stack(LOG_ID, "pushRemoval", it) }
         }
@@ -331,7 +331,7 @@ object WearSync2 {
             val raw10 = triples[base + 2].toInt()
             buf.putInt(if (GlucoseValuePlausibility.isPlausibleMgdl(raw10 / 10f)) raw10 else 0)
         }
-        return MessageSender.sendSyncMessageAwait(MessageSender.SYNC2_CHUNK_PATH, buf.array())
+        return MessageSender.sendSyncMessageAwait(WearMessagePath.SYNC2_CHUNK, buf.array())
     }
 
 
@@ -375,7 +375,7 @@ object WearSync2 {
             rawIntegration = WearCalibrationMode(canonicalIntegrationAnchors(serial, true)),
         )
         MessageSender.sendSyncMessage(
-            MessageSender.SYNC2_CAL_PATH,
+            WearMessagePath.SYNC2_CAL,
             WearCalibrationPayload.encode(payload),
         )
     }
@@ -427,7 +427,7 @@ object WearSync2 {
                 val buf = ByteBuffer.allocate(9)
                 buf.put(VERSION.toByte())
                 buf.putLong(fromSec)
-                MessageSender.sendSyncMessage(MessageSender.SYNC2_REQ_PATH, buf.array())
+                MessageSender.sendSyncMessage(WearMessagePath.SYNC2_REQ, buf.array())
                 if (doLog) Log.i(LOG_ID, "requested sync from $fromSec")
             }.onFailure { Log.stack(LOG_ID, "requestSync", it) }
         }

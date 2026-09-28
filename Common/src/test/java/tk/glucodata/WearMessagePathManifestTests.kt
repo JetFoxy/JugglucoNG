@@ -1,6 +1,7 @@
 package tk.glucodata
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,17 +31,21 @@ class WearMessagePathManifestTests {
 
     private fun source(relative: String) = File(moduleRoot, relative)
 
-    private fun declaredPaths(): Map<String, String> {
-        val text = source("src/main/java/tk/glucodata/MessageSender.kt").readText()
-        return Regex("""const val (\w*PATH)\s*=\s*"([^"]+)"""")
-            .findAll(text)
-            .associate { it.groupValues[1] to it.groupValues[2] }
-    }
+    /**
+     * The paths, from the one place they now live.
+     *
+     * This used to parse `const val ..._PATH = "..."` out of MessageSender with a regex. It does
+     * not any more, because those constants are gone: the strings moved into WearMessagePath, and
+     * leaving the test reading a source pattern that no longer exists would have made it pass
+     * vacuously -- a test that finds nothing to check is worse than no test.
+     */
+    private fun declaredPaths(): Map<String, String> =
+        WearMessagePath.entries.associate { it.name to it.wire }
 
     private fun handledPaths(): List<String> {
         val declared = declaredPaths()
         val text = source("src/main/java/tk/glucodata/MessageReceiver.kt").readText()
-        return Regex("""MessageSender\.(\w*PATH)\s*->""")
+        return Regex("""WearMessagePath\.(\w+)\s*->""")
             .findAll(text)
             .mapNotNull { declared[it.groupValues[1]] }
             .distinct()
@@ -76,6 +81,86 @@ class WearMessagePathManifestTests {
 
     @Test
     fun everyHandledPathReachesThePhone() = assertCovers("src/mobile/AndroidManifest.xml")
+
+    /**
+     * The typed path set, the declared constants and the receiver's dispatch must be the same
+     * set, today and after the constants are removed.
+     *
+     * This test is the reason the type can be introduced before anything uses it. The rest of
+     * this class reads the paths by regex out of two source files, so it would stop being a guard
+     * the moment the constants go away -- the `when` would then be reading a type that nothing
+     * cross-checks, and a wrong `wire` string would be green in a debug build and wrong on a
+     * device. So the comparison is anchored on whichever side still exists: this runs now, against
+     * the constants, and it runs again once the receiver dispatches on the type.
+     */
+    @Test
+    fun theTypedPathsMatchTheReceiverDispatch() {
+        val typed = WearMessagePath.entries.map { it.wire }
+        assertEquals(
+            "every path in the type must be dispatched in MessageReceiver; the when is on the " +
+                "type now, so the compiler enforces coverage of the enum, and this enforces " +
+                "that every enum entry means a path the receiver acts on",
+            typed.toSet(),
+            handledPaths().toSet(),
+        )
+        assertEquals(
+            "the receiver must not dispatch a path that is not in the type",
+            handledPaths().toSet().intersect(typed.toSet()),
+            handledPaths().toSet(),
+        )
+        assertEquals(
+            "no duplicate wire strings, or fromWire cannot resolve an entry",
+            typed.size,
+            typed.toSet().size,
+        )
+    }
+
+    /**
+     * The wire strings are the protocol, and they are frozen.
+     *
+     * Every other check here compares the type with this build's own receiver and manifests, so
+     * a typo in a `wire` string would move sender, receiver and the check together and stay
+     * green -- while a watch or phone still running the previous build stops understanding that
+     * message. The two sides of a pair are updated separately, so the strings are pinned
+     * literally, copied from the `_PATH` constants they replaced (#488). Changing one is a
+     * protocol change and belongs with a `WearProtocol` version bump, not in a rename.
+     */
+    @Test
+    fun theWireStringsAreTheOnesOlderBuildsSpeak() {
+        val frozen = mapOf(
+            "ASKFORSTART" to "/askforstart",
+            "BLUETOOTH" to "/bluetooth",
+            "CALIBRATE" to "/calibrate",
+            "DATA" to "/data",
+            "DEFAULTS" to "/defaults",
+            "DISPLAY_PREFS" to "/displayprefs",
+            "DISPLAY_PREFS_MAINSENSOR" to "/displayprefs/mainsensor",
+            "DISPLAY_PREFS_REQ" to "/displayprefs/req",
+            "GLUCOSE_COLORS" to "/glucosecolors",
+            "MESSAGES" to "/messages",
+            "NETINFO" to "/netinfo",
+            "PROTOCOL" to "/protocol",
+            "SENSOR_CLAIM_STATUS" to "/sensorclaimstatus",
+            "SENSOR_HANDOFF" to "/sensorhandoff",
+            "SETTINGS" to "/settings",
+            "START" to "/start",
+            "SYNC2_CAL" to "/sync2/cal",
+            "SYNC2_CALCMD" to "/sync2/calcmd",
+            "SYNC2_CHUNK" to "/sync2/chunk",
+            "SYNC2_JOURNAL_CMD" to "/sync2/journal/cmd",
+            "SYNC2_JOURNAL_DATA" to "/sync2/journal",
+            "SYNC2_JOURNAL_REQ" to "/sync2/journal/req",
+            "SYNC2_OWN" to "/sync2/own",
+            "SYNC2_REMOVE" to "/sync2/remove",
+            "SYNC2_REQ" to "/sync2/req",
+            "TOGGLES" to "/toggles",
+            "TOGGLES_REQ" to "/toggles/req",
+            "TOGGLES_SET" to "/toggles/set",
+            "WAKE" to "/wake",
+            "WAKESTREAM" to "/wakestream",
+        )
+        assertEquals(frozen, WearMessagePath.entries.associate { it.name to it.wire })
+    }
 
     @Test
     fun thePathsThisTestReadsAreActuallyThere() {
