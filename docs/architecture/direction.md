@@ -43,6 +43,54 @@ Existing project rules that already applied before this document and still apply
 
 ---
 
+## 1.5 Where the plan actually stands
+
+Checked against the tree and the PR list on 2026-09-28. Read this before trusting the wording
+further down: several items describe prerequisites that were already built, and one counted wrong.
+
+| Plan item | Status | Evidence |
+| --- | --- | --- |
+| §2.1 T0.0-T0.2, green suites on both flavours | **done** | #373, #374, #375 merged |
+| §2.2 T5.1 first batch | **superseded** by the registration-seams recipe; per-PR state not re-verified in this pass | -- |
+| §2.3 T0.3 architecture gate | **done** | #386 merged; `ArchitectureGateTests` runs on both flavours |
+| §2.4 SettingsStore (#387-#397) | **closed, never merged** | #387 and #397 closed; neither `SettingKey` nor `SettingsStore` exists in the tree |
+| §4 category P, phone-only by design | **done** | #459, #461, #469; the pilot and the batches are in |
+| §4 category S, two real implementations | **done** | #469, #472, #473, #477, #481 |
+| §4 category R, reached by reflection | **done** | `ComposeHostKt` is gone, `ComposeHostAccess` replaced it |
+| §4 category W, the watch should get the feature | **not started** -- this is Q3 | -- |
+| §5 Room migration harness | **built** | migrations run to 30; `HistoryDatabase.isCompatibleAtStartup` gates startup |
+| §6 Q1 registration seams instead of reflection | **done** | `Class.forName` in `src/main` is 1, and it is the exclusion §6 Q1 names: `Log.java:197` |
+| §6 Q2 typed phone-watch protocol | **mostly done; the plan's framing is stale** | see below |
+| §6 Q3 D1 watch features | **not started** | needs the Nightscout-ownership and secret decisions |
+| §6 Q4 category S duplicates | **done, allow-list ends at three by decision** | #469, #472, #473, #477, #481; the floor is set in #475 |
+| §6 Q5 storage-ownership document | **first pass merged, four passes open** | #478 merged; #480-#484 open |
+
+### On Q2 specifically
+
+Q2's two lessons and its stated starting point are **already in the code**, and the code cites Q2
+by name where it did them. This section is stale about all of it.
+
+- **The settings-registry pilot is done.** `SettingsRegistry` holds 13 definitions,
+  `SettingScope.MIRRORED` marks the mirrored ones, and `WearPrefsSync` is generated from
+  `[mirrored]` rather than keeping its own list -- which is what this section asks for. #467 is
+  merged as well ("refuse a payload you cannot read, and pin the three version policies").
+- **Lesson 1, a mismatched build must be visible, is implemented.** `MessageReceiver.kt:73` has
+  the handshake advertising the protocol version and logging a mismatch; `WearProtocol.kt:63`
+  names it as lesson 1. `WearPrefsSync` frames its payload with a version line and refuses one
+  from a newer protocol.
+- **Lesson 2, per-sensor payloads must carry the sensor identity, is fixed.**
+  `SyncedWearCalibrationProvider.selectPayload` takes the requested sensor id, then the device's
+  main sensor, and only accepts a single payload when there is no sensor context at all -- the
+  comment records that choosing the highest revision is how a second sensor got the first one's
+  calibration.
+- **The unknown-message rule exists.** `MessageReceiver.kt:343` logs each unknown path once.
+
+What is left is the part the section was always about: **the message paths are still strings**.
+There are **30 of them, not 28**. The remaining work is to type them, generating the manifest from
+the types rather than hand-keeping a list, and -- per this section's own instruction -- to type
+`SensorOwnershipRuntime`'s messages without rewriting the state machine, leaving the clone/mirror
+protocol between phones on its own envelope.
+
 ## 2. Review of the first round
 
 ### 2.1 T0.0–T0.2 (#373, #374, #375) — merge
