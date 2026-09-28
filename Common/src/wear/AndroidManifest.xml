@@ -95,7 +95,6 @@
                 <data android:host="*" android:pathPrefix="/messages" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/netinfo" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/sensorhandoff" android:scheme="wear" />
-                <data android:host="*" android:pathPrefix="/settings" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/start" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/wake" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/wakestream" android:scheme="wear" />

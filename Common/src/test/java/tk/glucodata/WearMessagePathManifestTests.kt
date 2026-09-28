@@ -124,6 +124,12 @@ class WearMessagePathManifestTests {
      * message. The two sides of a pair are updated separately, so the strings are pinned
      * literally, copied from the `_PATH` constants they replaced (#488). Changing one is a
      * protocol change and belongs with a `WearProtocol` version bump, not in a rename.
+     *
+     * `SETTINGS` to `/settings` was the one entry removed rather than frozen (#491): no NG build
+     * ever sent that path -- `sendsettings()` was commented out in the first commit and the
+     * settings bytes travel inside `/start` -- and the Wearable layer only pairs apps with the
+     * same package, so an upstream Juggluco cannot send it to `tk.glucodata.ng` either. Nothing
+     * ever spoke it, so nothing can be broken by dropping it.
      */
     @Test
     fun theWireStringsAreTheOnesOlderBuildsSpeak() {
@@ -142,7 +148,6 @@ class WearMessagePathManifestTests {
             "PROTOCOL" to "/protocol",
             "SENSOR_CLAIM_STATUS" to "/sensorclaimstatus",
             "SENSOR_HANDOFF" to "/sensorhandoff",
-            "SETTINGS" to "/settings",
             "START" to "/start",
             "SYNC2_CAL" to "/sync2/cal",
             "SYNC2_CALCMD" to "/sync2/calcmd",

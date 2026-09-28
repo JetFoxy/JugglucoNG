@@ -214,10 +214,6 @@ class MessageReceiver: WearableListenerService() {
                Notify.mkunitstr(context,Natives.getunit())
                sendnetinfo(messageEvent.getSourceNodeId())
             }
-             WearMessagePath.SETTINGS   -> { //Never used
-                 Natives.ontbytesettings(data)
-                    Notify.mkunitstr(Applic.app,Natives.getunit())
-                }
              WearMessagePath.TOGGLES_REQ -> {
                  if (!isWearable) WearToggleSync.pushTo(messageEvent.sourceNodeId)
                 }

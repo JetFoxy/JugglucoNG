@@ -210,7 +210,6 @@
                 <data android:host="*" android:pathPrefix="/glucosecolors" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/sensorclaimstatus" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/sensorhandoff" android:scheme="wear" />
-                <data android:host="*" android:pathPrefix="/settings" android:scheme="wear" />
                 <data android:host="*" android:pathPrefix="/start" android:scheme="wear" />
 </intent-filter>
         </service>
