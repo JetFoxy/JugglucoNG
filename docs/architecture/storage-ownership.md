@@ -129,11 +129,40 @@ receives data and has no writer (see the table). For clone recovery, reconciliat
 
 ### Deletion
 
-**Not established for every datum.** What deleting a sensor, a treatment, or a history window
-actually removes -- Room rows, native mmap bytes, prefs files, and mirrored watch state -- is
-unverified. This matters more than it looks: the plan's own table says credentials are "never
-exported, never mirrored", so a delete that only clears the phone's rows would leave a secret in
-a prefs file. That needs to be answered before any storage contract exists.
+Traced per driver, and it is **not uniform**. Two different lifetimes for two kinds of
+credential, which is the finding here.
+
+**iCan ties its secret to the sensor.** `ICanHealthRegistry.removeSensor` drops the record set
+and then removes, in one commit, `PREF_AES_KEY_PREFIX`, `PREF_DEVICE_SN_PREFIX`,
+`PREF_AUTH_USER_ID_PREFIX`, `PREF_RECOVERED_USER_ID_PREFIX`, `PREF_AUTH_BYPASS_UNTIL_PREFIX` and
+the two history-edge keys. The AES keys also have hardcoded defaults in `ICanHealthConstants`
+(`DEFAULT_OLD_GLUCOSE_AES_KEY_ASCII` and friends), which are source constants and no deletion
+touches them -- so deleting a sensor removes that sensor's stored key, not the vendor default
+that ships in the binary.
+
+**AiDex does not tie its secret to the sensor.** `AiDexNativeSensorManager.removeSensor` clears
+the main sensor, destroys the BLE manager, drops the entry and persists the shortened list; it
+does not touch `AiDexPairingMaterialFile`, and that class has no delete or remove method at all
+-- only `normalizeSerial`, `encode` and `decode`. The pairing material *is* removable, but by a
+separate manual action: `AiDexKeyManagementScreen`, reached from `SensorCard` with
+`aidex_pairing_key_delete` / `_delete_confirm` / `_deleted`. So a user who removes a sensor and
+never visits that screen keeps that sensor's pairing material on disk.
+
+**History is deletable, and it is reachable.** `HistoryDao.deleteForSensor` deletes
+`history_readings` by serial, called from `HistoryRepository.deleteForSensor` and, from
+`HistorySync.kt:475`, for the serial and for each of its legacy aliases. A second path is the
+fuller one: it deletes the same rows and additionally clears `reading_uncertainty` and the display
+table, and its own comment notes that unlike `deleteForSensor` nothing re-syncs afterwards. The
+`deleteReadingsForSensorAfter` calls in `VirtualGlucoseSensorBridge.pruneFutureHistory` and
+`ICanHealthBleManager` are **not** deletion -- they trim rows past a cutoff (future-dated rows, a
+history boundary), and reading them as deletion would overstate what the code does.
+
+What is still open, and is the reason this section is not finished: no path found removes the
+native mmap bytes for a removed sensor, and no path found coordinates the driver-level removal
+with the Room purge or the watch's copy. The six `removeSensor` implementations (AiDex, Anytime,
+ICan, MQ, Ottai, Sibionics) are per driver, with no shared contract, so "what removal guarantees"
+currently has no single answer -- and the credentials row above shows the two drivers that manage
+a secret already answer it differently.
 
 ## Credentials and per-driver state, deliberately outside the settings registry
 
@@ -181,7 +210,12 @@ recalled:
 - `DisplayDataState` takes `maxOf(current, latestHistory)` and clamps `ageMillis` at 0.
 - Clone recovery's file list is the `CloneRecovery*` / `CloneOutgoingRecovery*` set in `src/main`
   plus the mobile coordinators and bridges.
-- AiDex pairing material has its own file; iCan AES constants live under `drivers/icanhealth/`.
+- AiDex pairing material has its own file, with no delete method; iCan AES keys are per-sensor
+  prefs keys that `ICanHealthRegistry.removeSensor` does remove, plus hardcoded vendor defaults
+  in `ICanHealthConstants` that no deletion reaches.
+- `HistoryDao.deleteForSensor` is reachable from `HistorySync.kt:475`; the
+  `deleteReadingsForSensorAfter` calls in `VirtualGlucoseSensorBridge` and `ICanHealthBleManager`
+  are cutoff trims, not deletion.
 
 Facets marked **not established** were not verified and are not guesses -- they are the open
 questions above. Documentation only: no app code was changed, and no build or device run was
