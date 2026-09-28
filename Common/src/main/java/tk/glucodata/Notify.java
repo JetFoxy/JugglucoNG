@@ -4551,10 +4551,17 @@ public class Notify {
                 }
                 return;
             }
-            // Stale resolved reading: honest status with its actual time in the
-            // text. No numeric value is presented as current; full last-reading
-            // retention stays a later PR.
-            publishStartupStatus(ticket, target, staleMessage(renderedMillis));
+            switch (outcome) {
+                case NO_SENSOR:
+                    publishStartupStatus(ticket, target, app.getString(R.string.no_sensors_connected));
+                    break;
+                case STALE_READING:
+                    publishStartupStatus(ticket, target, staleMessage(renderedMillis));
+                    break;
+                default:
+                    publishStartupStatus(ticket, target, app.getString(R.string.loading_data));
+                    break;
+            }
             return;
         }
         final java.util.List<GlucosePoint> historyPoints = NotificationHistorySource

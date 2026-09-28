@@ -394,6 +394,17 @@ class NotificationStartupRestoreTests {
         assertEquals("No sensors connected", titleOf(lastServiceNotification(svc)))
     }
 
+    @Test fun cachedReadingWithoutSensorIdentityReportsNoSensor() {
+        val h = harness()
+        set(h, "cannedSnapshot", snapshotAt(System.currentTimeMillis() - 60_000L, 150f))
+        set(h, "sensorSerial", null)
+        val svc = newService(h)
+        foregroundno(h, svc)
+        assertTrue(drainOne(h))
+        assertEquals(0, get(h, "renderCalls") as Int)
+        assertEquals("No sensors connected", titleOf(lastServiceNotification(svc)))
+    }
+
     @Test fun historyFailurePropagatesLoggedWithPlaceholderKept() {
         val h = harness()
         set(h, "cannedSnapshot", null)
