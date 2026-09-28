@@ -63,7 +63,7 @@ further down: several items describe prerequisites that were already built, and 
 | §6 Q2 typed phone-watch protocol | **mostly done; the plan's framing is stale** | see below |
 | §6 Q3 D1 watch features | **not started** | needs the Nightscout-ownership and secret decisions |
 | §6 Q4 category S duplicates | **done, allow-list ends at three by decision** | #469, #472, #473, #477, #481; the floor is set in #475 |
-| §6 Q5 storage-ownership document | **first pass merged, four passes open** | #478 merged; #480-#484 open |
+| §6 Q5 storage-ownership document | **all seven facets traced; open questions remain within them** | #478, then #480, #482, #483, #484 and a correction pass |
 
 ### On Q2 specifically
 
