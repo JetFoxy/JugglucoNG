@@ -340,10 +340,13 @@ class MessageReceiver: WearableListenerService() {
                      MessageSender.sendProtocol(messageEvent.sourceNodeId)
                  }
                }
-            else -> {
+            null -> {
                 // A path this build does not handle. Ignoring it is right; doing so in silence is
                 // not, because a message from a mismatched peer then disappears with no trace
                 // (plan §6 Q2). Log each unknown path once.
+                //
+                // `null`, not `else`: with every entry listed and no `else`, the compiler rejects
+                // this `when` the moment WearMessagePath gains an entry nobody dispatches.
                 if (unknownPaths.add(path)) {
                     Log.w(LOG_ID, "ignoring unknown wear message path=$path")
                 }

@@ -115,6 +115,53 @@ class WearMessagePathManifestTests {
         )
     }
 
+    /**
+     * The wire strings are the protocol, and they are frozen.
+     *
+     * Every other check here compares the type with this build's own receiver and manifests, so
+     * a typo in a `wire` string would move sender, receiver and the check together and stay
+     * green -- while a watch or phone still running the previous build stops understanding that
+     * message. The two sides of a pair are updated separately, so the strings are pinned
+     * literally, copied from the `_PATH` constants they replaced (#488). Changing one is a
+     * protocol change and belongs with a `WearProtocol` version bump, not in a rename.
+     */
+    @Test
+    fun theWireStringsAreTheOnesOlderBuildsSpeak() {
+        val frozen = mapOf(
+            "ASKFORSTART" to "/askforstart",
+            "BLUETOOTH" to "/bluetooth",
+            "CALIBRATE" to "/calibrate",
+            "DATA" to "/data",
+            "DEFAULTS" to "/defaults",
+            "DISPLAY_PREFS" to "/displayprefs",
+            "DISPLAY_PREFS_MAINSENSOR" to "/displayprefs/mainsensor",
+            "DISPLAY_PREFS_REQ" to "/displayprefs/req",
+            "GLUCOSE_COLORS" to "/glucosecolors",
+            "MESSAGES" to "/messages",
+            "NETINFO" to "/netinfo",
+            "PROTOCOL" to "/protocol",
+            "SENSOR_CLAIM_STATUS" to "/sensorclaimstatus",
+            "SENSOR_HANDOFF" to "/sensorhandoff",
+            "SETTINGS" to "/settings",
+            "START" to "/start",
+            "SYNC2_CAL" to "/sync2/cal",
+            "SYNC2_CALCMD" to "/sync2/calcmd",
+            "SYNC2_CHUNK" to "/sync2/chunk",
+            "SYNC2_JOURNAL_CMD" to "/sync2/journal/cmd",
+            "SYNC2_JOURNAL_DATA" to "/sync2/journal",
+            "SYNC2_JOURNAL_REQ" to "/sync2/journal/req",
+            "SYNC2_OWN" to "/sync2/own",
+            "SYNC2_REMOVE" to "/sync2/remove",
+            "SYNC2_REQ" to "/sync2/req",
+            "TOGGLES" to "/toggles",
+            "TOGGLES_REQ" to "/toggles/req",
+            "TOGGLES_SET" to "/toggles/set",
+            "WAKE" to "/wake",
+            "WAKESTREAM" to "/wakestream",
+        )
+        assertEquals(frozen, WearMessagePath.entries.associate { it.name to it.wire })
+    }
+
     @Test
     fun thePathsThisTestReadsAreActuallyThere() {
         // Guards the regexes: if the declarations move or change shape, the two

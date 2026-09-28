@@ -231,7 +231,6 @@ private fun nameSendMessageResult(name:String, messagePath: WearMessagePath, dat
     }
 
 private fun nodeSendmessage(node:Node,messagePath: WearMessagePath,data:ByteArray) {
-        val path = messagePath.wire
     nameSendMessage(node.id,messagePath,data);
     }
 
@@ -309,7 +308,6 @@ private fun nodeSendmessage(node:Node,messagePath: WearMessagePath,data:ByteArra
     sendmessage(messagePath,onar)
      } */
     public fun sendbool( messagePath: WearMessagePath,nodeName:String,on:Boolean) {
-        val path = messagePath.wire
         val onbyte:Byte=if(on) 1;else 0;
         val onar:ByteArray= byteArrayOf(onbyte)
        nameSendMessage(nodeName,messagePath,onar)
