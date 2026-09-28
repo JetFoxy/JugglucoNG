@@ -46,11 +46,26 @@ watch is never the authority", which is a rule rather than a compiler-enforced a
 
 ### Identity
 
-A datum is identified by (sensor, kind, time) for readings, and by (kind, primary key) for
-journal and history rows. The plan calls for recording identity per datum; **the time component
-of reading identity is not established** and is the first thing to pin down, because ordering and
-clock rollback both depend on it. There is a standing example of the hazard: #424 exists because
-a phone clock change could make a Chinese-protocol sensor look like it had restarted.
+A history row is identified by **(`sensorSerial`, `timestamp`)**, enforced as a unique index on
+`history_readings` (`HistoryReading.kt:19`); the `@PrimaryKey` is an auto-generated `id`, so the
+identity is the pair, not the row. `HistoryReading` also carries `value`, `rawValue`, nullable
+`rate`, `source` and `firstStoredAt` -- the last being insertion time, which records when the app
+learned of a reading, not when the sensor saw it.
+
+**The resolution of `timestamp` is not uniform across write paths, and this is the part worth
+knowing.** All seven sensor producers arrive through `storeSensorHistoryBatch*`, which ends at
+`storeReadingsReplacingSensorBuckets`, and that path calls
+`HistoryBucketReplacement.collapseReadings(..., SENSOR_MINUTE_BUCKET_MS = 60_000)` before writing.
+It keys on `timestamp / bucketDurationMs` and keeps **one row per 60-second bucket**. The
+single-reading path (`storeReading`) does not collapse, so it can write a sub-minute timestamp.
+
+So a reading's identity is exact to the millisecond on one path and quantised to the minute on the
+other, and the unique index only ever collides on exact equality. A sub-minute row from the single
+path therefore coexists with a bucket row for the same minute instead of replacing it. Which of the
+two happens is decided by the entry point a producer used, not by anything the datum itself asserts
+-- worth settling, because it is the same shape of problem as the take-over case below.
+
+Readings with `timestamp <= 0` are dropped by the collapse rather than stored.
 
 ### Authoritative writer
 
@@ -121,11 +136,23 @@ Recorded, not guessed:
 
 ### Ordering
 
-**Not established, per datum.** The one thing visible from today's code is that freshness is
-already computed in `src/main` by `DisplayDataState`, which takes
-`maxOf(currentTimestampMillis, latestHistoryTimestampMillis)` and classifies the result against
-`Notify.glucosetimeout`. So there is a live-vs-history reconciliation rule, and it is a *max*:
-the newer of the two wins. That is a fact about the tie-break, not a proof of ordering.
+Rows are ordered by `timestamp`, and the secondary index on `(sensorSerial, timestamp)` exists to
+serve that. That much is settled.
+
+**Within a minute there is no order on the batch path**, because `collapseReadings` discards
+sub-minute positions: a bucket yields exactly one row. The choice of which reading represents a
+bucket is a real policy, not an accident -- `choosePreferred` scores each candidate, +10 for a
+finite positive `value` and +5 for a finite positive `rawValue`, and only when the scores tie does
+it fall back to the **later** timestamp. So quality beats recency, and recency is only the
+tiebreak. A minute whose two readings both look valid is represented by the later one; a minute
+where only the raw value is usable keeps the reading that at least has a value.
+
+`firstStoredAt` does not help here: it is when the app stored the row, so on a re-sync it moves for
+a reading whose sensor time did not.
+
+Note that the display layer merges on the same 60-second granularity
+(`HistoryDisplayMerge`, with its own `SENSOR_MINUTE_BUCKET_MS`), which is consistent with the write
+path but for a different reason: display grouping, not storage identity.
 
 ### Clock rollback
 
@@ -241,5 +268,18 @@ recalled:
   are cutoff trims, not deletion.
 
 Facets marked **not established** were not verified and are not guesses -- they are the open
-questions above. Documentation only: no app code was changed, and no build or device run was
+questions above. The identity, ordering, live-reading, duplicates and deletion facets are now
+traced; clock rollback and reconciliation are the two that remain open.
+
+Additional verification for this pass:
+
+- `HistoryReading` declares `@PrimaryKey(autoGenerate = true) id` plus the unique index on
+  `(timestamp, sensorSerial)`, and its own comment gives the reason: the same timestamp from
+  different sensors must coexist.
+- `HistoryBucketReplacement.collapseReadings` keys on `timestamp / bucketDurationMs`, keeps one row
+  per bucket, drops `timestamp <= 0`, and returns them sorted by timestamp.
+- `choosePreferred` scores +10 for a finite positive `value`, +5 for a finite positive `rawValue`,
+  and breaks a tie on the later timestamp.
+- `SENSOR_MINUTE_BUCKET_MS = 60_000` is declared in `HistoryDisplayMerge.kt`, i.e. the display
+  layer's own copy of the same granularity. Documentation only: no app code was changed, and no build or device run was
 performed for this file.
