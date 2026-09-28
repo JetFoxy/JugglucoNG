@@ -236,13 +236,13 @@ private fun nodeSendmessage(node:Node,path:String,data:ByteArray) {
     }
         
     public fun sendnetinfo(data:ByteArray) {
-    sendmessage(NET_PATH,data);
+    sendmessage(NETINFO_PATH,data);
         }
     public fun sendnetinfo( node:Node,data:ByteArray) {
-    nodeSendmessage(node,NET_PATH,data);
+    nodeSendmessage(node,NETINFO_PATH,data);
         }
     public fun sendnetinfo( node:String,data:ByteArray) {
-        nameSendMessage(node,NET_PATH,data);
+        nameSendMessage(node,NETINFO_PATH,data);
         }
     /*
     public fun sendsettings() {
@@ -258,33 +258,33 @@ private fun nodeSendmessage(node:Node,path:String,data:ByteArray) {
      }
     /** Phone: reports the state of the on/off switches the watch can operate. */
     public fun sendToggleState(data:ByteArray) {
-        sendmessage(TOGGLE_STATE_PATH,data)
+        sendmessage(TOGGLES_PATH,data)
      }
     public fun sendToggleState(nodeName:String,data:ByteArray) {
-        nameSendMessage(nodeName,TOGGLE_STATE_PATH,data)
+        nameSendMessage(nodeName,TOGGLES_PATH,data)
      }
     /** Watch: asks the phone to flip a switch. */
     public fun sendToggleCommand(data:ByteArray) {
-        sendmessage(TOGGLE_CMD_PATH,data)
+        sendmessage(TOGGLES_SET_PATH,data)
      }
     /** Watch: asks the phone for the current state of every switch. */
     public fun requestToggles() {
-        sendmessage(TOGGLE_REQ_PATH, byteArrayOf(1))
+        sendmessage(TOGGLES_REQ_PATH, byteArrayOf(1))
      }
     /** Watch: asks the phone to change its sensor selection (primary, or shown/hidden). */
     public fun sendMainSensorCommand(data:ByteArray) {
-        sendmessage(MAIN_SENSOR_CMD_PATH,data)
+        sendmessage(DISPLAY_PREFS_MAINSENSOR_PATH,data)
      }
     /** Watch: asks the phone for the display preferences and colour scheme. */
     public fun requestWearPrefs() {
-        sendmessage(WEAR_PREFS_REQ_PATH, byteArrayOf(1))
+        sendmessage(DISPLAY_PREFS_REQ_PATH, byteArrayOf(1))
      }
     /** Broadcasts the mirrored display preferences (smoothing, prediction). */
     public fun sendWearPrefs(data:ByteArray) {
-        sendmessage(WEAR_PREFS_PATH,data)
+        sendmessage(DISPLAY_PREFS_PATH,data)
      }
     public fun sendWearPrefs(nodeName:String,data:ByteArray) {
-        nameSendMessage(nodeName,WEAR_PREFS_PATH,data)
+        nameSendMessage(nodeName,DISPLAY_PREFS_PATH,data)
      }
     public fun sendbluetooth( node:Node,on:Boolean) {
          sendbluetooth( node.id,on);
@@ -342,18 +342,18 @@ companion object {
     const val WAKE_PATH = "/wake"
     const val WAKESTREAM_PATH = "/wakestream"
     const val PROTOCOL_PATH = "/protocol"
-    const val NET_PATH = "/netinfo"
+    const val NETINFO_PATH = "/netinfo"
     const val START_PATH = "/start"
     const val ASKFORSTART_PATH = "/askforstart"
     const val DEFAULTS_PATH = "/defaults"
     const val SETTINGS_PATH = "/settings"
     const val GLUCOSE_COLORS_PATH = "/glucosecolors"
-    const val WEAR_PREFS_PATH = "/displayprefs"
-    const val WEAR_PREFS_REQ_PATH = "/displayprefs/req"
-    const val MAIN_SENSOR_CMD_PATH = "/displayprefs/mainsensor"
-    const val TOGGLE_STATE_PATH = "/toggles"
-    const val TOGGLE_CMD_PATH = "/toggles/set"
-    const val TOGGLE_REQ_PATH = "/toggles/req"
+    const val DISPLAY_PREFS_PATH = "/displayprefs"
+    const val DISPLAY_PREFS_REQ_PATH = "/displayprefs/req"
+    const val DISPLAY_PREFS_MAINSENSOR_PATH = "/displayprefs/mainsensor"
+    const val TOGGLES_PATH = "/toggles"
+    const val TOGGLES_SET_PATH = "/toggles/set"
+    const val TOGGLES_REQ_PATH = "/toggles/req"
     const val BLUETOOTH_PATH = "/bluetooth"
     const val DATA_PATH = "/data"
     const val MESSAGES_PATH = "/messages"
@@ -363,12 +363,12 @@ companion object {
     const val SYNC2_REQ_PATH = "/sync2/req"
     const val SYNC2_CHUNK_PATH = "/sync2/chunk"
     const val SYNC2_CAL_PATH = "/sync2/cal"
-    const val CALIBRATION_CMD_PATH = "/sync2/calcmd"
+    const val SYNC2_CALCMD_PATH = "/sync2/calcmd"
     const val SYNC2_REMOVE_PATH = "/sync2/remove"
-    const val JOURNAL_REQ_PATH = "/sync2/journal/req"
-    const val JOURNAL_DATA_PATH = "/sync2/journal"
-    const val JOURNAL_CMD_PATH = "/sync2/journal/cmd"
-    const val SENSOR_OWNERSHIP_PATH = "/sync2/own"
+    const val SYNC2_JOURNAL_REQ_PATH = "/sync2/journal/req"
+    const val SYNC2_JOURNAL_DATA_PATH = "/sync2/journal"
+    const val SYNC2_JOURNAL_CMD_PATH = "/sync2/journal/cmd"
+    const val SYNC2_OWN_PATH = "/sync2/own"
     val scope = CoroutineScope(Dispatchers.IO+SupervisorJob()  )
     private var messagesender: MessageSender? = null
     @Volatile private var wearableApiUnavailable = false
