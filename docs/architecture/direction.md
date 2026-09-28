@@ -65,6 +65,20 @@ further down: several items describe prerequisites that were already built, and 
 | §6 Q4 category S duplicates | **done, allow-list ends at three by decision** | #469, #472, #473, #477, #481; the floor is set in #475 |
 | §6 Q5 storage-ownership document | **all seven facets traced; open questions remain within them** | #478, then #480, #482, #483, #484 and a correction pass |
 
+### PR state, as of 2026-09-28
+
+Every PR number cited above is merged unless it is listed here.
+
+- **Merged since this table was written:** #494 — the `/settings` path is gone (29 paths), and
+  `assertNoDeadPrefix` now guards both manifests against a prefix left behind when a path is
+  dropped; #496 — the 17 `AndroidManifest.xml.*` copies no build read are deleted.
+- **Open:** #492 (meter BLE bonding), #495 (the §6 Q2 rewording; its payload-version half is on
+  hold, see the PR).
+- **Closed unmerged:** #452, #453, #454 — the Q2 version pilots. They added versions to the text
+  payloads; #467 superseded them by pinning the version policies that already exist and refusing a
+  payload the build cannot read. #387–#397 — the SettingsStore track of §2.4, never merged, which
+  is why the row above says `SettingKey` and `SettingsStore` do not exist.
+
 ### On Q2 specifically
 
 Q2's two lessons and its stated starting point are **already in the code**, and the code cites Q2
