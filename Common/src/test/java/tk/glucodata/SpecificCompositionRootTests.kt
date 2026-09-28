@@ -237,18 +237,24 @@ class SpecificCompositionRootTests {
     private fun sourceSet(flavour: String): String = if (flavour == "phone") "mobile" else "wear"
 
     /**
-     * No caller in any compiled source set or in native code, and it differs between the
-     * flavours -- the watch's opens a help dialog. Kept out of the contract and deleted in a
-     * separate one-line PR so this diff stays about the rename.
+     * `blockedNum` is gone.
+     *
+     * It had no caller in any compiled source set or in native code, and it was the one member
+     * that differed in kind between the flavours: empty on the phone, a help dialog on the
+     * watch. #477 left it on the bootstrap classes as a static so that the diff would stay about
+     * the rename, and this is the follow-up that removes it.
+     *
+     * Asserted by scanning the tree rather than by checking one file, so the test is a ratchet
+     * instead of a snapshot: if it ever comes back, this is where that shows up.
      */
     @Test
-    fun blockedNumHasNoSharedCaller() {
-        mustContain(phoneBootstrap, "blockedNum(MainActivity activity)", "phone bootstrap")
-        mustContain(watchBootstrap, "blockedNum(MainActivity activity)", "watch bootstrap")
-        assertFalse(
-            "blockedNum is in no contract and is called from nowhere; it is on the bootstrap " +
-                "classes only until its own PR deletes it",
-            contract.contains("blockedNum"),
+    fun blockedNumIsGone() {
+        val remaining = filesMatching(Regex("""\bblockedNum\b"""))
+        assertEquals(
+            "blockedNum is dead code and is not in the contract, so it should be absent " +
+                "entirely; found it in $remaining",
+            emptyList<String>(),
+            remaining,
         )
     }
 
