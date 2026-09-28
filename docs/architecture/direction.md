@@ -71,9 +71,9 @@ Every PR number cited above is merged unless it is listed here.
 
 - **Merged since this table was written:** #494 — the `/settings` path is gone (29 paths), and
   `assertNoDeadPrefix` now guards both manifests against a prefix left behind when a path is
-  dropped.
-- **Open:** #492 (meter BLE bonding), #495 (a version on the two hand-rolled command payloads, plus
-  the §6 Q2 rewording), #496 (delete the 17 manifest copies no build reads).
+  dropped; #496 — the 17 `AndroidManifest.xml.*` copies no build read are deleted.
+- **Open:** #492 (meter BLE bonding), #495 (the §6 Q2 rewording; its payload-version half is on
+  hold, see the PR).
 - **Closed unmerged:** #452, #453, #454 — the Q2 version pilots. They added versions to the text
   payloads; #467 superseded them by pinning the version policies that already exist and refusing a
   payload the build cannot read. #387–#397 — the SettingsStore track of §2.4, never merged, which
