@@ -37,11 +37,13 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
+import android.os.ParcelUuid;
 
 import androidx.annotation.RequiresApi;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -202,6 +204,8 @@ private void addDevice(BluetoothDevice device) {
                  }
          };
 
+private int scanTries=0;
+private static final boolean alwaysfilter=true;
 @SuppressLint("MissingPermission")
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public boolean scanStarter()  {
@@ -212,11 +216,22 @@ public boolean scanStarter()  {
             builder.setReportDelay(0);
             var mScanSettings = builder.build();
            if(doLog) {Log.i(LOG_ID,"start");};
-           if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
-           // Unfiltered, like xDrip: meters do not all advertise the glucose
-           // service (or the Verio one) in their advertisement packets, and a
-           // filtered scan then never shows them in the device list at all.
-           List<ScanFilter> mScanFilters=null;
+           List<ScanFilter> mScanFilters;
+           if(alwaysfilter||scanTries++%2==0) {
+               mScanFilters=new ArrayList<>();
+               if(doLog) {Log.d(LOG_ID,"SCAN: starting scan.");};
+               final UUID GLUCOSE_SERVICE =      UUID.fromString("00001808-0000-1000-8000-00805f9b34fb");
+               ScanFilter.Builder builder2 = new ScanFilter.Builder();
+               builder2.setServiceUuid(new ParcelUuid(GLUCOSE_SERVICE));
+               mScanFilters.add(builder2.build());
+               final var VERIO_F7A1_SERVICE = UUID.fromString("af9df7a1-e595-11e3-96b4-0002a5d5c51b");
+               builder2 = new ScanFilter.Builder();
+               builder2.setServiceUuid(new ParcelUuid(VERIO_F7A1_SERVICE));
+               mScanFilters.add(builder2.build());
+              }
+           else {
+                  mScanFilters=null;
+                  }
             try {
                  mBluetoothLeScanner.startScan(mScanFilters, mScanSettings, mScanCallback);
                  } 
