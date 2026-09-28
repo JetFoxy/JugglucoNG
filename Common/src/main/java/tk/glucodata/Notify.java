@@ -3485,6 +3485,11 @@ public class Notify {
     // UPDATE METHOD
     public Notification makearrownotification(int draw, float glvalue, String message, notGlucose glucose, String type,
             boolean once) {
+        return makearrownotification(draw, glvalue, message, glucose, type, once, null);
+    }
+
+    private Notification makearrownotification(int draw, float glvalue, String message, notGlucose glucose,
+            String type, boolean once, CurrentDisplaySource.Snapshot startupSnapshot) {
         // 1. Determine Arrow
         float rate = glucose.rate;
 
@@ -3493,10 +3498,12 @@ public class Notify {
         // 2. Build Chart
         long endT = System.currentTimeMillis();
         long startT = endT - 3 * 60 * 60 * 1000L;
-        boolean isMmol = Applic.unit == 1; // Check user unit preference
-        final String activeSensorSerial = NotificationHistorySource.resolveSensorSerial(resolvePrimarySensorName());
+        boolean isMmol = startupSnapshot != null ? startupSnapshot.isMmol() : Applic.unit == 1;
+        final String activeSensorSerial = startupSnapshot != null ? startupSnapshot.getSensorId()
+                : NotificationHistorySource.resolveSensorSerial(resolvePrimarySensorName());
 
-        final CurrentDisplaySource.Snapshot resolvedDisplay = GLUCOSENOTIFICATION.equals(type)
+        final CurrentDisplaySource.Snapshot resolvedDisplay = startupSnapshot != null ? startupSnapshot
+                : GLUCOSENOTIFICATION.equals(type)
                 ? resolveNotificationCurrentSnapshot(activeSensorSerial)
                 : null;
 
@@ -3520,7 +3527,7 @@ public class Notify {
 
         // Status Logic & ViewMode extraction
         String statusText = "";
-        int viewMode = 0; // Default
+        int viewMode = startupSnapshot != null ? startupSnapshot.getViewMode() : 0;
 
         if (activeSensorSerial != null && SensorBluetooth.blueone != null) {
             synchronized (SensorBluetooth.gattcallbacks) {
@@ -3532,7 +3539,7 @@ public class Notify {
                 }
             }
         }
-        if (viewMode == 0) {
+        if (startupSnapshot == null && viewMode == 0) {
             viewMode = resolveSensorViewMode(activeSensorSerial);
         }
 
@@ -3901,8 +3908,6 @@ public class Notify {
             GluNotBuilder.setContent(remoteViews);
         }
 
-        GluNotBuilder.setShowWhen(true);
-
         // Standard priority logic
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             GluNotBuilder.setTimeoutAfter(glucosetimeout);
@@ -3923,8 +3928,14 @@ public class Notify {
             }
         }
 
+        // Header timestamp is the reading actually displayed (the preferred resolved
+        // display, including its fallback), never render time and never the blindly
+        // passed incoming argument. Without a valid displayed reading no timestamp
+        // is fabricated: the header time is hidden instead.
+        applyReadingHeaderTimestamp(GluNotBuilder,
+                fallbackDisplay != null ? fallbackDisplay.getTimeMillis() : 0L);
+
         Notification notif = GluNotBuilder.build();
-        notif.when = System.currentTimeMillis();
 
         return notif;
     }
@@ -3976,6 +3987,7 @@ public class Notify {
 
         // Startup Text using the shared current-value resolver.
         CharSequence startupValue = "---";
+        long startupReadingMillis = current != null ? current.getTimeMillis() : 0L;
         if (current != null) {
             startupValue = current.getFullFormatted();
         } else if (!chartPoints.isEmpty()) {
@@ -3985,6 +3997,7 @@ public class Notify {
             // Also check staleness of history
             long now = System.currentTimeMillis();
             if (Math.abs(now - latest.timestamp) < 15 * 60 * 1000L) {
+                startupReadingMillis = latest.timestamp;
                 String vStr = format(usedlocale, pureglucoseformat, latest.value);
 
                 if (viewMode == 3 && latest.rawValue > 0.1f) {
@@ -4008,7 +4021,7 @@ public class Notify {
         Bitmap chartBitmapCollapsed = null;
         Bitmap chartBitmapExpanded = null;
 
-        if (showChart) {
+        if (showChart && (current != null || !chartPoints.isEmpty())) {
             chartPoints = DisplayTrendSource.augmentHistory(chartPoints, current, activeSensorSerial, startT);
             final NotificationPredictionBatch predictionBatch = new NotificationPredictionBatch();
             // Create Safe Context for Startup Notification too
@@ -4223,8 +4236,10 @@ public class Notify {
         } else {
             GluNotBuilder.setContent(remoteViews);
         }
-        GluNotBuilder.setSmallIcon(R.drawable.novalue).setOnlyAlertOnce(true).setContentTitle(message)
-                .setShowWhen(true);
+        GluNotBuilder.setSmallIcon(R.drawable.novalue).setOnlyAlertOnce(true).setContentTitle(message);
+        // The header carries the actual reading shown, if any. With no data no
+        // timestamp is fabricated and no empty chart is rendered as data.
+        applyReadingHeaderTimestamp(GluNotBuilder, startupReadingMillis);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             GluNotBuilder.setVisibility(VISIBILITY_PUBLIC);
             GluNotBuilder.setCategory(Notification.CATEGORY_SERVICE);
@@ -4260,10 +4275,14 @@ public class Notify {
             if (ongoing != null) ongoing.updateStatus(Applic.app, glucosenotificationid);
             notificationManager.notify(glucosealarmid, notif);
         } else {
-            if (keeprunning.theservice != null) {
-                keeprunning.theservice.startForeground(glucosenotificationid, notif);
-            } else {
-                notificationManager.notify(glucosenotificationid, notif);
+            synchronized (foregroundPublicationLock) {
+                if (keeprunning.theservice != null) {
+                    keeprunning.theservice.startForeground(glucosenotificationid, notif);
+                } else {
+                    notificationManager.notify(glucosenotificationid, notif);
+                }
+                startupPendingTicket = 0L;
+                startupPendingService = null;
             }
         }
     }
@@ -4380,18 +4399,79 @@ public class Notify {
         fornotify(getforgroundnotification());
         // notificationManager.notify(glucosenotificationid,getforgroundnotification());
     }
-    public void foregroundno(Service service) {
-        Notification not = getforgroundnotification();
-        if (isWearable) {
-            var ongoing = OngoingNotificationAccess.get();
-            if (ongoing != null) not = ongoing.attach(service, not, glucosenotificationid);
-        }
+
+    private static void startForegroundService(Service service, int id, Notification notif) {
         if (Build.VERSION.SDK_INT >= 29) {
-            service.startForeground(glucosenotificationid, not,
+            service.startForeground(id, notif,
                     android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
         } else {
-            service.startForeground(glucosenotificationid, not);
+            service.startForeground(id, notif);
         }
+    }
+
+    // N1-STARTUP-REGION-BEGIN: extracted by NotificationStartupRestoreTests. Keep this
+    // span free of unrelated members and compilable against stub Android types.
+    private static final Object foregroundPublicationLock = new Object();
+    private static long startupTicketCounter = 0L;
+    private static long startupPendingTicket = 0L;
+    private static Service startupPendingService;
+
+    /**
+     * Invalidates any pending startup restore. keeprunning.stopper/onDestroy call
+     * this under the publication gate before stopping, so a restore can never
+     * publish after its service is gone.
+     */
+    static void invalidateStartupRestore(Service service) {
+        synchronized (foregroundPublicationLock) {
+            if (startupPendingService == service) {
+                startupPendingTicket = 0L;
+                startupPendingService = null;
+            }
+        }
+    }
+
+    public void foregroundno(Service service) {
+        if (isWearable) {
+            // Wear keeps the previous synchronous path for this phone subset: same
+            // attachment, same foreground ID, no placeholder, no async restore.
+            Notification not = getforgroundnotification();
+            var ongoing = OngoingNotificationAccess.get();
+            if (ongoing != null) not = ongoing.attach(service, not, glucosenotificationid);
+            startForegroundService(service, glucosenotificationid, not);
+            {
+                if (doLog) {
+                    Log.i(LOG_ID, "startforeground");
+                }
+                ;
+            }
+            ;
+            return;
+        }
+        // Phone: promote the service immediately with a minimal standard-text
+        // placeholder (truthful loading state, no reading, no chart, no connection
+        // claim, no fabricated timestamp). The heavy Room/history/chart restore is
+        // enqueued afterwards and never precedes service promotion.
+        final Notification placeholder = makeRestoreStatusNotification(app.getString(R.string.loading_data));
+        final long ticket;
+        synchronized (foregroundPublicationLock) {
+            startForegroundService(service, glucosenotificationid, placeholder);
+            ticket = ++startupTicketCounter;
+            startupPendingTicket = ticket;
+            startupPendingService = service;
+        }
+        // The ticket and target service are captured immutably at enqueue time: an
+        // old dequeued invocation can never adopt a newer epoch.
+        final Service target = service;
+        glucoseRefreshHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    restoreStartupNotification(ticket, target);
+                } catch (Throwable th) {
+                    Log.stack(LOG_ID, "startupRestore", th);
+                }
+            }
+        });
         {
             if (doLog) {
                 Log.i(LOG_ID, "startforeground");
@@ -4400,6 +4480,150 @@ public class Notify {
         }
         ;
     }
+
+    /**
+     * Minimal standard-text ongoing notification for startup: loading state without
+     * a reading, chart, connection claim or fabricated timestamp. Used both as the
+     * immediate foreground placeholder and for restore outcomes that carry no
+     * current reading (waiting, no sensor).
+     */
+    private Notification makeRestoreStatusNotification(String message) {
+        final Notification.Builder builder = mkbuilder(GLUCOSENOTIFICATION);
+        builder.setSmallIcon(R.drawable.novalue).setOnlyAlertOnce(true)
+                .setContentTitle(message).setWhen(0L).setShowWhen(false).setOngoing(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            builder.setVisibility(VISIBILITY_PUBLIC);
+            builder.setCategory(Notification.CATEGORY_SERVICE);
+        }
+        Notification not = builder.build();
+        not.flags |= FLAG_ONGOING_EVENT;
+        return not;
+    }
+
+    /**
+     * Asynchronous startup restore on the background handler. Freshness is
+     * classified by the timestamp of the reading actually about to be rendered,
+     * never by a max over undisplayed sources. A history failure propagates to the
+     * caller (logged there); it is never silently converted into empty data, and
+     * the loading placeholder simply stays. Publication is visual-only through the
+     * captured target service under the publication gate: no alerts, no broadcaster
+     * fan-out, no mirroring.
+     */
+    private void restoreStartupNotification(long ticket, Service target) {
+        synchronized (foregroundPublicationLock) {
+            if (ticket != startupPendingTicket) {
+                return;
+            }
+        }
+        final String activeSensorSerial = NotificationHistorySource
+                .resolveSensorSerial(resolvePrimarySensorName());
+        final boolean sensorPresent = activeSensorSerial != null && !activeSensorSerial.isEmpty();
+        final CurrentDisplaySource.Snapshot snapshot = resolveNotificationCurrentSnapshot(
+                activeSensorSerial);
+        final long nowMillis = System.currentTimeMillis();
+        if (snapshot != null && snapshot.getPrimaryValue() >= 2.0f) {
+            final long renderedMillis = snapshot.getTimeMillis();
+            final NotificationStartupPolicy.RestoreOutcome outcome = NotificationStartupPolicy
+                    .classifyRestore(sensorPresent, renderedMillis, renderedMillis, nowMillis,
+                            glucosetimeout);
+            if (outcome == NotificationStartupPolicy.RestoreOutcome.FRESH_READING) {
+                synchronized (foregroundPublicationLock) {
+                    if (ticket != startupPendingTicket) {
+                        return;
+                    }
+                }
+                final float value = snapshot.getPrimaryValue();
+                final String message = format(usedlocale, glucoseformat, value);
+                final notGlucose legacy = toLegacyGlucose(snapshot);
+                final Notification notif = makearrownotification(
+                        FOREGROUND_GLUCOSE_NOTIFICATION_KIND, value, message, legacy,
+                        GLUCOSENOTIFICATION, true, snapshot);
+                // Final check and publication are atomic under the gate: a genuine
+                // foreground publication in between invalidates instead of being
+                // overwritten. No history or rendering happens under this lock.
+                synchronized (foregroundPublicationLock) {
+                    if (ticket != startupPendingTicket) {
+                        return;
+                    }
+                    target.startForeground(glucosenotificationid, notif);
+                    startupPendingTicket = 0L;
+                    startupPendingService = null;
+                }
+                return;
+            }
+            switch (outcome) {
+                case NO_SENSOR:
+                    publishStartupStatus(ticket, target, app.getString(R.string.no_sensors_connected));
+                    break;
+                case STALE_READING:
+                    publishStartupStatus(ticket, target, staleMessage(renderedMillis));
+                    break;
+                default:
+                    publishStartupStatus(ticket, target, app.getString(R.string.loading_data));
+                    break;
+            }
+            return;
+        }
+        final java.util.List<GlucosePoint> historyPoints = NotificationHistorySource
+                .getDisplayHistory(nowMillis - DisplayTrendSource.TREND_WINDOW_MS,
+                        Applic.unit == 1, activeSensorSerial);
+        final long latestMillis = latestNotificationTimestamp(historyPoints);
+        final NotificationStartupPolicy.RestoreOutcome outcome = NotificationStartupPolicy
+                .classifyRestore(sensorPresent, 0L, latestMillis, nowMillis, glucosetimeout);
+        switch (outcome) {
+            case NO_SENSOR:
+                publishStartupStatus(ticket, target,
+                        app.getString(R.string.no_sensors_connected));
+                break;
+            case STALE_READING:
+                publishStartupStatus(ticket, target, staleMessage(latestMillis));
+                break;
+            case FRESH_READING:
+            case AWAITING_DATA:
+            default:
+                // Fresh history with no renderable snapshot means the resolver
+                // produced nothing to show: honest waiting, no invented numeric.
+                publishStartupStatus(ticket, target, app.getString(R.string.loading_data));
+                break;
+        }
+    }
+
+    private String staleMessage(long actualMillis) {
+        return Applic.getContext().getString(R.string.nonewvalue)
+                + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT, usedlocale).format(actualMillis);
+    }
+
+    /** Visual-only status publication under the gate; never alerts or mirrors. */
+    private void publishStartupStatus(long ticket, Service target, String message) {
+        final Notification notif = makeRestoreStatusNotification(message);
+        synchronized (foregroundPublicationLock) {
+            if (ticket != startupPendingTicket) {
+                return;
+            }
+            target.startForeground(glucosenotificationid, notif);
+            startupPendingTicket = 0L;
+            startupPendingService = null;
+        }
+    }
+
+    /**
+     * Applies the header timestamp for the reading actually displayed: setWhen to
+     * that reading with showWhen, or hide the header when no valid reading is
+     * displayed instead of fabricating a timestamp. Used by the ongoing builder
+     * and the startup builder alike.
+     */
+    static void applyReadingHeaderTimestamp(Notification.Builder builder,
+            long displayedReadingMillis) {
+        if (NotificationStartupPolicy.showHeaderWhen(displayedReadingMillis)) {
+            builder.setWhen(
+                    NotificationStartupPolicy.resolveHeaderWhenMillis(displayedReadingMillis));
+            builder.setShowWhen(true);
+        } else {
+            builder.setWhen(0L);
+            builder.setShowWhen(false);
+        }
+    }
+    // N1-STARTUP-REGION-END
 
     static public void foregroundnot(Service service) {
         // Application app=service.getApplication();

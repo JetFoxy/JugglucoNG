@@ -131,6 +131,7 @@ static PowerManager.WakeLock wakeLock =null;
   @Override
   public void onDestroy() {
     logLifecycleState("onDestroy",null);
+    Notify.invalidateStartupRestore(this);
     CloneBackgroundLiveness.release();
     CloneRecoveryWake.releaseAll();
     if(theservice==this) {
@@ -158,6 +159,7 @@ static boolean start(Context context) {
    }
 void stopper() {
    logLifecycleState("stopper",null);
+   Notify.invalidateStartupRestore(this);
    stopForeground(true);
    stopSelf();
 //   turnoffwakelock();
