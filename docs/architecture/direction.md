@@ -60,7 +60,7 @@ further down: several items describe prerequisites that were already built, and 
 | §4 category W, the watch should get the feature | **not started** -- this is Q3 | -- |
 | §5 Room migration harness | **built** | migrations run to 30; `HistoryDatabase.isCompatibleAtStartup` gates startup |
 | §6 Q1 registration seams instead of reflection | **done** | `Class.forName` in `src/main` is 1, and it is the exclusion §6 Q1 names: `Log.java:197` |
-| §6 Q2 typed phone-watch protocol | **mostly done; the plan's framing is stale** | see below |
+| §6 Q2 typed phone-watch protocol | **done; §6 reworded to say how the version is carried** | #490, #491, #494; see below |
 | §6 Q3 D1 watch features | **not started** | needs the Nightscout-ownership and secret decisions |
 | §6 Q4 category S duplicates | **done, allow-list ends at three by decision** | #469, #472, #473, #477, #481; the floor is set in #475 |
 | §6 Q5 storage-ownership document | **all seven facets traced; open questions remain within them** | #478, then #480, #482, #483, #484 and a correction pass |
@@ -99,11 +99,13 @@ by name where it did them. This section is stale about all of it.
   calibration.
 - **The unknown-message rule exists.** `MessageReceiver.kt:343` logs each unknown path once.
 
-What is left is the part the section was always about: **the message paths are still strings**.
-There are **30 of them, not 28**. The remaining work is to type them, generating the manifest from
-the types rather than hand-keeping a list, and -- per this section's own instruction -- to type
-`SensorOwnershipRuntime`'s messages without rewriting the state machine, leaving the clone/mirror
-protocol between phones on its own envelope.
+What was left here is done as of #490: the paths are `WearMessagePath`, a closed enum, and the
+receiver dispatches on it with a `when` the compiler checks for coverage. #494 drops `/settings`,
+which no NG build ever spoke, leaving 29. Generating the manifest from the types is **not** done —
+the filter is still hand-kept XML, and `WearMessagePathManifestTests` is what notices when the two
+disagree. Still open, per this section's own instruction: type `SensorOwnershipRuntime`'s messages
+without rewriting the state machine, leaving the clone/mirror protocol between phones on its own
+envelope.
 
 ## 2. Review of the first round
 
@@ -341,7 +343,7 @@ One at a time, in this order, unless the maintainer reorders it. Each item is a 
 
 **Q1. Registration seams instead of reflection.** `src/main` currently has about 20 `Class.forName` lookups across roughly 16 target classes: `HistoryRepository`, `HistorySync`, `CalibrationManager`, `GlucoseUncertaintyStore`, the journal accessors, `OutboundApiJournalSnapshot` (looked up in three places), `JournalTreatmentUploader`, `NightscoutJournalFollowerImporter`, `NotificationPredictionOverlay`, `AlarmActivity`, `ComposeHostKt`, and the two clone-recovery accessors. Each one needs a ProGuard keep rule or it breaks only in minified builds, which has happened before. Replace each with an interface in `src/main` and a registration in `Specific.registerBridges()`, then delete its keep rule and its `ProguardKeepRulesTests` entry. Category P and R duplicates from §4 ride along, since they use the same mechanism. Ratchet: `Class.forName` from `src/main` goes from about 20 to 0. `Log.java`'s dynamic lookup is not a bridge, so exclude it.
 
-**Q2. Typed phone↔watch protocol.** `MessageSender` has 28 string paths, dispatched in `MessageReceiver` and guarded by `WearMessagePathManifestTests`. Replace them with explicit message types that carry a version field, go through one codec, and define what happens with an unknown message. Test old-watch/new-phone and new-watch/old-phone. Two lessons from recent field work belong in the design:
+**Q2. Typed phone↔watch protocol.** `MessageSender` had 28 string paths; they are now `WearMessagePath`, dispatched in `MessageReceiver` under a `when` the compiler checks for exhaustiveness, and guarded by `WearMessagePathManifestTests` (#490, then #494 for the dropped `/settings`). On the version: **structured payloads carry one, and the handshake owns it** — a `v:` line through `WearProtocol.accepts` for the text payloads, a version byte for `WearSync2`/`WearJournalSync`/`SensorOwnershipRuntime`, `"version"` in the handoff JSON. A field on every message would only repeat the version the handshake already advertised, and it would cost a protocol bump per device. **The two command payloads are the exception that proves it:** `/sync2/calcmd` opens with the command byte and `/displayprefs/mainsensor` with the action token, so a peer that does not know the value already logs and ignores it, and either extends by a new command or a new action word — which is what a version byte would do here, minus the break. A new watch paired with an old phone would otherwise lose its calibration toggles, and the two APKs update separately, so that is a real window. If a payload ever does need a version on top of its tag, the version is `WearProtocol.VERSION` and the sender asks `WearProtocol.peerVersion()` before using the new shape. Everything that carries a shape versions it. What does not is: the two command payloads above, which are discriminated by their own tag; `/start` and `/netinfo`, whose format is a native C struct and which get a version whenever that struct next changes; and the one-byte family -- `/bluetooth`, `/messages`, `/sensorclaimstatus`, `/toggles/req`, `/displayprefs/req`, `/defaults`, `/askforstart`, `/wake`, `/wakestream` -- plus `/calibrate`, which is one mg/dL int. A single byte has nothing to version: a value the receiver does not know is refused as unknown, which is the same outcome a version mismatch would produce. (`/data` is phone-to-phone mirroring and stays on its own envelope, as this section says below.) Old-watch/new-phone and new-watch/old-phone stay a test obligation. Two lessons from recent field work belong in the design:
 - The peer must be able to tell that it is talking to a mismatched build. A debug phone package and a release watch package cannot exchange messages at all, and today that failure is silent.
 - Per-sensor payloads must carry the sensor identity. The calibration payload currently falls back to "highest revision" when the sensor id is missing, which gives a second sensor the wrong calibration.
 
