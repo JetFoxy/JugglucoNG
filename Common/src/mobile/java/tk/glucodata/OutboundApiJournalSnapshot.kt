@@ -16,6 +16,7 @@ import java.util.Calendar
 import org.json.JSONArray
 import org.json.JSONObject
 import tk.glucodata.data.HistoryDatabase
+import tk.glucodata.data.journal.CarbEntry
 import tk.glucodata.data.journal.JournalEntryEntity
 import tk.glucodata.data.journal.JournalEntrySource
 import tk.glucodata.data.journal.JournalEntryType
@@ -23,6 +24,7 @@ import tk.glucodata.data.journal.CloneJournalIdentity
 import tk.glucodata.data.journal.JournalFoodEntity
 import tk.glucodata.data.journal.JournalInsulinPreset
 import tk.glucodata.data.journal.JournalIobCalculator
+import tk.glucodata.data.journal.JournalIobMath
 import tk.glucodata.data.journal.JournalInsulinPresetEntity
 import tk.glucodata.data.journal.JournalRepository
 import tk.glucodata.data.journal.JournalTreatmentTransfer
@@ -698,21 +700,17 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
     private fun activeCarbsGrams(entries: List<JournalEntryEntity>, atMillis: Long): Float {
         val prefs = Applic.app.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
         val profile = PredictionModelProfileStore.load(prefs)
-        return entries.sumOf { entry ->
-            if (JournalEntryType.fromStorage(entry.entryType) != JournalEntryType.CARBS) return@sumOf 0.0
-            val grams = entry.amount?.takeIf { it.isFinite() && it > 0f } ?: return@sumOf 0.0
-            val absorptionMinutes = entry.durationMinutes?.toFloat()
-                ?: (grams / profile.parametersAt(entry.timestamp).carbAbsorptionGramsPerHour * 60f)
-                    .coerceIn(30f, 360f)
-            val progress = linearProgress(entry.timestamp, absorptionMinutes, atMillis)
-            (grams * (1f - progress)).coerceAtLeast(0f).toDouble()
-        }.toFloat()
-    }
-
-    private fun linearProgress(startMillis: Long, durationMinutes: Float, atMillis: Long): Float {
-        if (atMillis <= startMillis) return 0f
-        val elapsedMinutes = (atMillis - startMillis) / 60_000f
-        return (elapsedMinutes / durationMinutes.coerceAtLeast(1f)).coerceIn(0f, 1f)
+        // The absorption arithmetic is shared (plan §4 category W, D1: the watch
+        // computes COB from its synced journal); the profile stays here because
+        // it is time-dependent and this is where the phone's entries are.
+        val carbs = entries.mapNotNull { entry ->
+            if (JournalEntryType.fromStorage(entry.entryType) != JournalEntryType.CARBS) return@mapNotNull null
+            val grams = entry.amount?.takeIf { it.isFinite() && it > 0f } ?: return@mapNotNull null
+            CarbEntry(entry.timestamp, grams, entry.durationMinutes?.toFloat())
+        }
+        return JournalIobMath.activeCarbsGrams(carbs, atMillis) { timestampMillis ->
+            profile.parametersAt(timestampMillis).carbAbsorptionGramsPerHour
+        }
     }
 
     private fun toPresetModel(entity: JournalInsulinPresetEntity): JournalInsulinPreset =
