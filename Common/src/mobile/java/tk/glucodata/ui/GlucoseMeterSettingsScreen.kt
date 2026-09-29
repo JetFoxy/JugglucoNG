@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Bloodtype
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -97,6 +98,7 @@ fun GlucoseMeterSettingsScreen(navController: NavController) {
     var scanRequest by remember { mutableIntStateOf(0) }
     var satelliteCode by remember { mutableStateOf(GlucoseMeterManager.satelliteCode()) }
     var pendingSatellite by remember { mutableStateOf<NearbyGlucoseMeter?>(null) }
+    var pendingForget by remember { mutableStateOf<GlucoseMeterSnapshot?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -180,6 +182,30 @@ fun GlucoseMeterSettingsScreen(navController: NavController) {
         } else {
             Toast.makeText(context, R.string.wentwrong, Toast.LENGTH_LONG).show()
         }
+    }
+
+    pendingForget?.let { meter ->
+        AlertDialog(
+            onDismissRequest = { pendingForget = null },
+            title = { Text(stringResource(R.string.glucose_meter_forget_title)) },
+            text = { Text(stringResource(R.string.glucose_meter_forget_desc, meter.name)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        GlucoseMeterManager.forget(meter.index)
+                        meters = GlucoseMeterManager.configuredMeters()
+                        pendingForget = null
+                    },
+                ) {
+                    Text(stringResource(R.string.glucose_meter_forget))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingForget = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 
     pendingSatellite?.let { candidate ->
@@ -310,17 +336,27 @@ fun GlucoseMeterSettingsScreen(navController: NavController) {
                     } else {
                         stringResource(R.string.glucose_meter_no_readings)
                     }
-                    SettingsSwitchItem(
-                        title = meter.name,
-                        subtitle = "$status · $lastReading",
-                        checked = meter.active,
-                        icon = Icons.Filled.Bloodtype,
-                        iconTint = MaterialTheme.colorScheme.primary,
-                        onCheckedChange = { enabled ->
-                            GlucoseMeterManager.setEnabled(meter.index, enabled)
-                            meters = GlucoseMeterManager.configuredMeters()
-                        },
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SettingsSwitchItem(
+                            title = meter.name,
+                            subtitle = "$status · $lastReading",
+                            checked = meter.active,
+                            icon = Icons.Filled.Bloodtype,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            onCheckedChange = { enabled ->
+                                GlucoseMeterManager.setEnabled(meter.index, enabled)
+                                meters = GlucoseMeterManager.configuredMeters()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { pendingForget = meter }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.glucose_meter_forget),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
                 }
             }
 

@@ -466,6 +466,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
  <string name="glucose_meters_nearby">Nearby meters</string>
  <string name="glucose_meter_last_reading">Last reading: %1$s</string>
  <string name="glucose_meter_no_readings">No readings imported yet</string>
+ <string name="glucose_meter_forget">Forget</string>
+ <string name="glucose_meter_forget_title">Forget meter</string>
+ <string name="glucose_meter_forget_desc">Stop using %1$s and unpair it from this phone? Readings already imported into the journal are kept.</string>
  <string name="finddevices">"Find devices"</string>
  <string name="nonewdata">"No new data"</string>
  <string name="newdata">"New data"</string>
