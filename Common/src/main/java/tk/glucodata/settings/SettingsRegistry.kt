@@ -208,8 +208,30 @@ object SettingsRegistry {
         SENSOR_COLORS,
     )
 
-    /** Every setting that travels phone→watch. */
-    val mirrored: List<SettingDefinition> = definitions.filter { it.scope == SettingScope.MIRRORED }
+    /**
+     * Every setting that travels phone→watch.
+     *
+     * Scope says a setting belongs on both devices; this filter is what keeps a **secret** off the
+     * watch. It is a property of the code rather than of the list, because a `MIRRORED` + `SECRET`
+     * definition is exactly what the first D1 watch feature wants to declare (a Nightscout URL, an
+     * API token — #498) and today nothing in the registry stops it from going out on the wire.
+     *
+     * Whether a secret may reach the watch is a maintainer decision and it is open (#498); the
+     * default here is the conservative one, and it changes nothing today because no definition
+     * declares [SettingBackup.SECRET].
+     */
+    val mirrored: List<SettingDefinition> = mirroredFrom(definitions)
+
+    /**
+     * What [definitions] sends to the watch, as a function of the list rather than of this
+     * object, so a test can hand it a definition that does not exist yet.
+     */
+    internal fun mirroredFrom(definitions: List<SettingDefinition>): List<SettingDefinition> =
+        definitions.filter { travelsToWatch(it.scope, it.backup) }
+
+    /** `MIRRORED` scope, and not a secret: what the watch is allowed to see. */
+    fun travelsToWatch(scope: SettingScope, backup: SettingBackup): Boolean =
+        scope == SettingScope.MIRRORED && backup != SettingBackup.SECRET
 
     private val byKey = definitions.associateBy { it.key }
 
