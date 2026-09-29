@@ -198,7 +198,7 @@ private boolean discover(BluetoothGatt bluetoothGatt) {
     }
 
 private void beginVerioSession(BluetoothGatt gatt) {
-    verioSession.begin(meterIndex);
+    verioSession.begin();
     writeNextVerioCommand(gatt);
     }
 
@@ -214,7 +214,7 @@ private void writeNextVerioCommand(BluetoothGatt gatt) {
 
 private void processVerioResponse(BluetoothGatt gatt, byte[] value) {
     if(doLog) Log.showbytes(LOG_ID+": verio notification",value);
-    verioSession.onNotification(value);
+    verioSession.onNotification(value,Natives.GlucoseMeterGetLastPos(meterIndex));
     final var readings=verioSession.takeReadings();
     if(!readings.isEmpty())
         persistVerioReadings(readings);
@@ -230,6 +230,9 @@ private void persistVerioReadings(List<VerioSession.Reading> readings) {
         if(saved==null || saved.length<2) continue;
         GlucoseMeterJournalBridge.record(meterIndex,saved[0],saved[1]);
         if(saved.length>=3 && saved[2]!=0L) newvalues=true;
+        final int stored=Natives.GlucoseMeterGetLastPos(meterIndex);
+        if(reading.getRecord()>stored)
+            Natives.GlucoseMeterSetLastPos(meterIndex,reading.getRecord());
         }
     receivedTime=System.currentTimeMillis();
     updateview();

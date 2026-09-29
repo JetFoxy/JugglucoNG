@@ -2,7 +2,6 @@ package tk.glucodata.glucosemeter
 
 import androidx.annotation.Keep
 import tk.glucodata.Log
-import tk.glucodata.Natives
 import tk.glucodata.drivers.aidex.native.crypto.Crc16CcittFalse
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -30,13 +29,12 @@ class VerioSession {
     private enum class Stage { IDLE, TIME, T_COUNTER, R_COUNTER, RECORDS, DONE }
 
     /** A reading the meter sent us; storing it is the caller's job. */
-    data class Reading(val timestampMillis: Long, val mgdlTenths: Int)
+    data class Reading(val record: Int, val timestampMillis: Long, val mgdlTenths: Int)
 
     private val outbox = ArrayDeque<ByteArray>()
     private val pendingReadings = ArrayList<Reading>()
     private var stage = Stage.IDLE
     private var begun = false
-    private var meterIndex = -1
     private var meterTimeOffset = 0L
     private var haveMeterTime = false
     private var highestRecordNumber = -1
@@ -44,6 +42,8 @@ class VerioSession {
     private var requestedRecord = -1
     private var nextRecordToRequest = -1
     private var recordsRequested = 0
+    /** Where the walk started, so storing a reading cannot shorten it. */
+    private var walkStart = -1
 
     fun reset() {
         outbox.clear()
@@ -57,11 +57,11 @@ class VerioSession {
         requestedRecord = -1
         nextRecordToRequest = -1
         recordsRequested = 0
+        walkStart = -1
     }
 
-    fun begin(index: Int) {
+    fun begin() {
         reset()
-        meterIndex = index
         begun = true
         stage = Stage.TIME
         queue(command(0x20, 0x02)) // meter time first, every reading needs it
@@ -82,10 +82,12 @@ class VerioSession {
         if (value != null) outbox.addLast(value)
     }
 
-    private fun highestRecordSeen() = Natives.GlucoseMeterGetLastPos(meterIndex)
-
+    /**
+     * @param alreadyHave highest record the caller has stored, the walk stops
+     *   there. Passed in so this stays free of storage and testable on the jvm.
+     */
     @Synchronized
-    fun onNotification(message: ByteArray?) {
+    fun onNotification(message: ByteArray?, alreadyHave: Int) {
         if (!begun) {
             Log.e(TAG, "notification outside a session, ignored")
             return
@@ -123,13 +125,13 @@ class VerioSession {
             reportError(messageType, message)
             return
         }
-        handleData(message)
+        handleData(message, alreadyHave)
         // every data packet has to be acked before anything else goes out
         queue(byteArrayOf(0x81.toByte()))
         queue(advance())
     }
 
-    private fun handleData(message: ByteArray) {
+    private fun handleData(message: ByteArray, alreadyHave: Int) {
         val result = message.copyOfRange(6, message.size - 3)
         val data = ByteBuffer.wrap(result).order(ByteOrder.LITTLE_ENDIAN)
         // the stage says what we asked for, which is more reliable than guessing
@@ -140,7 +142,7 @@ class VerioSession {
                     Log.e(TAG, String.format(Locale.US, "meter time expected 4 bytes, got %d", result.size))
                     return
                 }
-                val meterTime = (data.int.toLong() + TIME_OFFSET) * 1000L
+                val meterTime = (data.getInt(0).toLong() + TIME_OFFSET) * 1000L
                 meterTimeOffset = System.currentTimeMillis() - meterTime
                 haveMeterTime = true
                 Log.i(TAG, String.format(Locale.US, "meter time received, offset=%dms", meterTimeOffset))
@@ -150,7 +152,7 @@ class VerioSession {
                     Log.e(TAG, String.format(Locale.US, "record counter expected 4 bytes, got %d", result.size))
                     return
                 }
-                highestRecordNumber = data.int
+                highestRecordNumber = data.getInt(0)
                 Log.i(TAG, String.format(Locale.US, "record counter=%d", highestRecordNumber))
             }
             Stage.R_COUNTER -> {
@@ -158,9 +160,9 @@ class VerioSession {
                     Log.e(TAG, String.format(Locale.US, "record count expected 2 bytes, got %d", result.size))
                     return
                 }
-                numberOfRecords = data.short.toInt() and 0xFFFF
+                numberOfRecords = data.getShort(0).toInt() and 0xFFFF
                 Log.i(TAG, String.format(Locale.US, "number of records=%d", numberOfRecords))
-                startRecordRequests()
+                startRecordRequests(alreadyHave)
             }
             Stage.RECORDS -> handleReading(data)
             else -> Log.e(TAG, String.format(Locale.US, "data packet of %d bytes outside a request", result.size))
@@ -168,35 +170,54 @@ class VerioSession {
     }
 
     private fun handleReading(data: ByteBuffer) {
-        if (requestedRecord <= 0) {
+        val record = requestedRecord
+        // the walk has to move on whatever the record says, otherwise one bad
+        // reading is requested forever
+        try {
+            readReading(data, record)
+        } finally {
+            advanceRecord(record)
+        }
+    }
+
+    private fun readReading(data: ByteBuffer, record: Int) {
+        if (record <= 0) {
             Log.e(TAG, "reading we did not ask for")
+            return
+        }
+        if (data.remaining() < 11) {
+            Log.e(TAG, String.format(Locale.US, "record %d is only %d bytes", record, data.remaining()))
             return
         }
         // xDrip sums two ints at offsets 6 and 10 here, but the buffer is only
         // 11 bytes so its second read overruns; use the two trailing bytes.
         val marker = (data.get(6).toInt() and 0xFF) + (data.get(10).toInt() and 0xFF)
         if (marker != 0) {
-            Log.e(TAG, String.format(Locale.US, "record %d has non-zero marker %d", requestedRecord, marker))
+            Log.e(TAG, String.format(Locale.US, "record %d has non-zero marker %d", record, marker))
         }
         if (!haveMeterTime) {
             Log.e(TAG, "no meter time yet, cannot place the reading in time")
             return
         }
-        val mgdl = data.short.toInt() and 0xFFFF
+        // ByteBuffer.short/int are relative reads, these offsets are from the
+        // start of the payload
+        val mgdl = data.getShort(4).toInt() and 0xFFFF
         if (mgdl < MIN_PLAUSIBLE_MGDL || mgdl > MAX_PLAUSIBLE_MGDL) {
             Log.e(TAG, String.format(Locale.US, "implausible value %d mg/dl ignored", mgdl))
             return
         }
-        val timestamp = ((data.int.toLong() and 0xFFFFFFFFL) + TIME_OFFSET) * 1000L + meterTimeOffset
-        val record = requestedRecord
-        pendingReadings.add(Reading(timestamp, mgdl * 10))
+        val timestamp = ((data.getInt(0).toLong() and 0xFFFFFFFFL) + TIME_OFFSET) * 1000L + meterTimeOffset
+        pendingReadings.add(Reading(record, timestamp, mgdl * 10))
         Log.i(TAG, String.format(Locale.US, "reading %d = %d mg/dl at %d", record, mgdl, timestamp))
-        Natives.GlucoseMeterSetLastPos(meterIndex, maxOf(record, highestRecordSeen()))
+    }
+
+    private fun advanceRecord(record: Int) {
+        if (record <= 0) return
         nextRecordToRequest = record - 1
         recordsRequested++
     }
 
-    private fun startRecordRequests() {
+    private fun startRecordRequests(alreadyHave: Int) {
         if (highestRecordNumber < 0 || numberOfRecords < 0) {
             Log.e(TAG, "counters missing, cannot request records")
             nextRecordToRequest = 0
@@ -207,12 +228,15 @@ class VerioSession {
             nextRecordToRequest = 0
             return
         }
+        // the walk stops at what the caller already had when it started, not at
+        // the live value, which every stored reading moves forward
+        walkStart = alreadyHave
         val lowest = maxOf(highestRecordNumber - numberOfRecords, highestRecordNumber - MAX_BACKFILL_RECORDS)
         nextRecordToRequest = highestRecordNumber
         recordsRequested = 0
         Log.i(TAG, String.format(
             Locale.US, "%d records, highest=%d, walking down to %d, have %d",
-            numberOfRecords, highestRecordNumber, lowest, highestRecordSeen()))
+            numberOfRecords, highestRecordNumber, lowest, walkStart))
     }
 
     /** Moves to the next request and returns the command that asks for it. */
@@ -227,7 +251,7 @@ class VerioSession {
             Stage.T_COUNTER -> command(0x0a, 0x02, 0x06) // record counter
             Stage.R_COUNTER -> command(0x27, 0x00) // number of records
             Stage.RECORDS -> {
-                if (nextRecordToRequest <= highestRecordSeen() || recordsRequested >= MAX_BACKFILL_RECORDS) {
+                if (nextRecordToRequest <= walkStart || recordsRequested >= MAX_BACKFILL_RECORDS) {
                     stage = Stage.DONE
                     Log.i(TAG, "nothing newer on the meter")
                     null
