@@ -220,9 +220,9 @@ object SettingsRegistry {
      * definition is exactly what the first D1 watch feature wants to declare (a Nightscout URL, an
      * API token — #498) and today nothing in the registry stops it from going out on the wire.
      *
-     * Whether a secret may reach the watch is a maintainer decision and it is open (#498); the
-     * default here is the conservative one, and it changes nothing today because no definition
-     * declares [SettingBackup.SECRET].
+     * Per #498 the watch may hold a credential only for an output the user switched on there,
+     * so a secret reaches it through that output's own opt-in path, never through this generic
+     * mirror. Today no definition declares [SettingBackup.SECRET], so this changes nothing yet.
      */
     val mirrored: List<SettingDefinition> = mirroredFrom(definitions)
 

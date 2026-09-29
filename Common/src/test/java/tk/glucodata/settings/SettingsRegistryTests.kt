@@ -126,7 +126,8 @@ class SettingsRegistryTests {
     }
 
     @Test
-    fun keyConstantsAgreeWithTheirDefinitions() {        assertEquals(KEY_SMOOTHING_MINUTES, SettingsRegistry.SMOOTHING_MINUTES.key)
+    fun keyConstantsAgreeWithTheirDefinitions() {
+        assertEquals(KEY_SMOOTHING_MINUTES, SettingsRegistry.SMOOTHING_MINUTES.key)
         assertEquals(KEY_SMOOTHING_GRAPH_ONLY, SettingsRegistry.SMOOTHING_GRAPH_ONLY.key)
         assertEquals(KEY_SMOOTHING_COLLAPSE_CHUNKS, SettingsRegistry.SMOOTHING_COLLAPSE_CHUNKS.key)
         assertEquals(KEY_SMOOTHING_EXCHANGE_OUTPUTS_ONLY, SettingsRegistry.SMOOTHING_EXCHANGE_OUTPUTS_ONLY.key)
