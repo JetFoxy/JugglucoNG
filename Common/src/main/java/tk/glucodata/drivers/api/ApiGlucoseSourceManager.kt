@@ -184,6 +184,7 @@ class ApiGlucoseSourceManager(
     override fun terminateManagedSensor(wipeData: Boolean) {
         stop = true
         handler.removeCallbacksAndMessages(null)
+        ApiIobSnapshot.clear()
         if (wipeData) {
             Applic.app?.let { ApiGlucoseSourceRegistry.disableSourceSensor(it) }
         }
@@ -470,6 +471,7 @@ class ApiGlucoseSourceManager(
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return emptyList()
         importJournalPayload(trimmed)
+        importIobSnapshot(trimmed)
         val objects = when {
             trimmed.startsWith("[") -> jsonArrayObjects(JSONArray(trimmed))
             else -> {
@@ -669,6 +671,9 @@ class ApiGlucoseSourceManager(
             ?: fields["RAW_MMOL"]?.toDoubleOrNull()?.let { it * MGDL_PER_MMOLL }
             ?: fields["RAW"]?.toDoubleOrNull()?.let(::inferCompactGlucoseMgdl)
             ?: Double.NaN
+        // GlucoWatch text carries the sender's IOB/COB alongside glucose; keep
+        // the snapshot so the follower shows the sender's numbers (see parseOutboundJson).
+        ApiIobSnapshot.update(ApiIobSnapshot.fromTextFields(fields))
         return VirtualGlucoseSensorBridge.Reading(
             timestampMs = timestamp,
             glucoseMgdl = glucoseMgdl.toFloat(),
@@ -758,6 +763,15 @@ class ApiGlucoseSourceManager(
         }.onFailure {
             Log.w(TAG, "journal import ignored: ${it.message}")
         }.getOrDefault(0)
+    }
+
+    private fun importIobSnapshot(raw: String) {
+        if (raw.isBlank()) return
+        runCatching {
+            ApiIobSnapshot.update(ApiIobSnapshot.parse(raw))
+        }.onFailure {
+            Log.w(TAG, "IOB snapshot ignored: ${it.message}")
+        }
     }
 
     private fun firstFinite(vararg values: Double): Double? =

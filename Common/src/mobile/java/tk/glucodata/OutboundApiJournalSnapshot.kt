@@ -145,12 +145,14 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
         atMillis: Long,
         allowCloneRemote: Boolean = true,
         allowNightscoutRemote: Boolean = true,
+        allowApiRemote: Boolean = true,
     ): FloatArray? {
         val app = Applic.app ?: return null
         val remote = RemoteIobSnapshot.fresh(
             atMillis,
             allowClone = allowCloneRemote,
             allowNightscout = allowNightscoutRemote,
+            allowApi = allowApiRemote,
         )
         val prefs = app.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
         if (!prefs.getBoolean(JOURNAL_ENABLED_KEY, true)) {
@@ -189,7 +191,9 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
         // A fresh devicestatus from the uploading device replaces the local
         // journal math: IOB, eIOB and COB switch source together because they
         // come from one document and one computation — mixing them would be
-        // inconsistent. The one exception is a field the document lacks (an
+        // inconsistent. The same holds for the HTTP API follower snapshot: it
+        // is one sender's computation, preferred over the local one while
+        // fresh. The one exception is a field the document lacks (an
         // uploader without carb data omits cob): that field alone stays
         // local. The 30-minute-window projections keep the local values in
         // either case; they only feed the notification risk tint and have no
@@ -215,9 +219,10 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
             // turn a receiver into a timestamp-refreshing echo and keep stale
             // IOB alive after the authoritative sender disappeared. Local
             // journal state and a configured Nightscout follower remain valid
-            // sources for this phone's outbound snapshot.
+            // sources for this phone's outbound snapshot; the HTTP API
+            // follower snapshot is excluded for the same no-echo reason.
             runCatching {
-                buildBroadcastIob(atMillis, allowCloneRemote = false)
+                buildBroadcastIob(atMillis, allowCloneRemote = false, allowApiRemote = false)
             }.getOrNull()
         } ?: return@runBlocking ""
         CloneIobSnapshot.encode(values, atMillis)
@@ -232,6 +237,7 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
                     atMillis,
                     allowCloneRemote = false,
                     allowNightscoutRemote = false,
+                    allowApiRemote = false,
                 )
             }.getOrNull()
         }
