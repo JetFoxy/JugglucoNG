@@ -109,6 +109,7 @@ long foundtime=0L;
  private static final String SatelliteTxCharUUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
  private static final String VerioWriteCharUUID = "af9df7a2-e595-11e3-96b4-0002a5d5c51b";
  private static final String VerioNotifyCharUUID = "af9df7a3-e595-11e3-96b4-0002a5d5c51b";
+ private static final String GlucoseServiceUUID = "00001808-0000-1000-8000-00805f9b34fb";
 
 
 
@@ -144,6 +145,12 @@ private boolean discover(BluetoothGatt bluetoothGatt) {
         if(doLog) Log.i(LOG_ID,"service: "+ser.getUuid().toString());
         final boolean satelliteService=ser.getUuid().equals(SatelliteMeterProtocol.SERVICE_UUID);
         final boolean verioService=ser.getUuid().equals(VerioSession.SERVICE_UUID);
+        // Some meters (Accu-Chek Instant confirmed by an HCI capture) carry a second,
+        // vendor-private service with its own characteristic that reuses the standard
+        // Record Access Control Point UUID. Without this guard the vendor one is
+        // discovered last and silently overwrites the real one, so every RACP write
+        // lands on the wrong attribute and the meter rejects it with ATT error 0x81.
+        final boolean glucoseService=ser.getUuid().toString().equals(GlucoseServiceUUID);
         var chars=ser.getCharacteristics();
         for(var s:chars) {
             var uuid=s.getUuid().toString();
@@ -155,7 +162,7 @@ private boolean discover(BluetoothGatt bluetoothGatt) {
                 case IsensTimeCharUUID: IsensTimeChar=s;break;
                 case GlucoseCharUUID: GlucoseChar=s;success=true;break;
                 case ContextCharUUID: ContextChar=s;break;
-                case RecordsCharUUID: RecordsChar=s;break;
+                case RecordsCharUUID: if(glucoseService || RecordsChar==null) RecordsChar=s;break;
                 case SatelliteRxCharUUID: if(satelliteService) SatelliteRxChar=s;break;
                 case SatelliteTxCharUUID: if(satelliteService) SatelliteTxChar=s;break;
                 case VerioWriteCharUUID: if(verioService) VerioWriteChar=s;break;
