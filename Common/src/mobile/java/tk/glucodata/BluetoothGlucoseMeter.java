@@ -97,13 +97,85 @@ private static void removeBondStateReceiver() {
             }
         }
     }
+
+private static BroadcastReceiver pairingRequestReceiver =null;
+@SuppressLint("MissingPermission")
+private static boolean isOurMeter(BluetoothDevice device) {
+    final var gatts=meterGatts;
+    if(gatts!=null) {
+        for(var gatt:gatts) {
+            if(gatt.mActiveBluetoothDevice!=null&&gatt.mActiveBluetoothDevice.equals(device))
+                return true;
+            }
+        }
+    return false;
+    }
+
+/*  Android answers a PAIRING_VARIANT_NO_BONDING request from the meter with a
+    notification it expects the user to tap, and gives up after 30s with
+    SMP_CONN_TOUT - which restarts our own bonding attempt, forever. xDrip
+    confirms the request itself, so do the same for our own meters only. */
+private static void addPairingRequestReceiver() {
+    removePairingRequestReceiver();
+    try {
+        pairingRequestReceiver=new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                final BluetoothDevice device=intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if(device==null)
+                    return;
+                if(!isOurMeter(device)) {
+                    if(doLog)
+                        Log.i(LOG_ID,"Pairing request ignored, not our meter: "+device.getAddress());
+                    return;
+                    }
+                final int type=intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.ERROR);
+                if(doLog)
+                    Log.i(LOG_ID,"Pairing request for "+device.getAddress()+" type="+type);
+                if(type==BluetoothDevice.PAIRING_VARIANT_PIN) {
+                    // a pin we do not have, let the user type it into the system dialog
+                    return;
+                    }
+                try {
+                    device.setPairingConfirmation(true);
+                    if(doLog)
+                        Log.i(LOG_ID,"setPairingConfirmation(true) "+device.getAddress());
+                    abortBroadcast();
+                    }
+                catch(SecurityException se) {
+                    Log.stack(LOG_ID, "setPairingConfirmation",se);
+                    }
+                }
+            };
+        final var filter=new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
+        filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY-1);
+        Applic.app.registerReceiver(pairingRequestReceiver, filter);
+        }
+    catch(Throwable th) {
+        Log.stack(LOG_ID, "registerReceiver ACTION_PAIRING_REQUEST", th);
+        }
+    }
+private static void removePairingRequestReceiver() {
+    final var rec=pairingRequestReceiver;
+    pairingRequestReceiver=null;
+    if(rec!=null) {
+        try {
+            Applic.app.unregisterReceiver(rec);
+            }
+        catch(Throwable th) {
+            Log.stack(LOG_ID, "removePairingRequestReceiver",th);
+            }
+        }
+    }
 private static void addReceivers() {
    addBluetoothStateReceiver();
    addBondStateReceiver() ;
+   addPairingRequestReceiver() ;
     }
 private static void removeReceivers() {
    removeBluetoothStateReceiver();
    removeBondStateReceiver() ;
+   removePairingRequestReceiver() ;
     }
 
 static  GlucoseMeterGatt[] meterGatts;
