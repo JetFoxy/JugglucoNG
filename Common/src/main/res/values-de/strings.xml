@@ -422,6 +422,10 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
 <string name="glucose_meters_nearby">Messgeräte in der Nähe</string>
 <string name="glucose_meter_last_reading">Letzter Messwert: %1$s</string>
 <string name="glucose_meter_no_readings">Noch keine Messwerte importiert</string>
+<string name="satellite_meter_code_missing">Satellite-Messgerät: Legen Sie zuerst den Messgerätecode in den Einstellungen für Blutzuckermessgeräte fest</string>
+<string name="glucose_meter_forget">Vergessen</string>
+<string name="glucose_meter_forget_title">Messgerät vergessen</string>
+<string name="glucose_meter_forget_desc">%1$s nicht mehr verwenden und die Kopplung mit diesem Telefon aufheben? Bereits ins Journal importierte Messwerte bleiben erhalten.</string>
 <string name="finddevices">"Geräte suchen"</string>
 <string name="nonewdata">"Keine neuen Daten"</string>
 <string name="newdata">"Neue Daten"</string>

@@ -461,6 +461,10 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
  <string name="glucose_meters_nearby">Mitirrada kuu dhow</string>
  <string name="glucose_meter_last_reading">Cabbirkii ugu dambeeyay: %1$s</string>
  <string name="glucose_meter_no_readings">Weli cabbir lama soo dejin</string>
+ <string name="satellite_meter_code_missing">Mitirka Satellite: marka hore geli koodka mitirka ee dejinta mitirrada gulukooska</string>
+ <string name="glucose_meter_forget">Iska illow</string>
+ <string name="glucose_meter_forget_title">Iska illow mitirka</string>
+ <string name="glucose_meter_forget_desc">Jooji isticmaalka %1$s oo ka jar taleefankan? Akhrisyada horey loogu soo dejiyay joornaalka waa la hayaa.</string>
  <string name="finddevices">"Raad qalab"</string>
  <string name="nonewdata">"Ma jirto xog cusub"</string>
  <string name="newdata">"xog cusub"</string>

@@ -898,6 +898,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="glucose_meters_nearby">附近的血糖仪</string>
     <string name="glucose_meter_last_reading">最近读数：%1$s</string>
     <string name="glucose_meter_no_readings">尚未导入读数</string>
+    <string name="satellite_meter_code_missing">Satellite 血糖仪：请先在血糖仪设置中填写血糖仪代码</string>
+    <string name="glucose_meter_forget">忘记</string>
+    <string name="glucose_meter_forget_title">忘记血糖仪</string>
+    <string name="glucose_meter_forget_desc">停止使用 %1$s 并取消与此手机的配对？已导入日志的读数将保留。</string>
     <string name="mgdL">mg/dL</string>
     <string name="min">最小</string>
     <string name="min_glucose">最小</string>

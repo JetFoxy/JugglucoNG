@@ -458,12 +458,16 @@ Pressing OK will generate a connection on this phone and display a QR code that 
  <string name="satellite_meter_title">Satellite (Сателлит+) meter</string>
  <string name="satellite_meter_code_label">PIN or label code</string>
  <string name="satellite_meter_code_desc">Enter the 3-digit PIN or the longer code printed below the QR/DataMatrix label on the meter. It is used for each Bluetooth connection.</string>
+ <string name="satellite_meter_code_missing">Satellite meter: set the meter code in Glucose meters settings first</string>
  <string name="glucose_meters_configured">Configured meters</string>
  <string name="glucose_meters_none">No meters configured</string>
  <string name="glucose_meters_none_desc">Find a nearby meter to start importing readings.</string>
  <string name="glucose_meters_nearby">Nearby meters</string>
  <string name="glucose_meter_last_reading">Last reading: %1$s</string>
  <string name="glucose_meter_no_readings">No readings imported yet</string>
+ <string name="glucose_meter_forget">Forget</string>
+ <string name="glucose_meter_forget_title">Forget meter</string>
+ <string name="glucose_meter_forget_desc">Stop using %1$s and unpair it from this phone? Readings already imported into the journal are kept.</string>
  <string name="finddevices">"Find devices"</string>
  <string name="nonewdata">"No new data"</string>
  <string name="newdata">"New data"</string>
