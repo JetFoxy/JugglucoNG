@@ -57,6 +57,42 @@ internal fun resolvePeerGone(
     return undiscoverableForMs >= 0L && undiscoverableForMs >= graceMs
 }
 
+/** Whether to trust the peer's most recent "I don't own it" report yet; see [resolvePeerStandDownConfirmation]. */
+internal data class PeerStandDownConfirmation(
+    /**
+     * When owns=false was first seen since it was last true. Null once the peer
+     * reports owns=true again, or once the state is confirmed. Feed this back in
+     * as the next call's [resolvePeerStandDownConfirmation] previousFalseSinceMs
+     * — it is how the clock survives across reconciliation ticks.
+     */
+    val falseSinceMs: Long?,
+    /**
+     * True once owns=false has persisted for confirmMs and should be acted on;
+     * false while it is still inside its grace window.
+     */
+    val confirmed: Boolean,
+)
+
+/**
+ * A single owns=false announcement can be the peer's own reconnect taking a
+ * moment rather than it actually letting go of the sensor: reconcile() used to
+ * act on the report in the same tick it arrived, which pulled a device that
+ * could not even reach the sensor into a multi-minute connectGatt() storm over
+ * a blip the peer recovered from on its own a few seconds later. owns=true is
+ * always believed immediately — reverting to "keep reading" cannot lose data —
+ * only the negative report waits out a short confirmation window first.
+ */
+internal fun resolvePeerStandDownConfirmation(
+    peerOwns: Boolean,
+    previousFalseSinceMs: Long?,
+    nowMs: Long,
+    confirmMs: Long,
+): PeerStandDownConfirmation {
+    if (peerOwns) return PeerStandDownConfirmation(falseSinceMs = null, confirmed = false)
+    val since = previousFalseSinceMs ?: nowMs
+    return PeerStandDownConfirmation(falseSinceMs = since, confirmed = nowMs - since >= confirmMs)
+}
+
 /** The state of one sensor's handover window; see [resolveYieldWindow]. */
 internal data class SensorYieldWindow(
     /** When the current handover attempt began, or null to forget it. */
@@ -164,6 +200,16 @@ object SensorOwnershipRuntime {
     private const val PEER_UNDISCOVERABLE_GRACE_MS = 30_000L
 
     /**
+     * How long a peer's owns=false report must persist before it is believed.
+     *
+     * Short enough that a genuine handover is barely delayed — well under the
+     * ~60s reading cadence — but long enough to outlast the peer's own
+     * reconnect blips, which is what a live handoff storm turned out to be.
+     * See [resolvePeerStandDownConfirmation].
+     */
+    private const val PEER_STOOD_DOWN_CONFIRM_MS = 15_000L
+
+    /**
      * How long the phone lets go for, when the user hands a sensor to the watch.
      *
      * This window is the one time neither device is reading, so it is kept as
@@ -192,6 +238,9 @@ object SensorOwnershipRuntime {
     private val localReadings = ConcurrentHashMap<String, Long>()
     private val releaseState = SensorOwnershipReleaseState(::key)
     private val yieldStartedAt = ConcurrentHashMap<String, Long>()
+
+    /** Per-sensor state for [resolvePeerStandDownConfirmation]; see [confirmedPeerReportFor]. */
+    private val peerOwnsFalseSinceMs = ConcurrentHashMap<String, Long>()
 
     /**
      * Whether the last announcement we tried to deliver actually reached the
@@ -371,6 +420,18 @@ object SensorOwnershipRuntime {
             Log.i(LOG_ID, "peer holds ${report.first}=${report.second} newest=${report.third}")
         }
         executor.execute { runCatching { reconcile() }.onFailure { Log.stack(LOG_ID, "reconcile", it) } }
+        if (!report.second) {
+            // An unchanged owns=false is only repeated at the heartbeat, and the
+            // tick is a minute: reconcile again when the confirmation window
+            // closes, so a real hand-back waits the window and not the tick.
+            runCatching {
+                executor.schedule(
+                    { runCatching { reconcile() }.onFailure { Log.stack(LOG_ID, "stand-down reconcile", it) } },
+                    PEER_STOOD_DOWN_CONFIRM_MS + 1_000L,
+                    TimeUnit.MILLISECONDS,
+                )
+            }
+        }
     }
 
     /**
@@ -391,6 +452,37 @@ object SensorOwnershipRuntime {
             .mapNotNull { (id, _) -> peerReports[id] }
             // Several spellings of one sensor: trust the most recent word.
             .maxByOrNull { it.receivedAtMs }
+    }
+
+    /**
+     * [peerReportFor], debounced through [resolvePeerStandDownConfirmation] so a
+     * single owns=false report cannot start a takeover on its own — only one
+     * that persists past [PEER_STOOD_DOWN_CONFIRM_MS] is passed through as-is.
+     * Until then the fresh report is served with `owns` held at true: its
+     * [SensorOwnershipPolicy.PeerReport.receivedAtMs] and `lastReadingMs` stay
+     * current, so the peer does not start looking silent from an older report.
+     */
+    private fun confirmedPeerReportFor(serial: String, nowMs: Long): SensorOwnershipPolicy.PeerReport? {
+        val id = key(serial)
+        val raw = peerReportFor(serial) ?: run {
+            peerOwnsFalseSinceMs.remove(id)
+            return null
+        }
+        val confirmation = resolvePeerStandDownConfirmation(
+            peerOwns = raw.owns,
+            previousFalseSinceMs = peerOwnsFalseSinceMs[id],
+            nowMs = nowMs,
+            confirmMs = PEER_STOOD_DOWN_CONFIRM_MS,
+        )
+        if (confirmation.falseSinceMs == null) {
+            peerOwnsFalseSinceMs.remove(id)
+        } else {
+            peerOwnsFalseSinceMs[id] = confirmation.falseSinceMs
+        }
+        if (raw.owns || confirmation.confirmed) return raw
+        // Not yet confirmed: report the peer as still owning it rather than
+        // passing the fresh owns=false through, so a blip cannot start a takeover.
+        return raw.copy(owns = true)
     }
 
     private fun announceAndReconcile() {
@@ -528,7 +620,7 @@ object SensorOwnershipRuntime {
             if (autoSwitch) AUTO_SWITCH_PEER_SILENT_AFTER_MS else PEER_SILENT_AFTER_MS
         sensors().forEach { serial ->
             val id = key(serial)
-            val peer = if (companionEnabled && !peerGone) peerReportFor(serial) else null
+            val peer = if (companionEnabled && !peerGone) confirmedPeerReportFor(serial, now) else null
             val intent = intentFor(serial, companionEnabled)
             val shouldRead = SensorOwnershipPolicy.shouldReadLocally(
                 isPhone = !Applic.isWearable,

@@ -483,6 +483,54 @@ class SensorOwnershipPolicyTests {
     }
 
     @Test
+    fun peerOwningResetsAnyPendingFalseConfirmation() {
+        val result = resolvePeerStandDownConfirmation(
+            peerOwns = true,
+            previousFalseSinceMs = now - 5_000L,
+            nowMs = now,
+            confirmMs = 15_000L,
+        )
+        assertEquals(null, result.falseSinceMs)
+        assertFalse(result.confirmed)
+    }
+
+    @Test
+    fun aFreshFalseReportStartsTheClockButIsNotYetConfirmed() {
+        val result = resolvePeerStandDownConfirmation(
+            peerOwns = false,
+            previousFalseSinceMs = null,
+            nowMs = now,
+            confirmMs = 15_000L,
+        )
+        assertEquals(now, result.falseSinceMs)
+        assertFalse(result.confirmed)
+    }
+
+    @Test
+    fun aFalseReportInsideTheGraceWindowStaysUnconfirmed() {
+        val result = resolvePeerStandDownConfirmation(
+            peerOwns = false,
+            previousFalseSinceMs = now - 14_999L,
+            nowMs = now,
+            confirmMs = 15_000L,
+        )
+        assertEquals(now - 14_999L, result.falseSinceMs)
+        assertFalse(result.confirmed)
+    }
+
+    @Test
+    fun aFalseReportPastTheGraceWindowIsConfirmed() {
+        val result = resolvePeerStandDownConfirmation(
+            peerOwns = false,
+            previousFalseSinceMs = now - 15_000L,
+            nowMs = now,
+            confirmMs = 15_000L,
+        )
+        assertEquals(now - 15_000L, result.falseSinceMs)
+        assertTrue(result.confirmed)
+    }
+
+    @Test
     fun enabledCompanionStillHonoursExplicitWatchAssignment() {
         assertEquals(
             Intent.YIELD,

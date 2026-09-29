@@ -59,6 +59,12 @@ class OttaiBleManager(
         // all 88 drops of the 2026-08-01 jamming storm. See reconnectDelayAfterDisconnectMs.
         private const val GATT_CONN_TIMEOUT = 8
         private const val SUPERVISION_TIMEOUT_RECONNECT_DELAY_MS = 1_500L
+        // Below this many consecutive failed connects, the flat 3s default holds — it is what
+        // recovered an isolated drop in the 2026-08-01 storm. At or past it, a run of failures
+        // means the peripheral is not answering at all, and retrying at the same cadence forever
+        // just burns the radio; back off instead. See reconnectDelayAfterDisconnectMs.
+        private const val FAILURE_STREAK_BACKOFF_THRESHOLD = 3
+        private const val MAX_RECONNECT_DELAY_MS = 30_000L
         // The generic stack error a connectGatt() issued before registerApp() has settled comes
         // back as; see fastReArmBounced.
         private const val GATT_ERROR_STATUS = 133
@@ -559,17 +565,33 @@ class OttaiBleManager(
          * origin 1.5s earlier per status=8 outage, because connectDevice() stamps
          * lastBleActivityAtMs and arms the watchdog. The rungs (90/180/360s) are unchanged.
          *
-         * Every other status deliberately keeps the 3s default:
+         * Every other status deliberately keeps the 3s default for an isolated drop:
          *  - 19 (GATT_CONN_TERMINATE_PEER_USER) is a live peer closing the link itself, and a
          *    fast re-arm against that is how a connect/terminate loop gets built. 3s works —
          *    drop at 1785606352, reconnected 1785606359.
          *  - 22 (GATT_CONN_TERMINATE_LOCAL_HOST) is our own teardown, likewise.
          *  - 133 never occurred on this path: all five in the logs were ATT reads
          *    ("read err 00002aa7 ... phase=STREAMING").
+         *  - 147 was not in the 2026-08-01 dataset at all — a run of them, seen against a
+         *    handoff-triggered reconnect where the peripheral kept refusing every attempt for
+         *    over two minutes, is what [consecutiveFailures] backs off against below.
+         *
+         * [consecutiveFailures] is failed connects since the last STATE_CONNECTED, reset there and
+         * incremented on this path only — it does not touch the evidence-based 3s/1.5s choice
+         * above for the first [FAILURE_STREAK_BACKOFF_THRESHOLD] of them, and never overrides the
+         * supervision-timeout fast re-arm, which stays a deliberate exception regardless of streak
+         * length.
          */
-        internal fun reconnectDelayAfterDisconnectMs(status: Int, fastReArmAllowed: Boolean): Long =
-            if (status == GATT_CONN_TIMEOUT && fastReArmAllowed) SUPERVISION_TIMEOUT_RECONNECT_DELAY_MS
-            else RECONNECT_DELAY_MS
+        internal fun reconnectDelayAfterDisconnectMs(
+            status: Int,
+            fastReArmAllowed: Boolean,
+            consecutiveFailures: Int = 0,
+        ): Long {
+            if (status == GATT_CONN_TIMEOUT && fastReArmAllowed) return SUPERVISION_TIMEOUT_RECONNECT_DELAY_MS
+            if (consecutiveFailures < FAILURE_STREAK_BACKOFF_THRESHOLD) return RECONNECT_DELAY_MS
+            val doublings = consecutiveFailures - FAILURE_STREAK_BACKOFF_THRESHOLD + 1
+            return (RECONNECT_DELAY_MS shl doublings.coerceAtMost(30)).coerceAtMost(MAX_RECONNECT_DELAY_MS)
+        }
 
         /**
          * Whether this disconnect looks like the shortened re-arm above bouncing off the stack's
@@ -638,6 +660,9 @@ class OttaiBleManager(
     // GATT — unlike abnormalDropAtMs above, which several threads reach.
     @Volatile private var priorityReassertCount = 0
     @Volatile private var connectStallStreak = 0
+    // Failed connects since the last STATE_CONNECTED; reset there, incremented only on the
+    // ordinary disconnect path. Feeds reconnectDelayAfterDisconnectMs's backoff.
+    @Volatile private var consecutiveConnectFailures = 0
     @Volatile private var liveReadRetryCount = 0
     @Volatile private var lastUserReconnectAtMs = 0L
     // When the connect a shortened post-supervision-timeout re-arm scheduled is due to fire (not
@@ -1651,6 +1676,7 @@ class OttaiBleManager(
                 connectTime = System.currentTimeMillis()
                 lastBleActivityAtMs = connectTime
                 connectStallStreak = 0
+                consecutiveConnectFailures = 0
                 liveReadRetryCount = 0
                 // The outage is over. Stop the probe rather than letting it run out its window:
                 // the link landing IS an advertisement getting through, and a probe that is only
@@ -1777,7 +1803,16 @@ class OttaiBleManager(
                         Log.w(TAG, "status=$status ${now - fastReArmAtMs}ms after a shortened " +
                             "re-arm connected; back to the ${RECONNECT_DELAY_MS}ms delay for this outage")
                     }
-                    val delayMs = reconnectDelayAfterDisconnectMs(status, !fastReArmWithdrawn)
+                    consecutiveConnectFailures += 1
+                    val delayMs = reconnectDelayAfterDisconnectMs(
+                        status,
+                        !fastReArmWithdrawn,
+                        consecutiveConnectFailures,
+                    )
+                    if (delayMs > RECONNECT_DELAY_MS) {
+                        Log.w(TAG, "status=$status failure #$consecutiveConnectFailures in a row; " +
+                            "backing off to ${delayMs}ms")
+                    }
                     fastReArmAtMs =
                         if (delayMs == SUPERVISION_TIMEOUT_RECONNECT_DELAY_MS) now + delayMs else 0L
                     scheduleReconnect("gatt disconnect", delayMs)
