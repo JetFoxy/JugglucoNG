@@ -50,6 +50,11 @@ object JournalSnapshotAccess {
             .getOrNull()
 
     @JvmStatic
+    fun invalidateBroadcastIobCache() =
+        runCatching { bridge?.invalidateBroadcastIobCache() }
+            .onFailure { Log.stack(TAG, "invalidateBroadcastIobCache failed", it) }
+
+    @JvmStatic
     fun nightscoutUploadIobSnapshot(timeMillis: Long): FloatArray? =
         runCatching { bridge?.nightscoutUploadIobSnapshot(timeMillis) }
             .onFailure { Log.stack(TAG, "nightscoutUploadIobSnapshot failed", it) }

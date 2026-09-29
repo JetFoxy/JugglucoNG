@@ -19,6 +19,13 @@ interface JournalSnapshotBridge {
     /** `[classicIob, eiob, cob, iobNext30, cobNext30]`, or null when unavailable. */
     fun broadcastIobSnapshot(timeMillis: Long): FloatArray?
 
+    /**
+     * Drop the cached broadcast IOB snapshot so the next read recomputes.
+     * Follower sources call this when their remote state changes or is cleared;
+     * otherwise a stale cache keeps serving the previous remote values.
+     */
+    fun invalidateBroadcastIobCache()
+
     /** Local journal-only IOB/COB for upload; never echoes Clone or follower state. */
     fun nightscoutUploadIobSnapshot(timeMillis: Long): FloatArray?
 
