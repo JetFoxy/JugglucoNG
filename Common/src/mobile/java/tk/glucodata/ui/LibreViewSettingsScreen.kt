@@ -109,11 +109,10 @@ fun LibreViewSettingsScreen(navController: NavController) {
             Natives.setuselibreview(isActive)
         }
         val currentCountry = Natives.getLibreCountry()
-        val unitCountry = if (Natives.getunit() == 1) 0 else 1
         Natives.setLibreCountry(
             if (isRussia) 4
-            else if (currentCountry in 0..3 && (currentCountry and 1) == (unitCountry and 1)) currentCountry
-            else unitCountry
+            else if (currentCountry == 4) 0
+            else currentCountry
         )
         Natives.setLibreCurrent(libreCurrent)
         Natives.setLibreIsViewed(libreIsViewed)
