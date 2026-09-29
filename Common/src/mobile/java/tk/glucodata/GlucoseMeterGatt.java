@@ -521,8 +521,15 @@ boolean connected=false;
                         if(useConnect)
                             bluetoothGatt.connect();
                         }
-                    else
+                    else {
+                        // The one direct attempt a fresh sighting earns did not land.
+                        // Fall back to the whitelist connect: retrying directly would
+                        // keep the radio dialing for as long as the meter stays silent,
+                        // which for a meter is most of the day. The next sighting
+                        // (MeterScanner or the picker, via setDevice) earns another try.
+                        autoConnect=true;
                         connectActiveOrScan(0);
+                        }
                       }
                  }
          }
