@@ -355,6 +355,11 @@ class AiDexBleManager(
     private var serviceDiscoveryStarted = false
     /** Wall time of the most recent `onMtuChanged` on this connection, ours or the sensor's. */
     private var lastMtuCallbackAtMs = 0L
+    /**
+     * Set by [suppressPostUnpairBroadcastScan] before a delete-with-unbind. The ACK must not
+     * start a broadcast scan that the removal will stop before the platform has registered it.
+     */
+    @Volatile private var postUnpairBroadcastScanSuppressed = false
     /** Set when an `onMtuChanged` lands on top of the pending CCCD write; see the watchdog. */
     private var mtuExchangeCrossedPendingCccd = false
     /** F002 BOND reads on this connection that came back short (not 17 bytes). */
@@ -5287,9 +5292,14 @@ class AiDexBleManager(
             reconnect.isBroadcastOnlyMode = true
             stop = false
             UiRefreshBus.requestStatusRefresh()
-            handler.post { startBroadcastScan("post-unpair") }
+            if (postUnpairBroadcastScanSuppressed) {
+                Log.i(TAG, "post-unpair broadcast scan suppressed — sensor is being removed")
+            } else {
+                handler.post { startBroadcastScan("post-unpair") }
+            }
         } else if (pendingUnpairDisconnect) {
             pendingUnpairDisconnect = false
+            postUnpairBroadcastScanSuppressed = false
             isUnpaired = false
             Log.w(TAG, "DELETE_BOND was rejected or malformed; retaining PAIR credential")
             constatstatusstr = "Unpair failed — key retained"
@@ -6285,10 +6295,15 @@ class AiDexBleManager(
         return true
     }
 
+    override fun suppressPostUnpairBroadcastScan() {
+        postUnpairBroadcastScanSuppressed = true
+    }
+
     override fun unpairSensor(): Boolean {
         Log.i(TAG, "unpairSensor: sending deleteBond (0xF2) for $SerialNumber")
         consecutiveSetupDisconnects = 0
         val cmd = commandBuilder.deleteBond() ?: run {
+            postUnpairBroadcastScanSuppressed = false
             Log.e(TAG, "unpairSensor: session key unavailable — refusing unconfirmed local cleanup")
             constatstatusstr = "Connect before unpairing — key retained"
             UiRefreshBus.requestStatusRefresh()
@@ -6521,6 +6536,7 @@ class AiDexBleManager(
     }
 
     private fun startBroadcastScan(reason: String, continuous: Boolean = shouldContinueBroadcastScanning()) {
+        if (postUnpairBroadcastScanSuppressed) return
         if (broadcastScanActive && !recoverAlarmScanIfStale("start-$reason")) return
 
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
