@@ -1,7 +1,6 @@
 package tk.glucodata.glucosemeter
 
 import androidx.annotation.Keep
-import tk.glucodata.GlucoseMeterJournalBridge
 import tk.glucodata.Log
 import tk.glucodata.Natives
 import tk.glucodata.drivers.aidex.native.crypto.Crc16CcittFalse
@@ -30,7 +29,11 @@ class VerioSession {
 
     private enum class Stage { IDLE, TIME, T_COUNTER, R_COUNTER, RECORDS, DONE }
 
+    /** A reading the meter sent us; storing it is the caller's job. */
+    data class Reading(val timestampMillis: Long, val mgdlTenths: Int)
+
     private val outbox = ArrayDeque<ByteArray>()
+    private val pendingReadings = ArrayList<Reading>()
     private var stage = Stage.IDLE
     private var begun = false
     private var meterIndex = -1
@@ -44,6 +47,7 @@ class VerioSession {
 
     fun reset() {
         outbox.clear()
+        pendingReadings.clear()
         stage = Stage.IDLE
         begun = false
         meterTimeOffset = 0L
@@ -59,11 +63,20 @@ class VerioSession {
         reset()
         meterIndex = index
         begun = true
+        stage = Stage.TIME
         queue(command(0x20, 0x02)) // meter time first, every reading needs it
     }
 
     /** Next command to write, or null when there is nothing to send. */
     fun take(): ByteArray? = outbox.pollFirst()
+
+    /** Readings received since the last call. */
+    fun takeReadings(): List<Reading> {
+        if (pendingReadings.isEmpty()) return emptyList()
+        val copy = pendingReadings.toList()
+        pendingReadings.clear()
+        return copy
+    }
 
     private fun queue(value: ByteArray?) {
         if (value != null) outbox.addLast(value)
@@ -81,11 +94,12 @@ class VerioSession {
             Log.e(TAG, "empty notification")
             return
         }
-        // a single 0x81 is the meter acknowledging one of our commands
+        // a single 0x81 is the meter acknowledging one of our commands. It says
+        // nothing about which answer is coming, so the stage only moves on the
+        // data packet itself.
         if (message.size == 1) {
             if ((message[0].toInt() and 0x81) == 0x81) {
-                advanceHandshake()
-                queue(nextCommand())
+                Log.i(TAG, "ack")
             } else {
                 Log.e(TAG, String.format(Locale.US, "unexpected byte 0x%02X", message[0]))
             }
@@ -112,33 +126,44 @@ class VerioSession {
         handleData(message)
         // every data packet has to be acked before anything else goes out
         queue(byteArrayOf(0x81.toByte()))
-        advanceHandshake()
-        queue(nextCommand())
+        queue(advance())
     }
 
     private fun handleData(message: ByteArray) {
         val result = message.copyOfRange(6, message.size - 3)
         val data = ByteBuffer.wrap(result).order(ByteOrder.LITTLE_ENDIAN)
-        when (result.size) {
-            4 -> {
-                val value = data.int
-                if (value > 100000) {
-                    val meterTime = (value.toLong() + TIME_OFFSET) * 1000L
-                    meterTimeOffset = System.currentTimeMillis() - meterTime
-                    haveMeterTime = true
-                    Log.i(TAG, String.format(Locale.US, "meter time received, offset=%dms", meterTimeOffset))
-                } else {
-                    highestRecordNumber = value
-                    Log.i(TAG, String.format(Locale.US, "record counter=%d", value))
+        // the stage says what we asked for, which is more reliable than guessing
+        // from the payload length
+        when (stage) {
+            Stage.TIME -> {
+                if (result.size != 4) {
+                    Log.e(TAG, String.format(Locale.US, "meter time expected 4 bytes, got %d", result.size))
+                    return
                 }
+                val meterTime = (data.int.toLong() + TIME_OFFSET) * 1000L
+                meterTimeOffset = System.currentTimeMillis() - meterTime
+                haveMeterTime = true
+                Log.i(TAG, String.format(Locale.US, "meter time received, offset=%dms", meterTimeOffset))
             }
-            2 -> {
+            Stage.T_COUNTER -> {
+                if (result.size != 4) {
+                    Log.e(TAG, String.format(Locale.US, "record counter expected 4 bytes, got %d", result.size))
+                    return
+                }
+                highestRecordNumber = data.int
+                Log.i(TAG, String.format(Locale.US, "record counter=%d", highestRecordNumber))
+            }
+            Stage.R_COUNTER -> {
+                if (result.size != 2) {
+                    Log.e(TAG, String.format(Locale.US, "record count expected 2 bytes, got %d", result.size))
+                    return
+                }
                 numberOfRecords = data.short.toInt() and 0xFFFF
                 Log.i(TAG, String.format(Locale.US, "number of records=%d", numberOfRecords))
                 startRecordRequests()
             }
-            11 -> handleReading(data)
-            else -> Log.e(TAG, String.format(Locale.US, "data packet of %d bytes", result.size))
+            Stage.RECORDS -> handleReading(data)
+            else -> Log.e(TAG, String.format(Locale.US, "data packet of %d bytes outside a request", result.size))
         }
     }
 
@@ -164,10 +189,7 @@ class VerioSession {
         }
         val timestamp = ((data.int.toLong() and 0xFFFFFFFFL) + TIME_OFFSET) * 1000L + meterTimeOffset
         val record = requestedRecord
-        val saved = Natives.GlucoseMeterSaveDecodedResult(meterIndex, timestamp, mgdl * 10)
-        if (saved != null && saved.size >= 2) {
-            GlucoseMeterJournalBridge.record(meterIndex, saved[0], saved[1])
-        }
+        pendingReadings.add(Reading(timestamp, mgdl * 10))
         Log.i(TAG, String.format(Locale.US, "reading %d = %d mg/dl at %d", record, mgdl, timestamp))
         Natives.GlucoseMeterSetLastPos(meterIndex, maxOf(record, highestRecordSeen()))
         nextRecordToRequest = record - 1
@@ -177,12 +199,12 @@ class VerioSession {
     private fun startRecordRequests() {
         if (highestRecordNumber < 0 || numberOfRecords < 0) {
             Log.e(TAG, "counters missing, cannot request records")
-            stage = Stage.DONE
+            nextRecordToRequest = 0
             return
         }
         if (numberOfRecords == 0) {
             Log.i(TAG, "no readings on the meter")
-            stage = Stage.DONE
+            nextRecordToRequest = 0
             return
         }
         val lowest = maxOf(highestRecordNumber - numberOfRecords, highestRecordNumber - MAX_BACKFILL_RECORDS)
@@ -193,30 +215,29 @@ class VerioSession {
             numberOfRecords, highestRecordNumber, lowest, highestRecordSeen()))
     }
 
-    private fun advanceHandshake() {
+    /** Moves to the next request and returns the command that asks for it. */
+    private fun advance(): ByteArray? {
         stage = when (stage) {
-            Stage.IDLE -> Stage.TIME
             Stage.TIME -> Stage.T_COUNTER
             Stage.T_COUNTER -> Stage.R_COUNTER
             Stage.R_COUNTER -> Stage.RECORDS
             else -> stage
         }
-    }
-
-    private fun nextCommand(): ByteArray? = when (stage) {
-        Stage.TIME -> command(0x0a, 0x02, 0x06) // record counter
-        Stage.T_COUNTER -> command(0x27, 0x00) // number of records
-        Stage.RECORDS -> {
-            if (nextRecordToRequest <= highestRecordSeen() || recordsRequested >= MAX_BACKFILL_RECORDS) {
-                stage = Stage.DONE
-                Log.i(TAG, "nothing newer on the meter")
-                null
-            } else {
-                requestedRecord = nextRecordToRequest
-                command(0xb3, requestedRecord and 0xff, (requestedRecord shr 8) and 0xff)
+        return when (stage) {
+            Stage.T_COUNTER -> command(0x0a, 0x02, 0x06) // record counter
+            Stage.R_COUNTER -> command(0x27, 0x00) // number of records
+            Stage.RECORDS -> {
+                if (nextRecordToRequest <= highestRecordSeen() || recordsRequested >= MAX_BACKFILL_RECORDS) {
+                    stage = Stage.DONE
+                    Log.i(TAG, "nothing newer on the meter")
+                    null
+                } else {
+                    requestedRecord = nextRecordToRequest
+                    command(0xb3, requestedRecord and 0xff, (requestedRecord shr 8) and 0xff)
+                }
             }
+            else -> null
         }
-        else -> null
     }
 
     private fun reportError(messageType: Byte, message: ByteArray) {

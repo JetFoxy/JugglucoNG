@@ -48,4 +48,24 @@ class VerioSessionTest {
         assertArrayEquals(VerioSession.command(0x20, 0x02), session.take())
         assertEquals("only one command may be in flight", null, session.take())
     }
+
+    @Test
+    fun `the ack alone does not move the handshake on`() {
+        val session = VerioSession()
+        session.begin(-1)
+        assertArrayEquals(VerioSession.command(0x20, 0x02), session.take())
+        session.onNotification(byteArrayOf(0x81.toByte()))
+        assertEquals("ack must not queue the next request", null, session.take())
+    }
+
+    @Test
+    fun `a data packet acks and then asks for the next thing`() {
+        val session = VerioSession()
+        session.begin(-1)
+        assertArrayEquals(VerioSession.command(0x20, 0x02), session.take())
+        session.onNotification(VerioSession.command(0x06, 0x3e, 0x3c, 0x4e, 0x32, 0x03, 0x65, 0x2a))
+        assertArrayEquals("ack first", byteArrayOf(0x81.toByte()), session.take())
+        assertArrayEquals("then the record counter", VerioSession.command(0x0a, 0x02, 0x06), session.take())
+        assertEquals("and nothing after that", null, session.take())
+    }
 }

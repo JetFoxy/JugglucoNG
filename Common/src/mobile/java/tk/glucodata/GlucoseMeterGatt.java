@@ -215,6 +215,25 @@ private void writeNextVerioCommand(BluetoothGatt gatt) {
 private void processVerioResponse(BluetoothGatt gatt, byte[] value) {
     if(doLog) Log.showbytes(LOG_ID+": verio notification",value);
     verioSession.onNotification(value);
+    final var readings=verioSession.takeReadings();
+    if(!readings.isEmpty())
+        persistVerioReadings(readings);
+    // the answer queues the ack and the next request, and no write is in
+    // flight any more, so drain it here
+    writeNextVerioCommand(gatt);
+    }
+
+private void persistVerioReadings(List<VerioSession.Reading> readings) {
+    for(final var reading:readings) {
+        final long[] saved=Natives.GlucoseMeterSaveDecodedResult(
+            meterIndex,reading.getTimestampMillis(),reading.getMgdlTenths());
+        if(saved==null || saved.length<2) continue;
+        GlucoseMeterJournalBridge.record(meterIndex,saved[0],saved[1]);
+        if(saved.length>=3 && saved[2]!=0L) newvalues=true;
+        }
+    receivedTime=System.currentTimeMillis();
+    updateview();
+    Applic.app.redraw();
     }
 
 private void beginSatelliteSession(BluetoothGatt gatt) {
