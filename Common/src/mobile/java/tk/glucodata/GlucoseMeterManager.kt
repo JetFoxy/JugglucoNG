@@ -71,7 +71,8 @@ object GlucoseMeterManager {
             }.onFailure { Log.stack(TAG, "removeBond", it) }.getOrDefault(false)
         }
         Natives.GlucoseMeterSetDeviceAddress(index, null)
-        Natives.GlucoseMeterSetLastTime(index, 0L)
+        // lastTime is deliberately kept: it is what stops the native store from
+        // taking the same readings a second time if this meter is paired again.
         return unbound
     }
 
@@ -98,9 +99,11 @@ object GlucoseMeterManager {
         // is on that row whether the meter was ever added or not, so a stored
         // device address is what actually makes one configured. Filtering on the
         // name alone lists every known model and leaves forget() with no row to
-        // remove. getActiveGlucoseMeters() exists for the same distinction on
-        // the connection side.
-        val address = Natives.GlucoseMeterDeviceAddress(index)?.takeIf { it.isNotBlank() } ?: return null
+        // remove. An active row still counts without one: the legacy meter list
+        // enables a meter before the scanner has found it, and hiding that row
+        // would leave no way to switch it off here.
+        val address = Natives.GlucoseMeterDeviceAddress(index)?.takeIf { it.isNotBlank() }
+        if (address == null && !Natives.GlucoseMeterGetActive(index)) return null
         val gatt = BluetoothGlucoseMeter.getExistingGatt(index)
         return GlucoseMeterSnapshot(
             index = index,

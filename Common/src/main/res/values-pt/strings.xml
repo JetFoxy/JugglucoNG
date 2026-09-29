@@ -826,6 +826,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="glucose_meters_nearby">Medidores próximos</string>
     <string name="glucose_meter_last_reading">Última medição: %1$s</string>
     <string name="glucose_meter_no_readings">Ainda não foram importadas medições</string>
+    <string name="satellite_meter_code_missing">Medidor Satellite: defina primeiro o código do medidor nas definições de medidores de glicose</string>
+    <string name="glucose_meter_forget">Esquecer</string>
+    <string name="glucose_meter_forget_title">Esquecer medidor</string>
+    <string name="glucose_meter_forget_desc">Deixar de usar %1$s e desemparelhá-lo deste telefone? As leituras já importadas para o diário são mantidas.</string>
     <string name="mgdL">mg/dL</string>
     <string name="min">Mínimo</string>
     <string name="min_glucose">Mínimo</string>

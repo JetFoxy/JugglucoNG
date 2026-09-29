@@ -886,6 +886,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="glucose_meters_nearby">Mätare i närheten</string>
     <string name="glucose_meter_last_reading">Senaste mätning: %1$s</string>
     <string name="glucose_meter_no_readings">Inga mätvärden har importerats ännu</string>
+    <string name="satellite_meter_code_missing">Satellite-mätare: ange först mätarkoden i inställningarna för blodsockermätare</string>
+    <string name="glucose_meter_forget">Glöm</string>
+    <string name="glucose_meter_forget_title">Glöm mätare</string>
+    <string name="glucose_meter_forget_desc">Sluta använda %1$s och koppla bort den från den här telefonen? Mätvärden som redan importerats till journalen behålls.</string>
     <string name="min">Min</string>
     <string name="min_glucose">Min</string>
     <string name="newdata">"New data"</string>

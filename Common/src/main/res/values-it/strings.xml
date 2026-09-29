@@ -806,6 +806,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="glucose_meters_nearby">Glucometri nelle vicinanze</string>
     <string name="glucose_meter_last_reading">Ultima misurazione: %1$s</string>
     <string name="glucose_meter_no_readings">Nessuna misurazione ancora importata</string>
+    <string name="satellite_meter_code_missing">Glucometro Satellite: imposta prima il codice del glucometro nelle impostazioni dei glucometri</string>
+    <string name="glucose_meter_forget">Dimentica</string>
+    <string name="glucose_meter_forget_title">Dimentica glucometro</string>
+    <string name="glucose_meter_forget_desc">Smettere di usare %1$s e dissociarlo da questo telefono? Le letture già importate nel diario vengono mantenute.</string>
     <string name="mgdL">mg/dL</string>
     <string name="min">minimo</string>
     <string name="min_glucose">minimo</string>

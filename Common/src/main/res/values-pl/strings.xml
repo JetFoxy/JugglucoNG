@@ -939,6 +939,10 @@
     <string name="glucose_meters_nearby">Glukometry w pobliżu</string>
     <string name="glucose_meter_last_reading">Ostatni pomiar: %1$s</string>
     <string name="glucose_meter_no_readings">Nie zaimportowano jeszcze pomiarów</string>
+    <string name="satellite_meter_code_missing">Glukometr Satellite: najpierw ustaw kod glukometru w ustawieniach glukometrów</string>
+    <string name="glucose_meter_forget">Zapomnij</string>
+    <string name="glucose_meter_forget_title">Zapomnij glukometr</string>
+    <string name="glucose_meter_forget_desc">Przestać używać %1$s i rozparować go z tym telefonem? Odczyty już zaimportowane do dziennika zostaną zachowane.</string>
     <string name="min">Min</string>
     <string name="min_glucose">Min</string>
     <string name="newdata">"Nowe dane"</string>

@@ -898,6 +898,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="glucose_meters_nearby">Глюкометри поблизу</string>
     <string name="glucose_meter_last_reading">Останнє вимірювання: %1$s</string>
     <string name="glucose_meter_no_readings">Вимірювання ще не імпортовано</string>
+    <string name="satellite_meter_code_missing">Глюкометр Satellite: спочатку вкажіть код глюкометра в налаштуваннях глюкометрів</string>
+    <string name="glucose_meter_forget">Забути</string>
+    <string name="glucose_meter_forget_title">Забути глюкометр</string>
+    <string name="glucose_meter_forget_desc">Припинити використовувати %1$s і від’єднати його від цього телефона? Показання, вже імпортовані в журнал, збережуться.</string>
     <string name="min">Мін</string>
     <string name="min_glucose">Мін</string>
     <string name="newdata">"New data"</string>
