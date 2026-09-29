@@ -84,6 +84,8 @@ private data class NearbyGlucoseMeter(
 private val satelliteMeterServiceUuid =
     UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
 
+private const val satelliteMeterNamePrefix = "Satellite"
+
 @SuppressLint("MissingPermission")
 @Composable
 fun GlucoseMeterSettingsScreen(navController: NavController) {
@@ -133,8 +135,13 @@ fun GlucoseMeterSettingsScreen(navController: NavController) {
                     ?: result.scanRecord?.deviceName
                     ?: return@startScan
                 if (nearby.none { it.address == address }) {
+                    // The Satellite does not advertise any service UUID at all
+                    // (services=null in the trace), so fall back to its name -
+                    // otherwise the code dialog never shows and the meter can
+                    // only be added without a code.
                     val requiresSatelliteCode = result.scanRecord?.serviceUuids
-                        ?.any { it.uuid == satelliteMeterServiceUuid } == true
+                        ?.any { it.uuid == satelliteMeterServiceUuid } == true ||
+                        name.startsWith(satelliteMeterNamePrefix, ignoreCase = true)
                     nearby = nearby + NearbyGlucoseMeter(
                         device = device,
                         name = name,

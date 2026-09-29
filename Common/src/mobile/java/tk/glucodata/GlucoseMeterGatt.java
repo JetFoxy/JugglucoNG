@@ -59,6 +59,7 @@ import tk.glucodata.glucosemeter.SatelliteMeterCredentials;
 import tk.glucodata.glucosemeter.SatelliteMeterProtocol;
 import tk.glucodata.glucosemeter.SatelliteMeterSession;
 import tk.glucodata.glucosemeter.SatelliteSessionUpdate;
+import tk.glucodata.glucosemeter.VerioSession;
 
 public  class GlucoseMeterGatt  extends BluetoothGattCallback {
     MeterList.MeterView view=null;
@@ -106,6 +107,8 @@ long foundtime=0L;
  private static final String IsensTimeCharUUID ="0000fff1-0000-1000-8000-00805f9b34fb";
  private static final String SatelliteRxCharUUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
  private static final String SatelliteTxCharUUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+ private static final String VerioWriteCharUUID = "af9df7a2-e595-11e3-96b4-0002a5d5c51b";
+ private static final String VerioNotifyCharUUID = "af9df7a3-e595-11e3-96b4-0002a5d5c51b";
 
 
 
@@ -120,6 +123,9 @@ private BluetoothGattCharacteristic SatelliteRxChar;
 private BluetoothGattCharacteristic SatelliteTxChar;
 private SatelliteMeterSession satelliteSession;
 private boolean satelliteMode=false;
+private BluetoothGattCharacteristic VerioWriteChar;
+private BluetoothGattCharacteristic VerioNotifyChar;
+private final VerioSession verioSession=new VerioSession();
 
 
 
@@ -131,9 +137,13 @@ private boolean discover(BluetoothGatt bluetoothGatt) {
     SatelliteRxChar=null;
     SatelliteTxChar=null;
     satelliteSession=null;
+    VerioWriteChar=null;
+    VerioNotifyChar=null;
+    verioSession.reset();
     for(var ser:services) {
         if(doLog) Log.i(LOG_ID,"service: "+ser.getUuid().toString());
         final boolean satelliteService=ser.getUuid().equals(SatelliteMeterProtocol.SERVICE_UUID);
+        final boolean verioService=ser.getUuid().equals(VerioSession.SERVICE_UUID);
         var chars=ser.getCharacteristics();
         for(var s:chars) {
             var uuid=s.getUuid().toString();
@@ -148,6 +158,8 @@ private boolean discover(BluetoothGatt bluetoothGatt) {
                 case RecordsCharUUID: RecordsChar=s;break;
                 case SatelliteRxCharUUID: if(satelliteService) SatelliteRxChar=s;break;
                 case SatelliteTxCharUUID: if(satelliteService) SatelliteTxChar=s;break;
+                case VerioWriteCharUUID: if(verioService) VerioWriteChar=s;break;
+                case VerioNotifyCharUUID: if(verioService) VerioNotifyChar=s;break;
                 }
             }
         }
@@ -157,8 +169,21 @@ private boolean discover(BluetoothGatt bluetoothGatt) {
         if(doLog) Log.i(LOG_ID,"Satellite Nordic UART service discovered");
         beginSatelliteSession(bluetoothGatt);
     }
+    else if(VerioWriteChar!=null && VerioNotifyChar!=null) {
+        // OneTouch Verio Flex: no glucose service at all, just this vendor pair
+        success=true;
+        if(doLog) Log.i(LOG_ID,"OneTouch Verio service discovered");
+        if(!enableNotification(bluetoothGatt,VerioNotifyChar)) {
+            Log.e(LOG_ID,"Could not enable Verio notifications");
+            success=false;
+            }
+        }
     else if(success)  {
         if(doLog) Log.i(LOG_ID,"discover succesfull");
+        if(ManufacturerNameChar==null) {
+            Log.e(LOG_ID,"no manufacturer name characteristic");
+            return false;
+            }
         tryer( ()->
             {
             return bluetoothGatt.readCharacteristic(ManufacturerNameChar);
@@ -172,10 +197,31 @@ private boolean discover(BluetoothGatt bluetoothGatt) {
     return success;
     }
 
+private void beginVerioSession(BluetoothGatt gatt) {
+    verioSession.begin(meterIndex);
+    writeNextVerioCommand(gatt);
+    }
+
+private void writeNextVerioCommand(BluetoothGatt gatt) {
+    final byte[] command=verioSession.take();
+    if(command==null)
+        return;
+    if(doLog) Log.showbytes(LOG_ID+": verio write",command);
+    if(!writeVerio(gatt,command)) {
+        Log.e(LOG_ID,"verio write failed");
+        }
+    }
+
+private void processVerioResponse(BluetoothGatt gatt, byte[] value) {
+    if(doLog) Log.showbytes(LOG_ID+": verio notification",value);
+    verioSession.onNotification(value);
+    }
+
 private void beginSatelliteSession(BluetoothGatt gatt) {
     final String pin=SatelliteMeterProtocol.resolvePin(SatelliteMeterCredentials.load());
     if(pin==null) {
         Log.e(LOG_ID,"Satellite meter code is missing or invalid");
+        Applic.argToaster(app, R.string.satellite_meter_code_missing, android.widget.Toast.LENGTH_LONG);
         return;
     }
     satelliteSession=new SatelliteMeterSession(pin,System.currentTimeMillis());
@@ -195,6 +241,9 @@ boolean newvalues=false;
         switch(uuid) {
             case SatelliteTxCharUUID:
                 processSatelliteResponse(gatt,value);
+                break;
+            case VerioNotifyCharUUID:
+                processVerioResponse(gatt,value);
                 break;
             case GlucoseCharUUID:
                 final long[] saved = Natives.GlucoseMeterSaveResult(meterIndex,value);
@@ -350,6 +399,13 @@ private void handleManufactory(BluetoothGatt gatt,String manufacturer) {
         switch(uuid) {
             case IsensTimeCharUUID: tryer(()->enableNotification(gatt, GlucoseChar));break;
 
+            case VerioWriteCharUUID:
+                // the meter takes one command at a time, so send the next queued one
+                if(status!=GATT_SUCCESS)
+                    Log.e(LOG_ID,"verio write status: "+status);
+                writeNextVerioCommand(gatt);
+                break;
+
             default:
             }
     }
@@ -432,9 +488,6 @@ boolean connected=false;
                 Log.i(LOG_ID,"onDescriptorRead/4 "+status);
     }
 
-static private          byte[] VerioGetTimeCMD={0x20, 0x02};
-static private          byte[] VerioGetTcounterCMD={0x20, 0x02};
-
   private boolean writer(BluetoothGatt mBluetoothGatt,BluetoothGattCharacteristic cha, byte[] data) {
         if (!cha.setValue(data)) {
             {if(doLog){Log.showbytes(LOG_ID + ": " +cha.getUuid().toString() + " cha.setValue failed", data);};}
@@ -457,6 +510,15 @@ private boolean writeSatellite(BluetoothGatt gatt,byte[] command) {
     final boolean written=gatt.writeCharacteristic(characteristic);
     if(doLog) Log.i(LOG_ID,written ? "Satellite command written" : "Satellite command write failed");
     return written;
+}
+
+private boolean writeVerio(BluetoothGatt gatt,byte[] command) {
+    final BluetoothGattCharacteristic characteristic=VerioWriteChar;
+    if(characteristic==null || !characteristic.setValue(command)) {
+        Log.e(LOG_ID,"Could not prepare Verio command");
+        return false;
+        }
+    return gatt.writeCharacteristic(characteristic);
 }
 //s/\<\([a-zA-Z0-9]*\).writeCharacteristic(\([^,]*\),\([^)]*\))/writer(\1,\2,\3)
 
@@ -484,6 +546,13 @@ private void setCareSenseTime(BluetoothGatt bluetoothGatt) {
                     final byte[] command=session.notificationsEnabled().getCommand();
                     if(command!=null) tryer(()->writeSatellite(bluetoothGatt,command));
                 }
+                break;
+           case VerioNotifyCharUUID:
+                if(status!=GATT_SUCCESS) {
+                    Log.e(LOG_ID,"Verio notification descriptor failed: "+status);
+                    break;
+                    }
+                beginVerioSession(bluetoothGatt);
                 break;
            case GlucoseCharUUID:
                 tryer(()->enableIndication(bluetoothGatt, RecordsChar));
