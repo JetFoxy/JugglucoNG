@@ -59,6 +59,31 @@ class WearJournalIdentityWiringTests {
     }
 
     @Test
+    fun theOutboxIsPersistedAndTheRetryIsGatedOnTheEcho() {
+        val text = source("src/main/java/tk/glucodata/WearJournalSync.kt")
+        assertTrue(
+            "an add the phone has not confirmed has to survive a restart, or it is lost the moment " +
+                "the watch app is killed",
+            text.contains("""putString(KEY_OUTBOX, encodeOutbox(items))"""),
+        )
+        assertTrue(
+            "an add that has already been sent may only be sent again against a phone that echoes " +
+                "identities; without the check a re-send against an older phone is a second row",
+            text.contains("val mayRepeat = cached?.identityEcho == true") &&
+                text.contains("if (repeat && !mayRepeat(item, mayRepeat)) return@map item"),
+        )
+        assertTrue(
+            "saved must mean persisted: sendAdd returning the transport result is the bug #502 is about",
+            text.contains("fun sendAdd(") && text.contains("storeOutbox(outbox() + item)"),
+        )
+        assertTrue(
+            "a serve is the only proof available, so it has to be the thing that empties the queue",
+            text.contains("val kept = outbox().filterNot { confirmedBy(served, it) }") &&
+                text.contains("reconcile(journal)"),
+        )
+    }
+
+    @Test
     fun theseChecksAreReadingTheFilesTheyName() {
         // A regex that has stopped matching is a test that passes by finding nothing, which is
         // worse than no test at all.
