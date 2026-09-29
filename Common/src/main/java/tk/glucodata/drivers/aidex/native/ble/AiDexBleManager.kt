@@ -360,6 +360,12 @@ class AiDexBleManager(
      * start a broadcast scan that the removal will stop before the platform has registered it.
      */
     @Volatile private var postUnpairBroadcastScanSuppressed = false
+    /**
+     * Pairs the ACK's write of [AiDexReconnect.isBroadcastOnlyMode] with the release that reads it.
+     * The ACK runs on the handler. Release runs on the disconnect coroutine's IO thread.
+     * The field is not volatile.
+     */
+    private val postUnpairScanLock = Any()
     /** Set when an `onMtuChanged` lands on top of the pending CCCD write; see the watchdog. */
     private var mtuExchangeCrossedPendingCccd = false
     /** F002 BOND reads on this connection that came back short (not 17 bytes). */
@@ -5288,14 +5294,18 @@ class AiDexBleManager(
             keyExchange.reset()
             softDisconnect()
             constatstatusstr = "Unpaired — Broadcast Only"
-            // Transition to broadcast-only mode so user keeps getting data
-            reconnect.isBroadcastOnlyMode = true
+            // The ACK runs on the handler. Release reads the mode on the IO thread, so the
+            // write and that read share this lock.
             stop = false
+            val startPostUnpairScan = synchronized(postUnpairScanLock) {
+                reconnect.isBroadcastOnlyMode = true
+                !postUnpairBroadcastScanSuppressed
+            }
             UiRefreshBus.requestStatusRefresh()
-            if (postUnpairBroadcastScanSuppressed) {
-                Log.i(TAG, "post-unpair broadcast scan suppressed — sensor is being removed")
-            } else {
+            if (startPostUnpairScan) {
                 handler.post { startBroadcastScan("post-unpair") }
+            } else {
+                Log.i(TAG, "post-unpair broadcast scan suppressed — sensor is being removed")
             }
         } else if (pendingUnpairDisconnect) {
             pendingUnpairDisconnect = false
@@ -6299,11 +6309,42 @@ class AiDexBleManager(
         postUnpairBroadcastScanSuppressed = true
     }
 
+    override fun releasePostUnpairBroadcastScanSuppression() {
+        // Under the same lock as the ACK's mode write. Clearing the flag here either happens
+        // before that read, so the ACK starts the scan, or after it, so this side sees
+        // broadcast-only and starts the scan the ACK skipped. Release runs off the handler,
+        // and the field is not volatile.
+        val startNow = synchronized(postUnpairScanLock) {
+            if (!postUnpairBroadcastScanSuppressed) return@synchronized false
+            postUnpairBroadcastScanSuppressed = false
+            reconnect.isBroadcastOnlyMode
+        }
+        if (!startNow) return
+        handler.post {
+            if (postUnpairBroadcastScanSuppressed || !broadcastOnlyConnection) return@post
+            startBroadcastScan("delete-unbind-cancelled")
+        }
+    }
+
+    /**
+     * A refused unpair did not send DELETE_BOND, so no ACK will start the scan. Drop the
+     * suppression. Once a confirmed unpair has already entered broadcast-only, the ACK skipped
+     * its scan and [releasePostUnpairBroadcastScanSuppression] still owes it: clearing the flag
+     * here would make that release return without starting.
+     */
+    private fun clearPostUnpairSuppressionUnlessBroadcastOnly() {
+        synchronized(postUnpairScanLock) {
+            if (!reconnect.isBroadcastOnlyMode) {
+                postUnpairBroadcastScanSuppressed = false
+            }
+        }
+    }
+
     override fun unpairSensor(): Boolean {
         Log.i(TAG, "unpairSensor: sending deleteBond (0xF2) for $SerialNumber")
         consecutiveSetupDisconnects = 0
         val cmd = commandBuilder.deleteBond() ?: run {
-            postUnpairBroadcastScanSuppressed = false
+            clearPostUnpairSuppressionUnlessBroadcastOnly()
             Log.e(TAG, "unpairSensor: session key unavailable — refusing unconfirmed local cleanup")
             constatstatusstr = "Connect before unpairing — key retained"
             UiRefreshBus.requestStatusRefresh()
