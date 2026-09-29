@@ -241,7 +241,6 @@ object SensorOwnershipRuntime {
 
     /** Per-sensor state for [resolvePeerStandDownConfirmation]; see [confirmedPeerReportFor]. */
     private val peerOwnsFalseSinceMs = ConcurrentHashMap<String, Long>()
-    private val lastConfirmedPeerReport = ConcurrentHashMap<String, SensorOwnershipPolicy.PeerReport>()
 
     /**
      * Whether the last announcement we tried to deliver actually reached the
@@ -421,6 +420,18 @@ object SensorOwnershipRuntime {
             Log.i(LOG_ID, "peer holds ${report.first}=${report.second} newest=${report.third}")
         }
         executor.execute { runCatching { reconcile() }.onFailure { Log.stack(LOG_ID, "reconcile", it) } }
+        if (!report.second) {
+            // An unchanged owns=false is only repeated at the heartbeat, and the
+            // tick is a minute: reconcile again when the confirmation window
+            // closes, so a real hand-back waits the window and not the tick.
+            runCatching {
+                executor.schedule(
+                    { runCatching { reconcile() }.onFailure { Log.stack(LOG_ID, "stand-down reconcile", it) } },
+                    PEER_STOOD_DOWN_CONFIRM_MS + 1_000L,
+                    TimeUnit.MILLISECONDS,
+                )
+            }
+        }
     }
 
     /**
@@ -447,15 +458,14 @@ object SensorOwnershipRuntime {
      * [peerReportFor], debounced through [resolvePeerStandDownConfirmation] so a
      * single owns=false report cannot start a takeover on its own — only one
      * that persists past [PEER_STOOD_DOWN_CONFIRM_MS] is passed through as-is.
-     * Until then this keeps serving the last report that was actually believed,
-     * which is what [reconcile] must see to avoid reading "peer gone" from a
-     * report we have decided not to trust yet.
+     * Until then the fresh report is served with `owns` held at true: its
+     * [SensorOwnershipPolicy.PeerReport.receivedAtMs] and `lastReadingMs` stay
+     * current, so the peer does not start looking silent from an older report.
      */
     private fun confirmedPeerReportFor(serial: String, nowMs: Long): SensorOwnershipPolicy.PeerReport? {
         val id = key(serial)
         val raw = peerReportFor(serial) ?: run {
             peerOwnsFalseSinceMs.remove(id)
-            lastConfirmedPeerReport.remove(id)
             return null
         }
         val confirmation = resolvePeerStandDownConfirmation(
@@ -469,15 +479,10 @@ object SensorOwnershipRuntime {
         } else {
             peerOwnsFalseSinceMs[id] = confirmation.falseSinceMs
         }
-        if (raw.owns || confirmation.confirmed) {
-            lastConfirmedPeerReport[id] = raw
-            return raw
-        }
+        if (raw.owns || confirmation.confirmed) return raw
         // Not yet confirmed: report the peer as still owning it rather than
-        // passing the fresh owns=false through, so a blip cannot start a
-        // takeover. Falls back to the raw report (with owns overridden) only
-        // the first time we have ever heard from this peer at all.
-        return lastConfirmedPeerReport[id] ?: raw.copy(owns = true)
+        // passing the fresh owns=false through, so a blip cannot start a takeover.
+        return raw.copy(owns = true)
     }
 
     private fun announceAndReconcile() {
