@@ -59,6 +59,10 @@ class ApiGlucoseSourceManager(
     @Volatile private var phase: Phase = Phase.IDLE
     @Volatile private var status: String = localizedString(R.string.api_source_status_idle, "API source idle")
     @Volatile private var lastImportedHistoryTailMs: Long = 0L
+    // Snapshot parsed from the current poll, committed only once the refresh is
+    // known to still be active (see refresh()): parsing must not mutate the
+    // shared ApiIobSnapshot while a disable/terminate may be racing it.
+    @Volatile private var pendingIobSnapshot: ApiIobSnapshot.RemoteIob? = null
     @Volatile private var latestReadingTimeMs: Long = 0L
     @Volatile private var latestReadingMgdl: Float = Float.NaN
     @Volatile private var latestAutoMgdl: Float = Float.NaN
@@ -172,6 +176,7 @@ class ApiGlucoseSourceManager(
     override fun softDisconnect() {
         stop = true
         handler.removeCallbacksAndMessages(null)
+        dropApiIobSnapshot()
         setStatus(Phase.IDLE, localizedString(R.string.api_source_status_paused, "API source paused"))
     }
 
@@ -184,7 +189,7 @@ class ApiGlucoseSourceManager(
     override fun terminateManagedSensor(wipeData: Boolean) {
         stop = true
         handler.removeCallbacksAndMessages(null)
-        ApiIobSnapshot.clear()
+        dropApiIobSnapshot()
         if (wipeData) {
             Applic.app?.let { ApiGlucoseSourceRegistry.disableSourceSensor(it) }
         }
@@ -219,7 +224,15 @@ class ApiGlucoseSourceManager(
         setStatus(Phase.SYNCING, localizedString(R.string.api_source_status_syncing, "Refreshing API source"))
         try {
             VirtualGlucoseSensorBridge.pruneFutureHistory(SerialNumber, "API source")
+            pendingIobSnapshot = null
             val readings = fetchReadings()
+            if (stop) {
+                // Disabled or terminated while the network request was in flight:
+                // drop what it brought back instead of resurrecting cleared state.
+                dropApiIobSnapshot()
+                return
+            }
+            commitPendingIobSnapshot()
             if (readings.isEmpty()) {
                 setStatus(Phase.IDLE, localizedString(R.string.api_source_status_no_readings, "No API readings yet"))
                 scheduleRefresh(pollIntervalMs)
@@ -471,7 +484,7 @@ class ApiGlucoseSourceManager(
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return emptyList()
         importJournalPayload(trimmed)
-        importIobSnapshot(trimmed)
+        noteIobSnapshot(ApiIobSnapshot.parse(trimmed))
         val objects = when {
             trimmed.startsWith("[") -> jsonArrayObjects(JSONArray(trimmed))
             else -> {
@@ -673,7 +686,7 @@ class ApiGlucoseSourceManager(
             ?: Double.NaN
         // GlucoWatch text carries the sender's IOB/COB alongside glucose; keep
         // the snapshot so the follower shows the sender's numbers (see parseOutboundJson).
-        ApiIobSnapshot.update(ApiIobSnapshot.fromTextFields(fields))
+        noteIobSnapshot(ApiIobSnapshot.fromTextFields(fields))
         return VirtualGlucoseSensorBridge.Reading(
             timestampMs = timestamp,
             glucoseMgdl = glucoseMgdl.toFloat(),
@@ -765,13 +778,29 @@ class ApiGlucoseSourceManager(
         }.getOrDefault(0)
     }
 
-    private fun importIobSnapshot(raw: String) {
-        if (raw.isBlank()) return
-        runCatching {
-            ApiIobSnapshot.update(ApiIobSnapshot.parse(raw))
-        }.onFailure {
-            Log.w(TAG, "IOB snapshot ignored: ${it.message}")
+    /** Stage a snapshot parsed mid-poll; the newest timestamp wins across messages. */
+    private fun noteIobSnapshot(remote: ApiIobSnapshot.RemoteIob?) {
+        if (remote == null) return
+        val current = pendingIobSnapshot
+        if (current == null || remote.timestampMillis > current.timestampMillis) {
+            pendingIobSnapshot = remote
         }
+    }
+
+    /** Publish the staged snapshot now that the refresh is known to still be active. */
+    private fun commitPendingIobSnapshot() {
+        val pending = pendingIobSnapshot
+        pendingIobSnapshot = null
+        if (pending != null && ApiIobSnapshot.update(pending)) {
+            tk.glucodata.JournalSnapshotAccess.invalidateBroadcastIobCache()
+        }
+    }
+
+    /** Forget local and remote API IOB state: the source is gone, nothing may linger. */
+    private fun dropApiIobSnapshot() {
+        pendingIobSnapshot = null
+        ApiIobSnapshot.clear()
+        tk.glucodata.JournalSnapshotAccess.invalidateBroadcastIobCache()
     }
 
     private fun firstFinite(vararg values: Double): Double? =

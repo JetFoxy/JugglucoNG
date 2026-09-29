@@ -286,6 +286,7 @@ object ApiGlucoseSourceRegistry {
         val config = loadConfig(context)
         val sensorId = config.sensorId
         ApiIobSnapshot.clear()
+        tk.glucodata.JournalSnapshotAccess.invalidateBroadcastIobCache()
         ManagedCurrentSensor.clearIfMatches(sensorId)
         saveConfig(
             context = context,

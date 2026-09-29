@@ -63,28 +63,42 @@ object ApiIobSnapshot {
         latest?.takeIf { nowMillis - it.timestampMillis <= FRESHNESS_WINDOW_MS }
 
     /**
-     * The sender's snapshot from an OutboundApi normalized-glucose body: a single
-     * object or an array of them (a relay may serve several readings). The nested
-     * `journal` snapshot is preferred — it is the only level carrying eIOB and its
-     * own timestamp; the top-level `journal_iob`/`iob` + `journal_cob`/`cob` fields
+     * The sender's snapshot from an OutboundApi normalized-glucose body, in any of
+     * the shapes the follower accepts for readings: a single object, a top-level
+     * array, or a `readings`/`entries` wrapper object. The nested `journal`
+     * snapshot is preferred — it is the only level carrying eIOB and its own
+     * timestamp; the top-level `journal_iob`/`iob` + `journal_cob`/`cob` fields
      * are the fallback. IOB-only and COB-only payloads are kept: the broadcast
-     * layer falls back to the local computation per missing field.
+     * layer falls back to the local computation per missing field. When several
+     * readings are present the newest valid snapshot wins.
      */
     fun parse(body: String): RemoteIob? {
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return null
         if (trimmed.startsWith("[")) {
-            val array = runCatching { JSONArray(trimmed) }.getOrNull() ?: return null
-            var newest: RemoteIob? = null
-            for (index in 0 until array.length()) {
-                val parsed = array.optJSONObject(index)?.let(::parseSingle) ?: continue
-                if (newest == null || parsed.timestampMillis > newest.timestampMillis) {
-                    newest = parsed
-                }
-            }
-            return newest
+            return newestFromArray(runCatching { JSONArray(trimmed) }.getOrNull() ?: return null)
         }
-        return runCatching { parseSingle(JSONObject(trimmed)) }.getOrNull()
+        val root = runCatching { JSONObject(trimmed) }.getOrNull() ?: return null
+        var newest = parseSingle(root)
+        for (key in arrayOf("readings", "entries")) {
+            root.optJSONArray(key)?.let { newest = newerOf(newest, newestFromArray(it)) }
+        }
+        return newest
+    }
+
+    private fun newestFromArray(array: JSONArray): RemoteIob? {
+        var newest: RemoteIob? = null
+        for (index in 0 until array.length()) {
+            val parsed = array.optJSONObject(index)?.let(::parseSingle) ?: continue
+            newest = newerOf(newest, parsed)
+        }
+        return newest
+    }
+
+    private fun newerOf(current: RemoteIob?, candidate: RemoteIob?): RemoteIob? {
+        if (candidate == null) return current
+        if (current == null) return candidate
+        return if (candidate.timestampMillis > current.timestampMillis) candidate else current
     }
 
     private fun parseSingle(root: JSONObject): RemoteIob? {

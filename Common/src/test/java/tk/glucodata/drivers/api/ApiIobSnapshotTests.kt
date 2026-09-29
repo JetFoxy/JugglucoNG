@@ -177,6 +177,53 @@ class ApiIobSnapshotTests {
     }
 
     @Test
+    fun readingsWrapperBodyPicksNewestSnapshot() {
+        val newer = JSONObject(senderPayload())
+        val older = JSONObject(senderPayload(timestamp = senderMillis - 300_000L))
+        val body = JSONObject()
+            .put("readings", JSONArray().put(older).put(newer))
+            .toString()
+        val remote = ApiIobSnapshot.parse(body)
+        assertNotNull(remote)
+        assertEquals(senderMillis, remote!!.timestampMillis)
+        assertEquals(1.85f, remote.iobUnits, 0.0001f)
+        assertEquals(24.0f, remote.cobGrams, 0.0001f)
+        assertEquals(1.20f, remote.eiobUnits, 0.0001f)
+    }
+
+    @Test
+    fun entriesWrapperBodyFallsBackToTopLevelSnapshot() {
+        val entry = JSONObject()
+            .put("timestamp", senderMillis)
+            .put("glucose_mgdl", 142)
+        val body = JSONObject()
+            .put("timestamp", senderMillis)
+            .put("journal_iob", 2.5)
+            .put("cob", 30.0)
+            .put("entries", JSONArray().put(entry))
+            .toString()
+        val remote = ApiIobSnapshot.parse(body)
+        assertNotNull(remote)
+        assertEquals(2.5f, remote!!.iobUnits, 0.0001f)
+        assertEquals(30.0f, remote.cobGrams, 0.0001f)
+        assertEquals(senderMillis, remote.timestampMillis)
+    }
+
+    @Test
+    fun wrapperWithoutAnySnapshotParsesToNull() {
+        val entry = JSONObject()
+            .put("timestamp", senderMillis)
+            .put("glucose_mgdl", 142)
+        assertNull(
+            ApiIobSnapshot.parse(
+                JSONObject().put("readings", JSONArray().put(entry)).toString()
+            )
+        )
+        assertNull(ApiIobSnapshot.parse(JSONObject().put("entries", JSONArray()).toString()))
+        assertNull(ApiIobSnapshot.parse(JSONObject().put("readings", JSONArray()).toString()))
+    }
+
+    @Test
     fun textFieldsParseIobCobAndTimestamp() {
         val remote = ApiIobSnapshot.fromTextFields(
             mapOf("GV" to "7.88", "IOB" to "1.85", "COB" to "24.0", "TS" to senderMillis.toString())

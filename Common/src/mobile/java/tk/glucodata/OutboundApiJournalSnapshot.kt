@@ -141,6 +141,10 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
         return fresh
     }
 
+    override fun invalidateBroadcastIobCache() {
+        broadcastIobCache = null
+    }
+
     private suspend fun buildBroadcastIob(
         atMillis: Long,
         allowCloneRemote: Boolean = true,
@@ -219,8 +223,10 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
             // turn a receiver into a timestamp-refreshing echo and keep stale
             // IOB alive after the authoritative sender disappeared. Local
             // journal state and a configured Nightscout follower remain valid
-            // sources for this phone's outbound snapshot; the HTTP API
+            // sources for this phone's outbound snapshot; the direct HTTP API
             // follower snapshot is excluded for the same no-echo reason.
+            // (Journal entries imported from the API source still flow through
+            // the local computation, as before.)
             runCatching {
                 buildBroadcastIob(atMillis, allowCloneRemote = false, allowApiRemote = false)
             }.getOrNull()
