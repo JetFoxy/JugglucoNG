@@ -42,8 +42,8 @@ class VerioSession {
     private var requestedRecord = -1
     private var nextRecordToRequest = -1
     private var recordsRequested = 0
-    /** Where the walk started, so storing a reading cannot shorten it. */
-    private var walkStart = -1
+    /** Lowest record index the walk may still ask for. */
+    private var walkFloor = 0
 
     fun reset() {
         outbox.clear()
@@ -57,7 +57,7 @@ class VerioSession {
         requestedRecord = -1
         nextRecordToRequest = -1
         recordsRequested = 0
-        walkStart = -1
+        walkFloor = 0
     }
 
     fun begin() {
@@ -69,6 +69,15 @@ class VerioSession {
 
     /** Next command to write, or null when there is nothing to send. */
     fun take(): ByteArray? = outbox.pollFirst()
+
+    /**
+     * Puts a command back after a failed write. Without this the command is
+     * lost: writeCharacteristic returning false means no write callback comes,
+     * so nothing would ever ask for it again.
+     */
+    fun putBack(command: ByteArray) {
+        outbox.addFirst(command)
+    }
 
     /** Readings received since the last call. */
     fun takeReadings(): List<Reading> {
@@ -123,6 +132,11 @@ class VerioSession {
         val messageType = message[5]
         if (messageType != 0x06.toByte()) {
             reportError(messageType, message)
+            // still ack, the meter is waiting, and then stop rather than sit
+            // there: the request that was rejected has no answer to wait for
+            // and no write is outstanding to drive the next step
+            queue(byteArrayOf(0x81.toByte()))
+            stage = Stage.DONE
             return
         }
         handleData(message, alreadyHave)
@@ -212,7 +226,8 @@ class VerioSession {
     }
 
     private fun advanceRecord(record: Int) {
-        if (record <= 0) return
+        // unconditional: if this could be skipped the walk would sit on the same
+        // index forever, because nothing else moves it
         nextRecordToRequest = record - 1
         recordsRequested++
     }
@@ -228,15 +243,20 @@ class VerioSession {
             nextRecordToRequest = 0
             return
         }
-        // the walk stops at what the caller already had when it started, not at
-        // the live value, which every stored reading moves forward
-        walkStart = alreadyHave
-        val lowest = maxOf(highestRecordNumber - numberOfRecords, highestRecordNumber - MAX_BACKFILL_RECORDS)
+        // walkFloor is exclusive: we ask for a record while it is above it. The
+        // floor is one below the oldest record the meter still keeps, so that
+        // oldest one is included, and never below 0 because record indices
+        // start at 1. Folding FIRST_RECORD into this same maximum would be
+        // wrong - a 1 there would be treated as exclusive and skip record 1,
+        // which is exactly the reading on a meter that has not rolled over its
+        // history yet, the normal case on first pairing.
+        val oldest = maxOf(highestRecordNumber - numberOfRecords, 0)
+        walkFloor = maxOf(oldest, alreadyHave)
         nextRecordToRequest = highestRecordNumber
         recordsRequested = 0
         Log.i(TAG, String.format(
             Locale.US, "%d records, highest=%d, walking down to %d, have %d",
-            numberOfRecords, highestRecordNumber, lowest, walkStart))
+            numberOfRecords, highestRecordNumber, walkFloor, alreadyHave))
     }
 
     /** Moves to the next request and returns the command that asks for it. */
@@ -251,7 +271,7 @@ class VerioSession {
             Stage.T_COUNTER -> command(0x0a, 0x02, 0x06) // record counter
             Stage.R_COUNTER -> command(0x27, 0x00) // number of records
             Stage.RECORDS -> {
-                if (nextRecordToRequest <= walkStart || recordsRequested >= MAX_BACKFILL_RECORDS) {
+                if (nextRecordToRequest <= walkFloor || recordsRequested >= MAX_BACKFILL_RECORDS) {
                     stage = Stage.DONE
                     Log.i(TAG, "nothing newer on the meter")
                     null

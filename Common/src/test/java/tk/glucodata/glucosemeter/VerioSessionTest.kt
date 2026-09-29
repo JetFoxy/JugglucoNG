@@ -3,6 +3,8 @@ package tk.glucodata.glucosemeter
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class VerioSessionTest {
@@ -135,5 +137,125 @@ class VerioSessionTest {
         // record 3184 was stored, so the walk must continue to 3183 rather
         // than stopping against the value we just wrote
         assertArrayEquals(VerioSession.command(0xb3, 0x6f, 0x0c), session.take())
+    }
+
+    /** A session that got as far as walking records, for the walk bound tests. */
+    private fun walkSession(highest: Int, count: Int, alreadyHave: Int = -1): VerioSession {
+        val session = VerioSession()
+        session.begin()
+        session.take()
+        session.onNotification(VerioSession.command(0x06, 0x39, 0x43, 0x4e, 0x32), alreadyHave)
+        session.take()
+        session.take()
+        session.onNotification(VerioSession.command(0x06, highest and 0xff, (highest shr 8) and 0xff, 0, 0), alreadyHave)
+        session.take()
+        session.take()
+        session.onNotification(VerioSession.command(0x06, count and 0xff, (count shr 8) and 0xff), alreadyHave)
+        return session
+    }
+
+    @Test
+    fun `the walk stops at the oldest record the meter still keeps`() {
+        // 5 readings, highest 10: asking below 6 has to stop, not run to zero
+        val session = walkSession(highest = 10, count = 5)
+        session.take() // ack
+        val first = session.take()
+        assertArrayEquals(VerioSession.command(0xb3, 0x0a, 0x00), first)
+
+        var last: ByteArray? = null
+        for (i in 0 until 20) {
+            session.onNotification(recordPacket(), -1)
+            session.take() // ack
+            val next = session.take() ?: break
+            last = next
+            session.putBack(next)
+            session.take()
+        }
+        // the last request must be 6, and record 5 was never asked for
+        assertEquals("stopped one above the oldest", "01 02 0A 00 03 B3 06 00 03 CA 4B", hex(last!!))
+    }
+
+    @Test
+    fun `a meter with fewer readings than the cap is not over-asked`() {
+        val session = walkSession(highest = 10, count = 5)
+        session.take() // ack
+        session.take() // record 10
+        session.onNotification(recordPacket(), -1)
+        session.take() // ack
+        assertArrayEquals(VerioSession.command(0xb3, 0x09, 0x00), session.take())
+        session.onNotification(recordPacket(), -1)
+        session.take() // ack
+        session.take() // record 8
+        session.onNotification(recordPacket(), -1)
+        session.take() // ack
+        session.take() // record 7
+        session.onNotification(recordPacket(), -1)
+        session.take() // ack
+        session.take() // record 6
+        session.onNotification(recordPacket(), -1)
+        session.take() // ack
+        assertEquals("record 5 does not exist, walk is over", null, session.take())
+    }
+
+    @Test
+    fun `an error answer is acked and ends the walk instead of stalling`() {
+        val session = handshakenSession()
+        // 0x07 0x03 is "command not allowed"
+        session.onNotification(VerioSession.command(0x07, 0x03), -1)
+        assertArrayEquals("the meter still gets its ack", byteArrayOf(0x81.toByte()), session.take())
+        assertEquals("and no further request is queued", null, session.take())
+    }
+
+    @Test
+    fun `a command survives a failed write`() {
+        val session = VerioSession()
+        session.begin()
+        val command = session.take()!!
+        session.putBack(command)
+        assertArrayEquals("taken again after a failed write", command, session.take())
+        assertNull(session.take())
+    }
+
+    @Test
+    fun `a non positive record cannot freeze the walk`() {
+        val session = handshakenSession()
+        // the meter answers a request we never made, with record 0
+        session.onNotification(recordPacket(), -1)
+        assertEquals(1, session.takeReadings().size)
+        session.take() // ack
+        val next = session.take()
+        assertNotNull(next)
+        // the walk keeps producing decreasing indices, never sticking on one
+        val record = (next!![6].toInt() and 0xFF) or ((next[7].toInt() and 0xFF) shl 8)
+        assertEquals("record 3183 after storing 3184", 3183, record)
+    }
+
+    @Test
+    fun `a meter that has not rolled over yet still gives up record one`() {
+        // one single reading, nothing stored: record 1 is the only one there is
+        val session = walkSession(highest = 1, count = 1, alreadyHave = 0)
+        session.take() // ack
+        assertArrayEquals(VerioSession.command(0xb3, 0x01, 0x00), session.take())
+        session.onNotification(recordPacket(), 0)
+        session.take() // ack
+        assertEquals("record 1 is all there is, walk is over", null, session.take())
+    }
+
+    @Test
+    fun `every record a fresh meter still keeps is asked for`() {
+        // 3 readings and no history evicted, so the oldest existing is 1 and
+        // the floor must not skip it
+        val session = walkSession(highest = 3, count = 3, alreadyHave = 0)
+        session.take() // ack
+        val asked = mutableListOf<Int>()
+        while (true) {
+            val next = session.take() ?: break
+            asked.add((next[6].toInt() and 0xFF) or ((next[7].toInt() and 0xFF) shl 8))
+            session.putBack(next)
+            session.take()
+            session.onNotification(recordPacket(), 0)
+            session.take() // ack
+        }
+        assertEquals(listOf(3, 2, 1), asked)
     }
 }

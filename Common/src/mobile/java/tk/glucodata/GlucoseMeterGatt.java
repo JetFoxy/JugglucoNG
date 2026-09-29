@@ -208,7 +208,9 @@ private void writeNextVerioCommand(BluetoothGatt gatt) {
         return;
     if(doLog) Log.showbytes(LOG_ID+": verio write",command);
     if(!writeVerio(gatt,command)) {
-        Log.e(LOG_ID,"verio write failed");
+        // no write callback will follow, so keep the command for the next try
+        Log.e(LOG_ID,"verio write failed, command kept");
+        verioSession.putBack(command);
         }
     }
 
