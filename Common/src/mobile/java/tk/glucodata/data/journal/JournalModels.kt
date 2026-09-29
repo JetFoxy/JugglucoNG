@@ -126,10 +126,13 @@ data class JournalFoodInput(
     val sortOrder: Int = 0
 )
 
-data class JournalCurvePoint(
-    val minute: Int,
-    val activity: Float
-)
+/**
+ * The shared curve shape (plan §4 category W, D1). The watch computes against
+ * the same `(minute, activity)` points, so the type is the shared one and this
+ * name is a spelling of it -- which keeps every existing construction and
+ * signature in the phone's journal code compiling unchanged.
+ */
+typealias JournalCurvePoint = IobCurvePoint
 
 data class JournalInsulinPreset(
     val id: Long,
@@ -408,18 +411,8 @@ fun resolveJournalCurve(
     }
 }
 
-internal fun interpolateJournalCurve(points: List<JournalCurvePoint>, minute: Float): Float {
-    if (points.isEmpty()) return 0f
-    if (minute <= points.first().minute.toFloat()) return points.first().activity
-    if (minute >= points.last().minute.toFloat()) return points.last().activity
-
-    val upperIndex = points.indexOfFirst { it.minute >= minute }.takeIf { it >= 0 } ?: return 0f
-    val upper = points[upperIndex]
-    val lower = points.getOrNull(upperIndex - 1) ?: return upper.activity
-    val span = (upper.minute - lower.minute).toFloat().coerceAtLeast(1f)
-    val progress = ((minute - lower.minute) / span).coerceIn(0f, 1f)
-    return lower.activity + ((upper.activity - lower.activity) * progress)
-}
+internal fun interpolateJournalCurve(points: List<JournalCurvePoint>, minute: Float): Float =
+    JournalIobMath.interpolate(points, minute)
 
 private fun formatJournalCurveValue(value: Float): String {
     return ((value.coerceIn(0f, 1f) * 100f).roundToInt() / 100f).toString()
