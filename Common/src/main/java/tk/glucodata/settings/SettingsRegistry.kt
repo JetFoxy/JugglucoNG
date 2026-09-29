@@ -38,7 +38,11 @@ const val DEFAULT_PREDICTION_HORIZON_MINUTES = 120
 /** Where a setting belongs and who may write it. */
 enum class SettingScope { PHONE, WATCH, MIRRORED }
 
-/** Whether the value travels with a backup/export. Inert until O5 builds that feature. */
+/**
+ * Whether the value travels with a backup/export — and, for [SECRET], that it does not travel to
+ * the watch either. The export half is inert until O5 builds that feature; the watch half is live
+ * ([SettingsRegistry.mirrored]) and is the reason a secret is a rule rather than a comment.
+ */
 enum class SettingBackup { INCLUDED, EXCLUDED, SECRET }
 
 /** The stored type, and the wire tag [tk.glucodata.WearPrefsSync] has always used for it. */
@@ -208,8 +212,30 @@ object SettingsRegistry {
         SENSOR_COLORS,
     )
 
-    /** Every setting that travels phone→watch. */
-    val mirrored: List<SettingDefinition> = definitions.filter { it.scope == SettingScope.MIRRORED }
+    /**
+     * Every setting that travels phone→watch.
+     *
+     * Scope says a setting belongs on both devices; this filter is what keeps a **secret** off the
+     * watch. It is a property of the code rather than of the list, because a `MIRRORED` + `SECRET`
+     * definition is exactly what the first D1 watch feature wants to declare (a Nightscout URL, an
+     * API token — #498) and today nothing in the registry stops it from going out on the wire.
+     *
+     * Per #498 the watch may hold a credential only for an output the user switched on there,
+     * so a secret reaches it through that output's own opt-in path, never through this generic
+     * mirror. Today no definition declares [SettingBackup.SECRET], so this changes nothing yet.
+     */
+    val mirrored: List<SettingDefinition> = mirroredFrom(definitions)
+
+    /**
+     * What [definitions] sends to the watch, as a function of the list rather than of this
+     * object, so a test can hand it a definition that does not exist yet.
+     */
+    internal fun mirroredFrom(definitions: List<SettingDefinition>): List<SettingDefinition> =
+        definitions.filter { travelsToWatch(it.scope, it.backup) }
+
+    /** `MIRRORED` scope, and not a secret: what the watch is allowed to see. */
+    fun travelsToWatch(scope: SettingScope, backup: SettingBackup): Boolean =
+        scope == SettingScope.MIRRORED && backup != SettingBackup.SECRET
 
     private val byKey = definitions.associateBy { it.key }
 

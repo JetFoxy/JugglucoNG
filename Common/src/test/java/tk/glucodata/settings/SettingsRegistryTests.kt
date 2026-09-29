@@ -67,6 +67,64 @@ class SettingsRegistryTests {
         assertTrue("mirrored definitions carry the mirrored scope", SettingsRegistry.mirrored.all { it.scope == SettingScope.MIRRORED })
     }
 
+    /**
+     * A mirrored secret does not travel, and this is tested on a definition that does not exist
+     * yet -- the first D1 watch feature is going to want to declare one (a Nightscout URL, an API
+     * token), and until it does the real registry cannot exercise the rule at all.
+     *
+     * The whole table, not just the interesting cell: `PHONE` + `SECRET` must not start travelling
+     * because of this filter either, and `WATCH` + anything still has to be declared `MIRRORED` to
+     * be sent.
+     */
+    @Test
+    fun aMirroredSecretDoesNotTravel() {
+        fun definition(scope: SettingScope, backup: SettingBackup) =
+            SettingDefinition("test_$scope$backup", SettingType.STRING, "", scope, backup)
+
+        val travels = SettingsRegistry::travelsToWatch
+        assertTrue(travels(SettingScope.MIRRORED, SettingBackup.INCLUDED))
+        assertTrue(travels(SettingScope.MIRRORED, SettingBackup.EXCLUDED))
+        assertEquals(false, travels(SettingScope.MIRRORED, SettingBackup.SECRET))
+        assertEquals(false, travels(SettingScope.PHONE, SettingBackup.INCLUDED))
+        assertEquals(false, travels(SettingScope.PHONE, SettingBackup.SECRET))
+        assertEquals(false, travels(SettingScope.WATCH, SettingBackup.INCLUDED))
+        assertEquals(false, travels(SettingScope.WATCH, SettingBackup.SECRET))
+
+        val sent = SettingsRegistry.mirroredFrom(
+            listOf(
+                definition(SettingScope.MIRRORED, SettingBackup.INCLUDED),
+                definition(SettingScope.MIRRORED, SettingBackup.SECRET),
+                definition(SettingScope.PHONE, SettingBackup.SECRET),
+                definition(SettingScope.WATCH, SettingBackup.INCLUDED),
+            ),
+        ).map { it.key }
+        assertEquals(
+            listOf("test_${SettingScope.MIRRORED}${SettingBackup.INCLUDED}"),
+            sent,
+        )
+    }
+
+    /**
+     * Nothing is a secret yet, so the filter above changes no payload today. It is here so that
+     * adding one is a deliberate act that has to touch this line, rather than a silent change to
+     * what the watch receives.
+     */
+    @Test
+    fun noDefinitionIsASecretYet() {
+        val secrets = SettingsRegistry.definitions.filter { it.backup == SettingBackup.SECRET }
+        assertTrue(
+            "declaring a secret is allowed, but it must be noticed: " +
+                secrets.joinToString { it.key },
+            secrets.isEmpty(),
+        )
+        assertEquals(
+            "with no secret declared, the filter cannot change what is sent",
+            SettingsRegistry.definitions.filter { it.scope == SettingScope.MIRRORED }
+                .map { it.key },
+            SettingsRegistry.mirrored.map { it.key },
+        )
+    }
+
     @Test
     fun keyConstantsAgreeWithTheirDefinitions() {
         assertEquals(KEY_SMOOTHING_MINUTES, SettingsRegistry.SMOOTHING_MINUTES.key)
