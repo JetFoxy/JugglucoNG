@@ -335,6 +335,11 @@ private void persistSatelliteReadings(List<SatelliteMeterProtocol.Reading> readi
 
 
 private boolean firstRecordonly=false;
+// Roche meters (Accu-Chek Instant confirmed by trace) accept the write of a
+// filtered RACP "records >= sequence" request but then never answer and drop
+// the link, unlike xDrip which only ever sends them the plain ALL_RECORDS
+// request. newerRecords stays on for every other manufacturer.
+private boolean allRecordsOnly=false;
 static private final boolean newerRecords=true;
 
 protected  final boolean enableNotification(BluetoothGatt bluetoothGatt1, BluetoothGattCharacteristic bluetoothGattCharacteristic) {
@@ -360,6 +365,7 @@ private void handleManufactory(BluetoothGatt gatt,String manufacturer) {
         if(doLog)
             Log.i(LOG_ID,"handleManufactory "+ manufacturer);
         if(manufacturer.startsWith("Roche")) {
+                allRecordsOnly=true;
                 if(doLog)
                         Log.i(LOG_ID,"read DateTime");
                 tryer(()->gatt.readCharacteristic(DateTimeChar));
@@ -587,6 +593,10 @@ private void setCareSenseTime(BluetoothGatt bluetoothGatt) {
            case RecordsCharUUID:
                 if(firstRecordonly) {
                       byte[] cmd={1,(byte)0x5};
+                      tryer(()->writer(bluetoothGatt, RecordsChar,cmd));
+                      }
+                else if(allRecordsOnly) {
+                      byte[] cmd={1,(byte)0x1};
                       tryer(()->writer(bluetoothGatt, RecordsChar,cmd));
                       }
                 else {
