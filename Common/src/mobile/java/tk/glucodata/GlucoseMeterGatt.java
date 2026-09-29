@@ -64,7 +64,14 @@ import tk.glucodata.glucosemeter.VerioSession;
 public  class GlucoseMeterGatt  extends BluetoothGattCallback {
     MeterList.MeterView view=null;
     final static private String LOG_ID="GlucoseMeterGatt";
-    static    final boolean autoconnect=true;
+    // Direct connect (false) right after we've just seen the device advertise -
+    // from the picker or from MeterScanner matching a configured meter - then
+    // back to the whitelist-based background connect (true) once we're in.
+    // Meters like the Contour Plus advertise in sub-second bursts with long
+    // gaps; the whitelist scan behind autoConnect=true is nowhere near
+    // aggressive enough to catch that window, so a fresh sighting always
+    // needs a direct connectGatt() to have a real chance of landing.
+    private boolean autoConnect=true;
     protected BluetoothGatt mBluetoothGatt;
     public BluetoothDevice mActiveBluetoothDevice;
     public final int meterIndex;
@@ -96,6 +103,10 @@ public String getDeviceName() {
         if(device!=null) {
             String address = device.getAddress();
             setDeviceAddress(address);
+            // We were just handed this device from a scan result (picker pairing or
+            // MeterScanner matching a configured meter), so it is advertising right
+            // now - connect directly instead of waiting on the whitelist scan.
+            autoConnect=false;
             }
         }
 long foundtime=0L;
@@ -463,6 +474,10 @@ boolean connected=false;
          isBonded=bondstate==BOND_BONDED;
          connectedTime=tim;
          updateview();
+         // The fresh-sighting direct connect (if that is what got us here) has done
+         // its job; go back to the battery-friendly whitelist reconnect for whenever
+         // this link drops later.
+         autoConnect=true;
         if(stop) {
             close();
             return;
@@ -502,7 +517,7 @@ boolean connected=false;
                       close();
                         }
                   else {
-                     if(autoconnect)  {
+                     if(autoConnect)  {
                         if(useConnect)
                             bluetoothGatt.connect();
                         }
@@ -737,9 +752,9 @@ private void setCareSenseTime(BluetoothGatt bluetoothGatt) {
                 }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    mBluetoothGatt = device.connectGatt(app, autoconnect, this, BluetoothDevice.TRANSPORT_LE);
+                    mBluetoothGatt = device.connectGatt(app, autoConnect, this, BluetoothDevice.TRANSPORT_LE);
                 } else {
-                    mBluetoothGatt = device.connectGatt(app, autoconnect, this);
+                    mBluetoothGatt = device.connectGatt(app, autoConnect, this);
                     }
 
             if(doLog) {Log.i(LOG_ID,meterIndex+" after connectGatt ="+mBluetoothGatt);};
