@@ -38,7 +38,11 @@ const val DEFAULT_PREDICTION_HORIZON_MINUTES = 120
 /** Where a setting belongs and who may write it. */
 enum class SettingScope { PHONE, WATCH, MIRRORED }
 
-/** Whether the value travels with a backup/export. Inert until O5 builds that feature. */
+/**
+ * Whether the value travels with a backup/export — and, for [SECRET], that it does not travel to
+ * the watch either. The export half is inert until O5 builds that feature; the watch half is live
+ * ([SettingsRegistry.mirrored]) and is the reason a secret is a rule rather than a comment.
+ */
 enum class SettingBackup { INCLUDED, EXCLUDED, SECRET }
 
 /** The stored type, and the wire tag [tk.glucodata.WearPrefsSync] has always used for it. */
