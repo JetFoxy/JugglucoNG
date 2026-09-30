@@ -258,4 +258,93 @@ class VerioSessionTest {
         }
         assertEquals(listOf(3, 2, 1), asked)
     }
+
+    /** Every packet a real OneTouch DH48 sent, captured from a live session. */
+    private val deviceTimePacket = "01 02 0C 00 03 06 39 43 4E 32 03 2A DB"
+    private val deviceCounterPacket = "01 02 0C 00 03 06 70 0C 00 00 03 17 BD"
+    private val deviceCountPacket = "01 02 0A 00 03 06 F4 01 03 5D B8"
+    private val deviceReadingPacket = "01 02 13 00 03 06 BB 81 44 31 44 00 00 00 00 00 00 03 F2 9A"
+
+    private fun packet(text: String): ByteArray {
+        val parts = text.split(' ')
+        val out = ByteArray(parts.size)
+        for (i in parts.indices) out[i] = parts[i].toInt(16).toByte()
+        return out
+    }
+
+    /**
+     * Walks the handshake with the meter's own packets up to the given step, so
+     * that the next packet arrives in the stage it would in a real session.
+     * Returns the session with nothing left queued.
+     */
+    private fun sessionAt(step: Int): VerioSession {
+        val session = VerioSession()
+        session.begin()
+        session.take() // get time
+        if (step > 0) {
+            session.onNotification(packet(deviceTimePacket), -1)
+            session.take(); session.take()
+        }
+        if (step > 1) {
+            session.onNotification(packet(deviceCounterPacket), -1)
+            session.take(); session.take()
+        }
+        if (step > 2) {
+            session.onNotification(packet(deviceCountPacket), -1)
+            session.take(); session.take()
+        }
+        return session
+    }
+
+    @Test
+    fun `crc check accepts every packet the meter really sent`() {
+        // a rejected packet leaves only the ack queued, an accepted one also
+        // queues the next request, so that is what tells the two apart
+        val cases = listOf(
+            Triple(0, deviceTimePacket, VerioSession.command(0x0a, 0x02, 0x06)),
+            Triple(1, deviceCounterPacket, VerioSession.command(0x27, 0x00)),
+            Triple(2, deviceCountPacket, VerioSession.command(0xb3, 0x70, 0x0c)),
+        )
+        for ((step, text, expected) in cases) {
+            val session = sessionAt(step)
+            session.onNotification(packet(text), -1)
+            assertArrayEquals("ack", byteArrayOf(0x81.toByte()), session.take())
+            assertArrayEquals("the $text packet must be accepted", expected, session.take())
+        }
+        val session = sessionAt(3)
+        session.onNotification(packet(deviceReadingPacket), -1)
+        assertArrayEquals("ack", byteArrayOf(0x81.toByte()), session.take())
+        assertArrayEquals("the reading packet must be accepted",
+            VerioSession.command(0xb3, 0x6f, 0x0c), session.take())
+    }
+
+    @Test
+    fun `crc check rejects a packet with a flipped bit`() {
+        val broken = packet(deviceReadingPacket).copyOf()
+        broken[10] = (broken[10].toInt() xor 0x01).toByte()
+        val session = sessionAt(3)
+        session.onNotification(broken, -1)
+        assertArrayEquals("the meter is still acked", byteArrayOf(0x81.toByte()), session.take())
+        assertNull("and nothing else is queued", session.take())
+    }
+
+    @Test
+    fun `crc check rejects a packet with a tampered length field`() {
+        val broken = packet(deviceCountPacket).copyOf()
+        broken[2] = 0x0b
+        val session = sessionAt(2)
+        session.onNotification(broken, -1)
+        assertArrayEquals(byteArrayOf(0x81.toByte()), session.take())
+        assertNull(session.take())
+    }
+
+    @Test
+    fun `crc check rejects a packet with a tampered reading`() {
+        val broken = packet(deviceReadingPacket).copyOf()
+        broken[14] = (broken[14].toInt() xor 0x10).toByte()
+        val session = sessionAt(3)
+        session.onNotification(broken, -1)
+        assertArrayEquals(byteArrayOf(0x81.toByte()), session.take())
+        assertNull(session.take())
+    }
 }

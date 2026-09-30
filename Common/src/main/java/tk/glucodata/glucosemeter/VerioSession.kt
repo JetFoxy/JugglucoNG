@@ -117,32 +117,51 @@ class VerioSession {
             return
         }
         if (message.size <= 5) {
-            Log.e(TAG, String.format(Locale.US, "unexpected message size %d", message.size))
+            reject(String.format(Locale.US, "unexpected message size %d", message.size))
             return
         }
-        // no CRC check on received packets for now, the meter decides whether to talk
+        // a bad header is logged, not rejected on its own: the crc below decides
         if (message[0] != HEADER || message[1] != FRAME_START) {
             Log.e(TAG, String.format(Locale.US, "invalid header %02X %02X", message[0], message[1]))
         }
         if (message[2].toInt() != message.size - 1) {
-            Log.e(TAG, String.format(
+            reject(String.format(
                 Locale.US, "length field %02X but message is %d bytes", message[2], message.size))
+            return
+        }
+        // Same slice xDrip checks with crc16ccitt(bytes, true, true): the crc
+        // covers the frame without the leading 0x01 and without its own two
+        // bytes. validateResponse() already drops the trailing two, so this only
+        // has to drop the header. All four packets a real OneTouch sent pass it.
+        if (!Crc16CcittFalse.validateResponse(message.copyOfRange(1, message.size))) {
+            reject(String.format(Locale.US, "crc mismatch on a %d byte packet", message.size))
             return
         }
         val messageType = message[5]
         if (messageType != 0x06.toByte()) {
             reportError(messageType, message)
-            // still ack, the meter is waiting, and then stop rather than sit
-            // there: the request that was rejected has no answer to wait for
-            // and no write is outstanding to drive the next step
-            queue(byteArrayOf(0x81.toByte()))
-            stage = Stage.DONE
+            // still ack and stop: the request that was rejected has no answer to
+            // wait for and no write is outstanding to drive the next step
+            reject(null)
             return
         }
         handleData(message, alreadyHave)
         // every data packet has to be acked before anything else goes out
         queue(byteArrayOf(0x81.toByte()))
         queue(advance())
+    }
+
+    /**
+     * Ends the exchange. The meter is waiting on an ack, so send one even when we
+     * are about to walk away - dropping it silently leaves it waiting and nothing
+     * outstanding to drive the next step, which is how the session used to hang.
+     * The next connection resumes from the stored position, so at worst this one
+     * answer is lost.
+     */
+    private fun reject(reason: String?) {
+        if (reason != null) Log.e(TAG, reason)
+        queue(byteArrayOf(0x81.toByte()))
+        stage = Stage.DONE
     }
 
     private fun handleData(message: ByteArray, alreadyHave: Int) {
