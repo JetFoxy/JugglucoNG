@@ -50,6 +50,9 @@ inline std::string_view fixedsensorview(const sensorname_t *sensorname) {
 	return {name,len};
 	}
 
+// Defined in common.cpp; the name a Nightscout entry is known by, for every writer.
+int mksgvidentifier(char *outiter,const std::string_view &sensorid,const uint32_t timsec);
+
 inline void copyfixedsensorname(char *out,size_t outsize,const sensorname_t *sensorname) {
 	if(!outsize)
 		return;

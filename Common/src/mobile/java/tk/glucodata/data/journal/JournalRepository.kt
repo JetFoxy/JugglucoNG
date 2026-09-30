@@ -79,11 +79,13 @@ class JournalRepository {
             } else {
                 null
             }
-            val existing = idMatch
-                ?: recoveryMatch
-                ?: overlap?.keeper
-                ?: sourceMatch
-                ?: remoteMatch
+            val existing = existingEntry(
+                idMatch = idMatch,
+                recoveryMatch = recoveryMatch,
+                overlapKeeper = overlap?.keeper,
+                sourceMatch = sourceMatch,
+                remoteMatch = remoteMatch,
+            )
             val writeIdentity = preserveMirroredJournalIdentity(
                 existingSource = existing?.source,
                 existingSourceRecordId = existing?.sourceRecordId,
@@ -671,6 +673,27 @@ class JournalRepository {
         )
     }
 }
+
+/**
+ * Which row an incoming entry is the same entry as, in the order the identities are trusted.
+ *
+ * Split out of [JournalRepository.upsertEntry] because that is the whole of what makes a repeated
+ * command idempotent, and nothing tested it: a watch that re-sends an add (#511) relies on
+ * `sourceRecordId` landing here and matching the row it wrote the first time.
+ *
+ * The order is deliberate and not alphabetical. An explicit id is the strongest claim, a clone
+ * recovery id is next, then the clone/Nightscout overlap (which resolves two rows the server already
+ * ties together), then the source's own record id, and only then a Nightscout remote id -- the
+ * weakest, because the server can hand one document several ids.
+ */
+internal fun existingEntry(
+    idMatch: JournalEntryEntity?,
+    recoveryMatch: JournalEntryEntity?,
+    overlapKeeper: JournalEntryEntity?,
+    sourceMatch: JournalEntryEntity?,
+    remoteMatch: JournalEntryEntity?,
+): JournalEntryEntity? =
+    idMatch ?: recoveryMatch ?: overlapKeeper ?: sourceMatch ?: remoteMatch
 
 internal fun matchExistingBuiltInPreset(
     newPreset: JournalInsulinPresetEntity,
