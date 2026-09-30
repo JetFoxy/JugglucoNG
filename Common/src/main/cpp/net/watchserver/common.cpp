@@ -264,7 +264,8 @@ char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorn
 		outptr+=mksgvidentifier(outptr,uploadid,val->gettime());
 	addar(outptr,R"(")");
 	if(server) {
-		addar(outptr,R"(","created_at":")");
+		// The identifier's closing quote is written above for both branches.
+		addar(outptr,R"(,"created_at":")");
 		struct tm tmbuf;
 		gmtime_r(&tim, &tmbuf);
 		outptr+=sprintf(outptr,R"(%04d-%02d-%02dT%02d:%02d:%02d)",tmbuf.tm_year+1900,tmbuf.tm_mon+1,tmbuf.tm_mday, tmbuf.tm_hour, tmbuf.tm_min,tmbuf.tm_sec);
