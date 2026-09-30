@@ -5309,7 +5309,8 @@ class AiDexBleManager(
             }
         } else if (pendingUnpairDisconnect) {
             pendingUnpairDisconnect = false
-            postUnpairBroadcastScanSuppressed = false
+            // The suppression stays: delete-with-unbind still removes the sensor after a rejected
+            // unpair. Its finally releases the flag if that removal does not happen.
             isUnpaired = false
             Log.w(TAG, "DELETE_BOND was rejected or malformed; retaining PAIR credential")
             constatstatusstr = "Unpair failed — key retained"

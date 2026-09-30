@@ -123,5 +123,16 @@ class SetupScanHandoffWiringTests {
         val release = disconnect.indexOf("if (!removed) gatt.releasePostUnpairBroadcastScanSuppression()")
         assertTrue(suppress in 0 until unpair)
         assertTrue(terminate in unpair until release)
+        // Cancellation, not a finished removal, is what releases the flag.
+        assertTrue(disconnect.contains(
+            "gatt.suppressPostUnpairBroadcastScan() var removed = false try {",
+        ))
+        assertTrue(disconnect.contains(
+            "terminateSensor(serial) } removed = true } finally { " +
+                "if (!removed) gatt.releasePostUnpairBroadcastScanSuppression() }",
+        ))
+        // A rejected unpair is still followed by that removal, so the ACK keeps the flag.
+        val manager = read("Common/src/main/java/tk/glucodata/drivers/aidex/native/ble/AiDexBleManager.kt")
+        assertTrue(manager.contains("} else if (pendingUnpairDisconnect) { pendingUnpairDisconnect = false isUnpaired = false"))
     }
 }
