@@ -1239,21 +1239,6 @@ class DefaultParamCatalogCompareTests {
     }
 
     @Test
-    fun persistedWearDaysIgnoresThe14DayShell() {
-        val start = 1_700_000_000_000L
-        fun end(days: Int) = start + days.toLong() * 24L * 60L * 60L * 1000L
-        assertEquals(10, AiDexWearProfile.persistedWearDays(start, end(10)))
-        assertEquals(7, AiDexWearProfile.persistedWearDays(start, end(7)))
-        assertEquals(8, AiDexWearProfile.persistedWearDays(start, end(8)))
-        assertEquals(15, AiDexWearProfile.persistedWearDays(start, end(15)))
-        assertEquals(16, AiDexWearProfile.persistedWearDays(start, end(16)))
-        assertNull(AiDexWearProfile.persistedWearDays(start, end(14)))
-        assertNull(AiDexWearProfile.persistedWearDays(start, start + 8L * 60_000L))
-        assertNull(AiDexWearProfile.persistedWearDays(start, end(10) + 60_000L))
-        assertNull(AiDexWearProfile.persistedWearDays(0L, end(10)))
-    }
-
-    @Test
     fun testWorking171UsesOfficialTrimmedFirmwareKey() {
         val currentRawHex = "010105000080C613008303BFFE68006700650068006B00100E302AD06BB0FFC4FFECFF00000000100E302AD06B0A0000000000C4092800FA00740E2003EE020A000A000800FA0019007D000802AA009CFF640000001100E803B80B32005500D501280046001E0032006400020014002003B004050014001E005A005A00F401F4019033B04F000000000000000000000000000000000000000000000000000000000000000000000000"
 

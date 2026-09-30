@@ -10,18 +10,11 @@ package tk.glucodata.drivers.aidex.native.protocol
  * at byte 4 of `settingContent`. The value is the same for every firmware of a model:
  * GX-01S is 15 days, GX-02S is 10, GX-03S is 8, and the GXXXS files are 7, 14 and 16.
  * The card used to assume 15 whenever startup `0x10` had not supplied `wear_days`.
+ * Nothing here decides when readings stop; that stays on the `0x10` byte.
  */
 object AiDexWearProfile {
     private const val SECONDS_PER_DAY = 86_400
-    private const val MINUTES_PER_DAY = 24L * 60L
     private const val WEAR_SECONDS_OFFSET = 4
-
-    /**
-     * A new Aidex shell is created at 14 days, and that is also what the native end
-     * reports before any wear write. A stored 14-day rating cannot be told apart from
-     * that shell, so it is not restored from native; the model read supplies it.
-     */
-    const val SHELL_DAYS = 14
 
     private val ratedDaysBySettingType: Map<String, Int> = AiDexOfficialDpCatalogSnapshot.entries
         .groupBy { it.settingType }
@@ -54,7 +47,8 @@ object AiDexWearProfile {
     }
 
     /**
-     * Life used for the card, the dashboard and the history cutoff.
+     * Life shown on the card and the dashboard. Display only: reading cutoffs and expiry
+     * stay on the sensor's own startup `0x10` byte.
      *
      * A startup byte that names a different life than the model file is kept when it is
      * specific: a 16-day sensor still reports model `GX-01S`. A byte of 15 on a model whose
@@ -71,18 +65,5 @@ object AiDexWearProfile {
             sensor > model -> sensor
             else -> sensor
         }
-    }
-
-    /**
-     * Days previously written by [aidexSetWearDays], recovered from the native end.
-     * Null for a missing end, a non-whole-day span, or the 14-day shell default.
-     */
-    fun persistedWearDays(startMs: Long, officialEndMs: Long): Int? {
-        if (startMs <= 0L || officialEndMs <= startMs) return null
-        val minutes = (officialEndMs - startMs) / 60_000L
-        if (minutes <= 0L || minutes % MINUTES_PER_DAY != 0L) return null
-        val days = (minutes / MINUTES_PER_DAY).toInt()
-        if (days !in 1..45 || days == SHELL_DAYS) return null
-        return days
     }
 }
