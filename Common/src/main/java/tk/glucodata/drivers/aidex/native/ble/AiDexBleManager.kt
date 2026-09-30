@@ -316,6 +316,10 @@ class AiDexBleManager(
     // -- Handler --
     private val handlerThread = HandlerThread("AiDex-$serial").also { it.start() }
     private val handler = Handler(handlerThread.looper)
+    /** Runs inline when the caller already owns [handlerThread], else posts, so ordering inside a handler runnable is unchanged. */
+    private fun runOnHandler(block: () -> Unit) {
+        if (Thread.currentThread() === handlerThread) block() else handler.post(block)
+    }
 
     // -- GATT Queue --
     private sealed class GattOp {
