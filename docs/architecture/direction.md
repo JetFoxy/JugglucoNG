@@ -65,18 +65,23 @@ further down: several items describe prerequisites that were already built, and 
 | §6 Q4 category S duplicates | **done, allow-list ends at three by decision** | #469, #472, #473, #477, #481; the floor is set in #475 |
 | §6 Q5 storage-ownership document | **all seven facets traced; open questions remain within them** | #478, then #480, #482, #483, #484 and a correction pass |
 
-### PR state, as of 2026-09-28
+### PR state, as of 2026-09-29
 
 Every PR number cited above is merged unless it is listed here.
 
-- **Merged since this table was written:** #494 — the `/settings` path is gone (29 paths), and
-  `assertNoDeadPrefix` now guards both manifests against a prefix left behind when a path is
-  dropped; #496 — the 17 `AndroidManifest.xml.*` copies no build read are deleted.
-- **Open:** #492 (meter BLE bonding), #495 (the §6 Q2 rewording; its payload-version half is on
-  hold, see the PR).
+- **Merged since the table in §1.5 was written:** #494 — the `/settings` path is gone (29 paths),
+  and `assertNoDeadPrefix` guards both manifests against a prefix left behind when a path is
+  dropped; #496 — the 17 `AndroidManifest.xml.*` copies no build read are deleted; #497 — this
+  bookkeeping; #501 — the IOB/COB arithmetic moved to `src/main` so the watch can compute it;
+  #503 — a `SECRET` setting can no longer travel to the watch through the generic mirror.
+- **Open:** #511 and #512 (a journal entry made away from the phone, and the identity that makes a
+  repeat of it one row — #502); #514 (a Nightscout glucose entry named after the reading rather
+  than after a position in the poll series); #515 and #516 (the de-duplication rule behind those,
+  and what the database guarantees about it).
 - **Closed unmerged:** #452, #453, #454 — the Q2 version pilots. They added versions to the text
   payloads; #467 superseded them by pinning the version policies that already exist and refusing a
-  payload the build cannot read. #387–#397 — the SettingsStore track of §2.4, never merged, which
+  payload the build cannot read, and #495's payload-version half was dropped for the same reason
+  the plan above now describes. #387–#397 — the SettingsStore track of §2.4, never merged, which
   is why the row above says `SettingKey` and `SettingsStore` do not exist.
 
 ### On Q2 specifically
@@ -103,9 +108,11 @@ What was left here is done as of #490: the paths are `WearMessagePath`, a closed
 receiver dispatches on it with a `when` the compiler checks for coverage. #494 drops `/settings`,
 which no NG build ever spoke, leaving 29. Generating the manifest from the types is **not** done —
 the filter is still hand-kept XML, and `WearMessagePathManifestTests` is what notices when the two
-disagree. Still open, per this section's own instruction: type `SensorOwnershipRuntime`'s messages
-without rewriting the state machine, leaving the clone/mirror protocol between phones on its own
-envelope.
+disagree. **`SensorOwnershipRuntime` needs nothing here and did not need it:** it has exactly one
+message — `onPeerReport` on `/sync2/own` — that payload already carried a version byte
+(`VERSION = 1`, and `decode` refuses any other value), and #490 put the path in `WearMessagePath`
+with the wire string pinned. A state machine with one message has nothing to type. What remains is
+the clone/mirror protocol between phones, which stays on its own envelope.
 
 ## 2. Review of the first round
 
