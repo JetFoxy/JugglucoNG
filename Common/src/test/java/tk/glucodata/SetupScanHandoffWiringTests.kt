@@ -76,6 +76,7 @@ class SetupScanHandoffWiringTests {
         assertFalse(scanEffect.substring(scanEffect.lastIndexOf("onDispose {")).contains("scanStarter"))
         assertTrue(wizard.contains(
             "DisposableEffect(Unit) { onDispose { " +
+                "scanner.stopScan() OttaiSetupScanHold.untrack(scanner) " +
                 "if (SensorBluetooth.gattcallbacks.isNotEmpty() && !SensorBluetooth.scanActiveOrPending()) { " +
                 "SensorBluetooth.blueone?.scanStarter(0L) } } }",
         ))

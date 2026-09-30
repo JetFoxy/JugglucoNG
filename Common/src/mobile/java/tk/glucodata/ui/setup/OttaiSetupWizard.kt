@@ -1984,11 +1984,14 @@ private fun OttaiBleScanPanel(
         }
     }
 
-    // Composed before the scan effect, so Compose disposes it after that effect.
-    // Leaving the panel stops the panel scanner first and only then starts the managed scan.
-    // Retry and NFC do not dispose this effect.
+    // Leaving the panel stops the panel scanner and only then starts the managed scan. The stop
+    // is done here, not left to the scan effect's own dispose: sibling dispose order is not part
+    // of the DisposableEffect contract. stopScan() is idempotent. Retry and NFC do not dispose
+    // this effect.
     DisposableEffect(Unit) {
         onDispose {
+            scanner.stopScan()
+            OttaiSetupScanHold.untrack(scanner)
             if (SensorBluetooth.gattcallbacks.isNotEmpty() && !SensorBluetooth.scanActiveOrPending()) {
                 SensorBluetooth.blueone?.scanStarter(0L)
             }
