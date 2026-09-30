@@ -153,6 +153,35 @@ int getExchangeOutputIntervalSeconds() {
         }
     return seconds>0?seconds:0;
     }
+/*
+ * The name a Nightscout entry is known by.
+ *
+ * Sensor id plus the reading's own timestamp in hex, the same shape the treatment uploader uses
+ * (JournalTreatmentUploader.datedIdentifier: a stable name derived from what the entry *is*, not
+ * from a counter). Two reasons it is not the position in this device's poll series, which is what
+ * mkv1streamid/mkv3streamid build from:
+ *  - a position is not the same number on the other device. The watch fills its series from the
+ *    phone's chunk, so its positions are its own, and both sides would create two documents for one
+ *    reading.
+ *  - a position moves when the series is compacted, so a re-post could name a different document.
+ * The same timestamp with the same value is the same reading, which is what an update needs.
+ */
+int mksgvidentifier(char *outiter,const std::string_view &sensorid,const uint32_t timsec) {
+	const size_t idlen=std::min<size_t>(sensorid.size(),64);
+	memcpy(outiter,sensorid.data(),idlen);
+	char *out=outiter+idlen;
+	*out++='-';
+	// The failure branch is inside the if on purpose: the structured binding is scoped to the
+	// init-statement, so `ec` is not in scope after it.
+	if(auto [ptr,ec]=std::to_chars(out,out+12,static_cast<unsigned long long>(timsec)*1000ULL,16);
+		ec==std::errc())
+		return int(ptr-outiter);
+	else
+		LOGGER("tochar failed: %s\n",std::make_error_code(ec).message().c_str());
+	*out='0';
+	return int(out-outiter)+1;
+	}
+
 int mkv3streamid(char *outiter,const sensorname_t *name,int num) { 
 //LOGGER("sensorname=%s\n",name->data());
 const uint16_t *gets=reinterpret_cast<const uint16_t*>(name->data());
@@ -184,7 +213,8 @@ return len;
 //0fffffff-ffff-ffff-ffff-17500fffffff"
 //c149bacfb000007f
 }
-char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server) {
+char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server,
+	const std::string_view &uploadid) {
 	char *outptr=outin;
 	addar(outptr,R"({"app":"Juggluco","device":")");
 	memcpy(outptr,sensorname->data(),sensorname->size());
@@ -225,7 +255,14 @@ char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorn
 	if(server)
 		addar(outptr,R"(,"utcOffset":0)");
 	addar(outptr,R"(,"identifier":")");
-	outptr+=mkv3streamid(outptr,sensorname,val->id);
+	// An upload names the document after the reading, so a retry updates it and the other device
+	// computes the same name. The /pebble response keeps the name it has always sent: nothing
+	// dedups on a field in a response.
+	if(server)
+		outptr+=mkv3streamid(outptr,sensorname,val->id);
+	else
+		outptr+=mksgvidentifier(outptr,uploadid,val->gettime());
+	addar(outptr,R"(")");
 	if(server) {
 		addar(outptr,R"(","created_at":")");
 		struct tm tmbuf;
@@ -250,9 +287,7 @@ char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorn
 		addar(outptr,R"(000})");
 		}
 	else {
-		addar(outptr,R"(","_id":")");
-		outptr+=mkv1streamid(outptr,sensorname,val->id);
-		addar(outptr,R"("})");
+		addar(outptr,R"(})");
 		}
 	return outptr;
 	}
