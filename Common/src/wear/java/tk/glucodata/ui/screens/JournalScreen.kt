@@ -119,10 +119,7 @@ fun JournalScreen(
                 JournalEntryRow(
                     entry = entry,
                     time = timeFormat.format(Date(entry.timestampMs)),
-                    onDelete = {
-                        WearJournalSync.sendDelete(entry.id, entry.timestampMs)
-                        WearJournalSync.removeLocally(entry.id)
-                    },
+                    onDelete = { WearJournalSync.sendDelete(entry.id, entry.timestampMs) },
                 )
             }
         }
@@ -157,6 +154,16 @@ private fun JournalEntryRow(
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
             )
+            if (entry.pending) {
+                // Only the watch has this entry so far. Saying so is the difference between "saved"
+                // and "saved and delivered", which is the bug #502 was (#502).
+                Text(
+                    text = stringResource(R.string.wear_journal_pending),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
         }
         if (confirming) {
             Button(
@@ -265,30 +272,20 @@ fun JournalEntryScreen(
                     resultOk = null
                     scope.launch {
                         val ok = withContext(Dispatchers.IO) {
+                            // `ok` now means the entry is saved in the watch's outbox, not that
+                            // a transport took it, and the outbox publishes it as pending -- so
+                            // there is nothing to add here (#502).
                             WearJournalSync.sendAdd(
                                 timestampMs = timestampMs.takeIf { it > 0L } ?: System.currentTimeMillis(),
                                 type = if (isInsulin) WearJournalSync.TYPE_INSULIN else WearJournalSync.TYPE_CARBS,
                                 amount = value,
                                 presetId = if (isInsulin) preset?.id ?: 0L else 0L,
+                                title = format(value) + if (isInsulin) " U" else " g",
                             )
                         }
                         resultOk = ok
                         sending = false
-                        if (ok) {
-                            // Show it at once; the next serve replaces this with
-                            // the phone's own record.
-                            WearJournalSync.addLocally(
-                                WearJournalSync.Entry(
-                                    timestampMs = timestampMs.takeIf { it > 0L } ?: System.currentTimeMillis(),
-                                    id = 0L,
-                                    type = if (isInsulin) WearJournalSync.TYPE_INSULIN else WearJournalSync.TYPE_CARBS,
-                                    amount = value,
-                                    title = format(value) + if (isInsulin) " U" else " g",
-                                    presetId = if (isInsulin) preset?.id ?: 0L else 0L,
-                                )
-                            )
-                            onDone()
-                        }
+                        if (ok) onDone()
                     }
                 },
                 label = { Text(stringResource(R.string.save)) },
