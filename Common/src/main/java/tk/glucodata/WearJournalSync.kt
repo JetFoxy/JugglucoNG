@@ -40,6 +40,15 @@ object WearJournalSync {
     const val VERSION = 3
     private const val MIN_VERSION = 1
 
+    /**
+     * Longest entry identity accepted on the wire, in UTF-8 bytes.
+     *
+     * The identity is a de-duplication hint, not content, so an over-long or malformed one is
+     * ignored rather than refusing the command: losing the de-duplication costs a duplicate on a
+     * retry, losing the command loses the entry (#502).
+     */
+    const val MAX_IDENTITY_BYTES = 64
+
     const val CMD_ADD = 1
     const val CMD_DELETE = 2
 
@@ -65,12 +74,19 @@ object WearJournalSync {
         /** Resolved per-dose curve; empty for payloads older than v3. */
         val curveMinutes: IntArray = IntArray(0),
         val curveActivity: FloatArray = FloatArray(0),
+        /**
+         * The id this entry has where it was made, echoed back by the phone. Empty for an entry
+         * the phone originated, and for payloads from a build that does not send it: a watch
+         * re-sending an add needs this to recognise its own entry instead of adding a second one.
+         */
+        val entryIdentity: String = "",
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is Entry) return false
             return timestampMs == other.timestampMs && id == other.id && type == other.type &&
                 amount == other.amount && title == other.title && presetId == other.presetId &&
+                entryIdentity == other.entryIdentity &&
                 curveMinutes.contentEquals(other.curveMinutes) &&
                 curveActivity.contentEquals(other.curveActivity)
         }
@@ -197,8 +213,12 @@ object WearJournalSync {
         type: Int,
         amount: Float,
         presetId: Long,
+        entryIdentity: String? = null,
     ): Boolean {
-        val data = ByteBuffer.allocate(1 + 1 + 8 + 8 + 1 + 4 + 8)
+        val identity = entryIdentity.orEmpty().takeIf { it.isNotEmpty() }?.toByteArray(StandardCharsets.UTF_8)
+        // Appended, so a phone that predates it reads the fixed fields and ignores the rest: the
+        // command still applies, it just cannot de-duplicate a repeat (#502).
+        val buffer = ByteBuffer.allocate(1 + 1 + 8 + 8 + 1 + 4 + 8 + if (identity != null) 2 + identity.size else 0)
             .put(VERSION.toByte())
             .put(command.toByte())
             .putLong(timestampMs)
@@ -206,8 +226,10 @@ object WearJournalSync {
             .put(type.toByte())
             .putFloat(amount)
             .putLong(presetId)
-            .array()
-        return MessageSender.sendSyncMessage(WearMessagePath.SYNC2_JOURNAL_CMD, data)
+        if (identity != null) {
+            buffer.putShort(identity.size.toShort()).put(identity)
+        }
+        return MessageSender.sendSyncMessage(WearMessagePath.SYNC2_JOURNAL_CMD, buffer.array())
     }
 
     @Volatile private var cached: Journal? = null
@@ -335,7 +357,34 @@ object WearJournalSync {
                 presets.add(Preset(id, units, name, minutes, activity))
             }
         }
-        return Journal(enabled, entries.sortedByDescending { it.timestampMs }, presets)
+        // The identity block is appended after the presets, one optional entry per served entry in
+        // payload order, so a build that predates it stops reading before it and the entries it
+        // already has are unaffected.
+        val identities = readServedIdentities(buffer, entries.size)
+        val withIdentity = entries.mapIndexed { index, entry ->
+            entry.copy(entryIdentity = identities.getOrElse(index) { "" })
+        }
+        return Journal(enabled, withIdentity.sortedByDescending { it.timestampMs }, presets)
+    }
+
+    /** The appended `[u16 count][u8 length][utf-8]` identities, empty for an older payload. */
+    private fun readServedIdentities(buffer: ByteBuffer, entryCount: Int): List<String> {
+        if (buffer.remaining() < 2) return emptyList()
+        val count = buffer.short.toInt() and 0xFFFF
+        if (count > entryCount) return emptyList()
+        val identities = ArrayList<String>(count)
+        repeat(count) {
+            // Length 0 is a phone-originated entry, which has no identity of its own -- not a
+            // malformed field. And one field this build will not take must not throw away the
+            // identities read before it, so each check ends the block instead of throwing it.
+            if (buffer.remaining() < 1) return identities
+            val length = buffer.get().toInt() and 0xFF
+            if (length > MAX_IDENTITY_BYTES || buffer.remaining() < length) return identities
+            val identity = ByteArray(length).also { buffer.get(it) }.toString(StandardCharsets.UTF_8)
+            if (identity.any { it.isISOControl() }) return identities
+            identities.add(identity)
+        }
+        return identities
     }
 
     /** Decodes a watch command; phone side. Returns null when malformed. */
@@ -344,7 +393,7 @@ object WearJournalSync {
         val buffer = ByteBuffer.wrap(data)
         val version = buffer.get().toInt()
         if (version < MIN_VERSION || version > VERSION) return null
-        return Command(
+        val command = Command(
             command = buffer.get().toInt(),
             timestampMs = buffer.long,
             id = buffer.long,
@@ -352,6 +401,19 @@ object WearJournalSync {
             amount = buffer.float,
             presetId = buffer.long,
         )
+        return command.copy(entryIdentity = readIdentity(buffer))
+    }
+
+    /**
+     * The trailing `<u16 length><utf-8>` identity, or "" when the frame has none or carries one
+     * this build will not take. Never fails the command: see [MAX_IDENTITY_BYTES].
+     */
+    private fun readIdentity(buffer: ByteBuffer): String {
+        if (buffer.remaining() < 2) return ""
+        val length = buffer.short.toInt() and 0xFFFF
+        if (length <= 0 || length > MAX_IDENTITY_BYTES || buffer.remaining() < length) return ""
+        val identity = ByteArray(length).also { buffer.get(it) }.toString(StandardCharsets.UTF_8)
+        return if (identity.any { it.isISOControl() }) "" else identity
     }
 
     internal data class Command(
@@ -361,5 +423,7 @@ object WearJournalSync {
         val type: Int,
         val amount: Float,
         val presetId: Long,
+        /** The id the watch gave this entry; the phone stores it and echoes it back. */
+        val entryIdentity: String = "",
     )
 }

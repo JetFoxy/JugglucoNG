@@ -87,6 +87,11 @@ object WearJournalBridge : JournalBridge {
                                     insulinPresetId = command.presetId.takeIf {
                                         it > 0L && type == JournalEntryType.INSULIN
                                     },
+                                    // The id the watch gave this entry, stored where every other
+                                    // producer's is (`meter:`, `pen:`, `clone:`) so the unique index
+                                    // and upsertEntry's match make a re-sent add the same row
+                                    // instead of a second one (#502).
+                                    sourceRecordId = command.entryIdentity.takeIf { it.isNotEmpty() },
                                     source = JournalEntrySource.MANUAL,
                                 ),
                             )
@@ -175,11 +180,21 @@ object WearJournalBridge : JournalBridge {
         }
         // v3 adds the immutable resolved curve per entry. The preset curve is
         // retained for v2 fallback and for watch entries awaiting phone sync.
+        // Appended, after the presets, and read only by a build that knows about it: the entry
+        // identities the watch needs to recognise an entry of its own (#502).
+        val identities = encodedEntries.map { encoded ->
+            val raw = encoded.entry.sourceRecordId
+                ?.takeIf { it.isNotEmpty() && it.length <= WearJournalSync.MAX_IDENTITY_BYTES }
+                ?.toByteArray(StandardCharsets.UTF_8)
+                ?: ByteArray(0)
+            raw
+        }
         val size = 1 + 1 + 2 +
             encodedEntries.sumOf { 8 + 8 + 1 + 4 + 1 + it.title.size + 8 + 1 + it.curve.size * 6 } +
             2 + encodedPresets.sumOf {
                 8 + 4 + 1 + it.second.size + 1 + curvePointsOf(it.first).size * 6
-            }
+            } +
+            2 + identities.sumOf { 1 + it.size }
         val buffer = ByteBuffer.allocate(size)
         buffer.put(WearJournalSync.VERSION.toByte())
         buffer.put(1)
@@ -211,6 +226,11 @@ object WearJournalBridge : JournalBridge {
                 buffer.putShort(point.minute.coerceIn(0, 0xFFFF).toShort())
                 buffer.putFloat(point.activity)
             }
+        }
+        buffer.putShort(identities.size.toShort())
+        identities.forEach { identity ->
+            buffer.put(identity.size.toByte())
+            buffer.put(identity)
         }
         return buffer.array()
     }
