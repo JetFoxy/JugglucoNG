@@ -40,6 +40,21 @@ class SibionicsSessionRestartPersistenceTest {
         assertTrue("nothing lands from a failed commit", prefs.values.isEmpty())
     }
 
+    @Test
+    fun theAutoResetBackoffIsCommittedAndClearedByTheRestartItWaitedFor() {
+        val prefs = FakePreferences()
+        val context = PrefsContext(prefs)
+        val commitsBefore = prefs.commits
+
+        SibionicsRegistry.saveAutoResetNotBeforeMs(context, sensor, 1_790_221_980_000L)
+
+        assertEquals("committed: the case it guards is a process that dies seconds later", commitsBefore + 1, prefs.commits)
+        assertEquals(1_790_221_980_000L, SibionicsRegistry.loadAutoResetNotBeforeMs(context, sensor))
+
+        assertTrue(SibionicsRegistry.saveSessionRestart(context, sensor, byteArrayOf(9)))
+        assertEquals(0L, SibionicsRegistry.loadAutoResetNotBeforeMs(context, sensor))
+    }
+
     private class PrefsContext(private val prefs: SharedPreferences) : ContextWrapper(null) {
         override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences = prefs
     }
