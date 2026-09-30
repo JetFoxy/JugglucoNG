@@ -322,6 +322,14 @@ object WearJournalSync {
 
     private var outboxCache: List<Pending>? = null
 
+    /**
+     * Every read-modify-write of the outbox, and the identity counter, happens under this lock.
+     * An add arrives on the screen's IO thread and a serve on the message thread; without it a
+     * serve that read the queue before an add was stored writes its older copy back, and the new
+     * entry is gone -- the #502 loss again, one level down. Same for two adds drawing one counter.
+     */
+    private val outboxLock = Any()
+
     private fun outbox(): List<Pending> {
         outboxCache?.let { return it }
         val items = decodeOutbox(runCatching { outboxPrefs()?.getString(KEY_OUTBOX, null) }.getOrNull())
@@ -338,7 +346,9 @@ object WearJournalSync {
     }
 
     /** A new identity: this install's prefix and a counter that only ever goes up. */
-    private fun nextIdentity(): String {
+    private fun nextIdentity(): String = synchronized(outboxLock) { nextIdentityLocked() }
+
+    private fun nextIdentityLocked(): String {
         val prefs = runCatching { outboxPrefs() }.getOrNull()
         val prefix = runCatching {
             prefs?.getString(KEY_OUTBOX_IDENTITY, null)
@@ -347,9 +357,11 @@ object WearJournalSync {
             if (it != prefs?.getString(KEY_OUTBOX_IDENTITY, null)) {
                 runCatching { prefs?.edit()?.putString(KEY_OUTBOX_IDENTITY, it)?.apply() }
             }
-        } ?: return "wear:unknown:${System.nanoTime()}"
+        } ?: return "wear:${java.util.UUID.randomUUID()}"
         val seq = runCatching { prefs?.getInt(KEY_OUTBOX_SEQ, 0) ?: 0 }.getOrDefault(0) + 1
-        runCatching { prefs?.edit()?.putInt(KEY_OUTBOX_SEQ, seq)?.apply() }
+        // commit, not apply: a counter that did not reach disk before the process died is handed
+        // out again, and a reused identity makes the phone overwrite the earlier entry.
+        runCatching { prefs?.edit()?.putInt(KEY_OUTBOX_SEQ, seq)?.commit() }
         return "$prefix:$seq"
     }
 
@@ -394,6 +406,10 @@ object WearJournalSync {
      */
     @JvmStatic
     fun flushPending() {
+        synchronized(outboxLock) { flushPendingLocked() }
+    }
+
+    private fun flushPendingLocked() {
         val items = outbox()
         if (items.isEmpty()) return
         val mayRepeat = cached?.identityEcho == true
@@ -423,7 +439,7 @@ object WearJournalSync {
      * to echo leaves the entry marked pending instead of silently losing it. A delete leaves as soon
      * as a serve does not contain the row, which any phone can confirm.
      */
-    private fun reconcile(served: Journal) {
+    private fun reconcile(served: Journal) = synchronized(outboxLock) {
         val kept = outbox().filterNot { confirmedBy(served, it) }
         if (kept.size != outbox().size) storeOutbox(kept)
     }
@@ -456,7 +472,7 @@ object WearJournalSync {
             presetId = presetId,
             title = title,
         )
-        storeOutbox(outbox() + item)
+        synchronized(outboxLock) { storeOutbox(outbox() + item) }
         flushPending()
         return true
     }
@@ -474,7 +490,7 @@ object WearJournalSync {
             amount = Float.NaN,
             presetId = 0L,
         )
-        storeOutbox(outbox() + item)
+        synchronized(outboxLock) { storeOutbox(outbox() + item) }
         flushPending()
         return true
     }
