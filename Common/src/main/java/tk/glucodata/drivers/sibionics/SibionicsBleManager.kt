@@ -444,7 +444,9 @@ class SibionicsBleManager(
             startupRecoveryIndex = lastIndex
         }
         startTimeMs = SibionicsRegistry.loadStartTimeMs(context, SerialNumber)
+        // Clamped: a value saved while the clock ran ahead must not outlive a corrected clock.
         autoResetNotBeforeMs = SibionicsRegistry.loadAutoResetNotBeforeMs(context, SerialNumber)
+            .coerceAtMost(System.currentTimeMillis() + AUTO_RESET_BACKOFF_MS)
         scheduleResetMaintenanceCheck()
         val (time, glucose, raw) = SibionicsRegistry.loadLastReading(context, SerialNumber)
         latestReadingTimeMs = time
