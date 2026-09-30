@@ -3382,7 +3382,11 @@ public class Notify {
     }
 
     private Notification.Builder mkbuilderintent(String type, PendingIntent notifyPendingIntent) {
-        return mkbuilderintent(type, notifyPendingIntent, true);
+        // The phone never posts a summary for aa2. Android 16 can regroup this
+        // orphan child with an alert, then cancel the foreground notification
+        // when the automatic summary is removed after snooze/dismiss. Leave
+        // phone grouping to Android so updates stay in its ungrouped bookkeeping.
+        return mkbuilderintent(type, notifyPendingIntent, isWearable);
     }
 
     private Notification.Builder mkbuilderintent(String type, PendingIntent notifyPendingIntent,
