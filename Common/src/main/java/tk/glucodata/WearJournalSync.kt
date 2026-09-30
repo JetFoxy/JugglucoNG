@@ -372,8 +372,8 @@ object WearJournalSync {
             )
         }
         val confirmed = served.entries.map { it.entryIdentity }.toSet()
-        // A queued delete hides its row the way `removeLocally` did, and for the same reason: the
-        // serve that proves it has not arrived yet. It reappears if that serve still lists it.
+        // A queued delete hides its row straight away, because the serve that proves it has not
+        // arrived yet. It reappears if that serve still lists it.
         val deleting = stillPending.map { it.entryId }.toSet() +
             outbox().filter { it.command == CMD_DELETE }.map { it.entryId }
         val merged = (
@@ -538,27 +538,6 @@ object WearJournalSync {
         return journal
     }
 
-    /**
-     * Watch: shows an entry the user just added before the phone has served it
-     * back, so the list does not appear to swallow the tap. The next serve
-     * replaces it with the phone's own record.
-     */
-    @JvmStatic
-    fun addLocally(entry: Entry) {
-        val current = cached()
-        cached = current.copy(entries = (listOf(entry) + current.entries).sortedByDescending { it.timestampMs })
-        _journal.value = cached
-        UiRefreshBus.requestStatusRefresh()
-    }
-
-    /** Watch: drops an entry locally after asking the phone to delete it. */
-    @JvmStatic
-    fun removeLocally(id: Long) {
-        val current = cached()
-        cached = current.copy(entries = current.entries.filterNot { it.id == id })
-        _journal.value = cached
-        UiRefreshBus.requestStatusRefresh()
-    }
 
     private fun store(payload: ByteArray) {
         runCatching {
