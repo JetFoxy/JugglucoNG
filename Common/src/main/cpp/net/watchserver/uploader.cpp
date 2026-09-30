@@ -543,7 +543,6 @@ static void uploadIobDeviceStatus() {
 extern double     calibrateONEtest(const SensorGlucoseData *sens,const ScanData &value);
 extern double getdelta(float change);
 extern std::string_view getdeltaname(float change);
-extern int mkv1streamid(char *outiter,const sensorname_t *name,int num);
 
 //Every other exchange output gets data smoothing applied in Java, by
 //CurrentDisplaySource.resolveCurrentForExchange. The Nightscout uploader builds its
@@ -656,7 +655,7 @@ static int smoothedUploadRaw(const SensorGlucoseData *sens,std::span<const ScanD
 
 //gdata/pos locate item inside the poll series so a rate can be derived when the driver reported
 //none (AiDex, Libre 3 backfill). Without it those sensors upload direction:"" and delta:0 forever.
-template <class T> int mkuploaditem(SensorGlucoseData *sens,char *buf,const sensorname_t *sensorname,const T &item,std::span<const ScanData> gdata,const int pos,const bool includeId=false,const bool trailingComma=true) {
+template <class T> int mkuploaditem(SensorGlucoseData *sens,char *buf,const sensorname_t *sensorname,const T &item,std::span<const ScanData> gdata,const int pos,const bool trailingComma=true) {
     const time_t tim=item.gettime();
     const std::string_view sensornameView=fixedsensorview(sensorname);
     char sensornameStr[64];
@@ -695,11 +694,9 @@ template <class T> int mkuploaditem(SensorGlucoseData *sens,char *buf,const sens
     addar(out,R"(,"unfiltered":)");
     addjsonint(out,mgdL*1000LL);
     addar(out,R"(,"rssi":100)");
-    if(includeId) {
-        addar(out,R"(,"_id":")");
-        out+=mkv1streamid(out,sensorname,item.getid());
-        addar(out,R"(")");
-        }
+    addar(out,R"(,"identifier":")");
+    out+=mksgvidentifier(out,sens->sensid(),tim);
+    addar(out,R"(")");
     if(trailingComma)
         addar(out,R"(},)");
     else
@@ -740,7 +737,7 @@ static bool uploadRecentV1(const int sensorid,SensorGlucoseData *sens,const sens
         char buf[512];
         char *ptr=buf;
         *ptr++='[';
-        ptr+=mkuploaditem(sens,ptr,sensorname,el,gdata,iter,true,false);
+        ptr+=mkuploaditem(sens,ptr,sensorname,el,gdata,iter,false);
         *ptr++=']';
         *ptr='\0';
         const int res=nightuploadEntries(buf,ptr-buf);
@@ -766,7 +763,7 @@ static bool uploadV1ChunkIndividually(const int sensorid,SensorGlucoseData *sens
         char buf[512];
         char *ptr=buf;
         *ptr++='[';
-        ptr+=mkuploaditem(sens,ptr,sensorname,el,gdata,iter,true,false);
+        ptr+=mkuploaditem(sens,ptr,sensorname,el,gdata,iter,false);
         *ptr++=']';
         *ptr='\0';
         const int res=nightuploadEntries(buf,ptr-buf);
@@ -777,7 +774,8 @@ static bool uploadV1ChunkIndividually(const int sensorid,SensorGlucoseData *sens
     }
 
 static const char *writeNightscoutV3UploadEntry(char *buf,SensorGlucoseData *sens,const sensorname_t *sensorname,const ScanData *el,std::span<const ScanData> gdata,const int pos) {
-extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server=true);
+extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *sensorname,bool server=true,
+	const std::string_view &uploadid={});
     char sensornameStr[64];
     copyfixedsensorname(sensornameStr,sizeof(sensornameStr),sensorname);
     //Average before calibrating, not after: calibrateONE is affine in the value, so
@@ -804,7 +802,7 @@ extern char * writev3entry(char *outin,const ScanData *val, const sensorname_t *
     else
         outel.g=autoMgdl;
     outel.ch=effectivechange(gdata,pos,*el);
-    return writev3entry(buf,&outel,sensorname,false);
+    return writev3entry(buf,&outel,sensorname,false,sens->sensid());
     }
 
 static bool uploadRecentV3(const int sensorid,SensorGlucoseData *sens,const sensorname_t *sensorname,std::span<const ScanData> gdata,const uint32_t mintime) {
@@ -984,7 +982,7 @@ static bool uploadCGM(const bool prioritizeRecent=false) {
                             if(isRecentNightUploadCovered(sensorid,el.gettime())) {
                                 continue;
                                 }
-                            ptr+=mkuploaditem(sens,ptr,sensorname,el,gdata,iter,false,true);
+                            ptr+=mkuploaditem(sens,ptr,sensorname,el,gdata,iter,true);
                             }
                         }
                     LOGGER("%d new positer=%d\n",sensorid,chunkend);
