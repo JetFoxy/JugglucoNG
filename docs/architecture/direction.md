@@ -61,23 +61,26 @@ further down: several items describe prerequisites that were already built, and 
 | §5 Room migration harness | **built** | migrations run to 30; `HistoryDatabase.isCompatibleAtStartup` gates startup |
 | §6 Q1 registration seams instead of reflection | **done** | `Class.forName` in `src/main` is 1, and it is the exclusion §6 Q1 names: `Log.java:197` |
 | §6 Q2 typed phone-watch protocol | **done; §6 reworded to say how the version is carried** | #490, #491, #494; see below |
-| §6 Q3 D1 watch features | **not started** | needs the Nightscout-ownership and secret decisions |
+| §6 Q3 D1 watch features | **in progress; the decisions are made** | #498 and #500 settled; #501 (shared IOB/COB maths), #511/#512 (the watch journal outbox, #502) and #514 (Nightscout glucose identity) merged |
 | §6 Q4 category S duplicates | **done, allow-list ends at three by decision** | #469, #472, #473, #477, #481; the floor is set in #475 |
 | §6 Q5 storage-ownership document | **all seven facets traced; open questions remain within them** | #478, then #480, #482, #483, #484 and a correction pass |
 
-### PR state, as of 2026-09-29
+### PR state, as of 2026-09-30
 
 Every PR number cited above is merged unless it is listed here.
 
-- **Merged since the table in §1.5 was written:** #494 — the `/settings` path is gone (29 paths),
-  and `assertNoDeadPrefix` guards both manifests against a prefix left behind when a path is
-  dropped; #496 — the 17 `AndroidManifest.xml.*` copies no build read are deleted; #497 — this
-  bookkeeping; #501 — the IOB/COB arithmetic moved to `src/main` so the watch can compute it;
-  #503 — a `SECRET` setting can no longer travel to the watch through the generic mirror.
-- **Open:** #511 and #512 (a journal entry made away from the phone, and the identity that makes a
-  repeat of it one row — #502); #514 (a Nightscout glucose entry named after the reading rather
-  than after a position in the poll series); #515 and #516 (the de-duplication rule behind those,
-  and what the database guarantees about it).
+- **Merged since the table in §1.5 was written:** #492 — Bluetooth glucose meters pair, and the
+  OneTouch Verio Flex is supported; #494 — the `/settings` path is gone (29 paths), and
+  `assertNoDeadPrefix` guards both manifests against a prefix left behind when a path is dropped;
+  #495 — §6 Q2 reworded to say how the version is carried; #496 — the 17 `AndroidManifest.xml.*`
+  copies no build read are deleted; #497 and #517 — this bookkeeping; #501 — the IOB/COB arithmetic
+  moved to `src/main` so the watch can compute it; #503 — a `SECRET` setting can no longer travel
+  to the watch through the generic mirror; #506 — a peer's `owns=false` is confirmed for 15 s
+  before the sensor is taken back; #511 and #512 — a journal entry made away from the phone is kept
+  in a watch outbox under an identity that makes a repeat one row (#502); #514 — a Nightscout
+  glucose entry is named after the reading rather than a position in the poll series; #515 and
+  #516 — the de-duplication rule behind those, and what the database guarantees about it.
+- **Open:** none of the Q-track PRs.
 - **Closed unmerged:** #452, #453, #454 — the Q2 version pilots. They added versions to the text
   payloads; #467 superseded them by pinning the version policies that already exist and refusing a
   payload the build cannot read, and #495's payload-version half was dropped for the same reason
