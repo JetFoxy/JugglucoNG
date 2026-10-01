@@ -97,7 +97,8 @@ interface AiDexDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenanceDr
         } else {
             0L
         }
-        val sensorWearDays = runCatching { getSensorReportedWearDays() }.getOrDefault(-1)
+        // Display life: the card and the dashboard only. Reading cutoffs use getSensorReportedWearDays().
+        val sensorWearDays = runCatching { getDisplayWearDays() }.getOrDefault(-1)
         val reportedOfficialEndMs = if (startMs > 0L && sensorWearDays > 0) {
             startMs + (sensorWearDays.toLong() * 24L * 3600_000L)
         } else {
@@ -196,6 +197,12 @@ interface AiDexDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenanceDr
 
     /** Sensor-reported wear duration in days (-1 = unknown). */
     fun getSensorReportedWearDays(): Int = -1
+
+    /**
+     * Life shown on the card and the dashboard (-1 = unknown): the sensor-reported days
+     * resolved against the model's rated life. Never used to stop or drop readings.
+     */
+    fun getDisplayWearDays(): Int = getSensorReportedWearDays()
 
     /** Whether legacy native expiry may be used when the driver has no sensor-reported wear days. */
     fun shouldUseNativeOfficialEndFallback(): Boolean = true

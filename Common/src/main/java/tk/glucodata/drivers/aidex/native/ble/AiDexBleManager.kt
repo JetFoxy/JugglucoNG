@@ -6062,6 +6062,9 @@ class AiDexBleManager(
 
     override fun getSensorReportedWearDays(): Int = reportedWearDaysOrNull() ?: -1
 
+    override fun getDisplayWearDays(): Int =
+        AiDexWearProfile.resolve(reportedWearDaysOrNull(), AiDexWearProfile.ratedDays(_modelName)) ?: -1
+
     override fun shouldUseNativeOfficialEndFallback(): Boolean = false
 
     override fun getSensorAgeHours(): Int {
