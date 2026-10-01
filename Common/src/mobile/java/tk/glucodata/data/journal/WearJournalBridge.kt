@@ -151,7 +151,10 @@ object WearJournalBridge : JournalBridge {
         return preset.curvePoints.take(MAX_CURVE_POINTS)
     }
 
-    private fun encode(
+    // internal so the IOB agreement test can encode through the real bridge rather than a
+    // hand-built copy of this shape: the point of that test is that the wire and the phone
+    // agree, which a mirror of the encoder would assume rather than check.
+    internal fun encode(
         entries: List<JournalEntry>,
         presets: List<JournalInsulinPreset>,
     ): ByteArray {
