@@ -50,20 +50,10 @@ object AiDexWearProfile {
      * Life shown on the card and the dashboard. Display only: reading cutoffs and expiry
      * stay on the sensor's own startup `0x10` byte.
      *
-     * A startup byte that names a different life than the model file is kept when it is
-     * specific: a 16-day sensor still reports model `GX-01S`. A byte of 15 on a model whose
-     * files are not 15 days is the GX-01S default, not that sensor's rating — GX-02S stays 10.
+     * The byte always wins, so the card agrees with the remaining hours and the cutoff:
+     * a 16-day sensor still reports model `GX-01S`. The rating fills in only while no
+     * byte has been read.
      */
-    fun resolve(sensorDays: Int?, modelDays: Int?): Int? {
-        val sensor = sensorDays?.takeIf { it > 0 }
-        val model = modelDays?.takeIf { it > 0 }
-        return when {
-            sensor == null -> model
-            model == null -> sensor
-            sensor == model -> sensor
-            model != 15 && sensor == 15 -> model
-            sensor > model -> sensor
-            else -> sensor
-        }
-    }
+    fun resolve(sensorDays: Int?, modelDays: Int?): Int? =
+        sensorDays?.takeIf { it > 0 } ?: modelDays?.takeIf { it > 0 }
 }

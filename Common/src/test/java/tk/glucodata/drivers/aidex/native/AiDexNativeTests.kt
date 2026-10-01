@@ -1227,12 +1227,13 @@ class DefaultParamCatalogCompareTests {
     }
 
     @Test
-    fun resolveKeepsAShorterModelWhenTheByteIsThe15DayDefault() {
+    fun resolveUsesTheRatingOnlyWithoutASensorByte() {
         assertNull(AiDexWearProfile.resolve(null, null))
         assertEquals(10, AiDexWearProfile.resolve(null, 10))
         assertEquals(10, AiDexWearProfile.resolve(10, 10))
-        assertEquals(10, AiDexWearProfile.resolve(15, 10))
-        assertEquals(8, AiDexWearProfile.resolve(15, 8))
+        assertEquals(15, AiDexWearProfile.resolve(15, 10))
+        assertEquals(15, AiDexWearProfile.resolve(15, 8))
+        assertEquals(8, AiDexWearProfile.resolve(0, 8))
         assertEquals(16, AiDexWearProfile.resolve(16, 15))
         assertEquals(15, AiDexWearProfile.resolve(15, 15))
         assertEquals(12, AiDexWearProfile.resolve(12, null))

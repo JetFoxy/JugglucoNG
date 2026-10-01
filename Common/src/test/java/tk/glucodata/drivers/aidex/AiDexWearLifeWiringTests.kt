@@ -51,7 +51,11 @@ class AiDexWearLifeWiringTests {
             2,
             Regex("AiDexWearProfile\\.").findAll(manager).count(),
         )
+        // Defined here, never called here: no reading gate, expiry or native write can use it.
+        assertEquals(1, Regex("getDisplayWearDays\\(").findAll(manager).count())
         val driver = read("Common/src/main/java/tk/glucodata/drivers/aidex/AiDexDriver.kt")
+        // Its default and the snapshot's officialEndMs are the only other uses.
+        assertEquals(2, Regex("getDisplayWearDays\\(").findAll(driver).count())
         assertTrue(driver.contains("val sensorWearDays = runCatching { getDisplayWearDays() }.getOrDefault(-1)"))
         assertTrue(driver.contains("fun getDisplayWearDays(): Int = getSensorReportedWearDays()"))
     }
