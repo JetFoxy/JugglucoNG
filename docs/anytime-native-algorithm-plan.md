@@ -752,3 +752,19 @@ Implemented:
   `anytime-native/ct3_ct4_stage_diff.md`, `ct3_ct4_decomp_clean.c`, `ct4_decomp.log`,
   `scripts/DecompPair.java`, `scripts/DecompDispatch.java`. **STOPPED: CT3-P5 (live
   validation) blocked until a real SN16 capture; no other CT3 code changes pending.**
+- 2026-10-01: **Family-catalog gap found from a live trace — SN91 hid behind the
+  CT5 handshake.** The sensor advertises as `SN9150002398` (trace
+  `juggluco-trace-20261001-114702.log`, `D4:FE:28:EB:50:6B`, advertised name
+  present, `services=null`). `EDevice` carries `DEVICE_SN91` (CT3_ULTRASONIC,
+  `algorithm 10`), but `AnytimeConstants.FAMILY_TABLE` never listed `SN91` — the
+  two hand-maintained copies of the vendor catalog had drifted. Consequences:
+  `resolveFamily` returned `FAMILY_UNKNOWN`, so `isAnytimeDevice` was false and the
+  setup wizard dropped the device unless *see all devices* was toggled; after a
+  manual pick, `beginHandshake` fell through to the generic `else -> checkFrame()`
+  arm. `EDevice.getEnumDevice` disagreed with `resolveFamily` on the same string.
+  Fixed by adding `FamilyEntry("SN91", Family.CT3_ULTRASONIC, 10, 6740)`, and
+  `AnytimeProfileTests` now pins `EDevice` ↔ `FAMILY_TABLE` prefix/algorithm/
+  endNumber equality so the copies cannot drift again. Note `DEVICE_UNKNOWN`
+  reuses `"SN06"` as its nameStart and must be excluded from that comparison.
+  This is a **classification** fix only — no CT3/CT2.5/CT4/CT5 kernel behaviour
+  changed, so the P5 hold still stands.

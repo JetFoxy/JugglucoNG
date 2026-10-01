@@ -518,6 +518,7 @@ object AnytimeConstants {
         FamilyEntry("SN29", Family.CT3_ULTRASONIC, 12, 3380),
         FamilyEntry("SN43", Family.CT3_ULTRASONIC, 9, 6740),
         FamilyEntry("SN47", Family.CT3_ULTRASONIC, 9, 6740),
+        FamilyEntry("SN91", Family.CT3_ULTRASONIC, 10, 6740),
         FamilyEntry("SN96", Family.CT3_ULTRASONIC, 12, 6740),
         FamilyEntry("SN98", Family.CT3_ULTRASONIC, 12, 6740),
         // ---- CT4 (voltage-switching) ----
