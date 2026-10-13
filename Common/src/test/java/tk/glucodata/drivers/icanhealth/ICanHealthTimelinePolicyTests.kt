@@ -167,4 +167,44 @@ class ICanHealthTimelinePolicyTests {
     fun missingCounterObservationIsNeverDivergent() {
         assertFalse(ICanHealthConstants.isAnchorDivergentFromObservedSequence(1L, 0L, 600_000L))
     }
+
+    /**
+     * End-to-end replay of the exact values in juggluco-trace-20261008-175444.log: the counter
+     * (seq 17070) read at 17:40:32, a skewed edge reconstructing 16:38:01, and the live seq 17073
+     * arriving at 17:40:57. The edge must be rejected and the reading stamped from the clock.
+     */
+    @Test
+    fun replay_traceSkewedEdgeIsDroppedAndTheLiveReadingIsStampedNow() {
+        val counterObservedAtMs = 1_791_470_432_000L // 17:40:32
+        val liveArrivalMs = 1_791_470_457_000L       // 17:40:57
+        val coveredSequence = 17_070
+        val coveredTimestampMs = 1_791_466_681_000L  // 16:38:01, the skewed edge
+
+        val anchor = ICanHealthConstants.persistedCoveredAnchorMs(
+            persistedCoveredSequence = coveredSequence,
+            persistedCoveredTimestampMs = coveredTimestampMs,
+            currentSequenceNumber = 17_070,
+            sequenceUnitMs = sequenceUnitMs,
+        )
+        assertEquals(coveredTimestampMs, anchor)
+        assertTrue(
+            ICanHealthConstants.isAnchorDivergentFromObservedSequence(
+                anchorMs = anchor,
+                sequenceObservedAtMs = counterObservedAtMs,
+                toleranceMs = 600_000L,
+            )
+        )
+
+        val resolvedLiveMs = anchor - (17_070 - 17_073).toLong() * sequenceUnitMs
+        assertEquals(1_791_466_861_000L, resolvedLiveMs) // 16:41:01, exactly what the trace stored
+        assertTrue(
+            ICanHealthConstants.isStaleLiveTimestamp(
+                sequenceNumber = 17_073,
+                currentSequenceNumber = 17_070,
+                resolvedMs = resolvedLiveMs,
+                nowMs = liveArrivalMs,
+                maxLagMs = 600_000L,
+            )
+        )
+    }
 }

@@ -3288,8 +3288,12 @@ class ICanHealthBleManager(
             persistedCoveredSequence >= 0 &&
             persistedCoveredTimestampMs > 0L &&
             currentSequenceNumber >= persistedCoveredSequence) {
-            val deltaMinutes = currentSequenceNumber - persistedCoveredSequence
-            val persistedAnchorTimeMs = persistedCoveredTimestampMs + deltaMinutes.toLong() * SEQUENCE_UNIT_MS
+            val persistedAnchorTimeMs = ICanHealthConstants.persistedCoveredAnchorMs(
+                persistedCoveredSequence = persistedCoveredSequence,
+                persistedCoveredTimestampMs = persistedCoveredTimestampMs,
+                currentSequenceNumber = currentSequenceNumber,
+                sequenceUnitMs = SEQUENCE_UNIT_MS,
+            )
             // The plausibility window is hours wide, so an edge that is merely an hour off
             // passes it and then re-seeds itself with every reading. The counter read is a
             // fresh wall-clock fix for currentSequenceNumber; the edge must agree with it.

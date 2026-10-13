@@ -407,6 +407,19 @@ object ICanHealthConstants {
     }
 
     /**
+     * Reconstructs the wall-clock time of [currentSequenceNumber] from a persisted covered edge
+     * `(persistedCoveredSequence, persistedCoveredTimestampMs)`, extrapolating by one minute per
+     * sequence step. This is the anchor the whole relative-timestamp path hangs off.
+     */
+    internal fun persistedCoveredAnchorMs(
+        persistedCoveredSequence: Int,
+        persistedCoveredTimestampMs: Long,
+        currentSequenceNumber: Int,
+        sequenceUnitMs: Long,
+    ): Long = persistedCoveredTimestampMs +
+        (currentSequenceNumber - persistedCoveredSequence).toLong() * sequenceUnitMs
+
+    /**
      * True when an edge-derived time for the sensor's current sequence disagrees with the moment
      * that sequence was actually read. No observation yet means nothing to compare against.
      */
