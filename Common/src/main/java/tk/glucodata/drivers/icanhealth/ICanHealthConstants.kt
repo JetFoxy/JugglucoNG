@@ -420,6 +420,24 @@ object ICanHealthConstants {
         (currentSequenceNumber - persistedCoveredSequence).toLong() * sequenceUnitMs
 
     /**
+     * Whether an anchor reconstructed by [persistedCoveredAnchorMs] may be used. The plausibility
+     * window is hours wide, so an edge that is merely an hour off passes it and then re-seeds
+     * itself with every reading. The counter read is a fresh wall-clock fix for the current
+     * sequence; the edge must agree with it as well.
+     */
+    internal fun isPersistedCoveredAnchorUsable(
+        anchorMs: Long,
+        sequenceObservedAtMs: Long,
+        divergenceToleranceMs: Long,
+        plausibleRange: LongRange,
+    ): Boolean {
+        if (anchorMs <= 0L || anchorMs !in plausibleRange) {
+            return false
+        }
+        return !isAnchorDivergentFromObservedSequence(anchorMs, sequenceObservedAtMs, divergenceToleranceMs)
+    }
+
+    /**
      * True when an edge-derived time for the sensor's current sequence disagrees with the moment
      * that sequence was actually read. No observation yet means nothing to compare against.
      */
