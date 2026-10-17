@@ -22,15 +22,19 @@ object MedtrumRegistry {
             return null
         }
         val sensorId = MedtrumPersistence.canonicalSensorId(serialNumber)
+        val previousSerial = MedtrumPersistence.getSerialNumber(context)
+        if (previousSerial != 0L && previousSerial != serialNumber) {
+            // The old patch's address would be tried first and its auth dialect reused.
+            MedtrumPersistence.setLastBtAddress(context, "")
+            MedtrumPersistence.setLegacyAuth(context, false)
+        }
         MedtrumPersistence.setSerialNumber(context, serialNumber)
         MedtrumPersistence.setSensorId(context, sensorId)
 
+        retireOtherDrivers(sensorId)
         val blue = SensorBluetooth.blueone ?: return sensorId
-        val existing = SensorBluetooth.gattcallbacks.firstOrNull { callback ->
-            val medtrum = callback as? MedtrumBleManager ?: return@firstOrNull false
-            SensorIdentity.matches(medtrum.SerialNumber, sensorId) || medtrum.matchesManagedSensorId(sensorId)
-        }
-        val callback = (existing as? MedtrumBleManager) ?: MedtrumBleManager(sensorId, 0L).also {
+        val existing = findDriver(sensorId)
+        val callback = existing ?: MedtrumBleManager(sensorId, 0L).also {
             it.mActiveDeviceAddress = MedtrumPersistence.getLastBtAddress(context).takeIf { addr -> addr.isNotBlank() }
             SensorBluetooth.gattcallbacks.add(it)
             runCatching { Natives.setmaxsensors(SensorBluetooth.gattcallbacks.size) }
@@ -39,5 +43,31 @@ object MedtrumRegistry {
             callback.connectDevice(0)
         }
         return sensorId
+    }
+
+    /** The running driver for this sensor, if SensorBluetooth holds one. */
+    @JvmStatic
+    fun findDriver(sensorId: String): MedtrumBleManager? =
+        SensorBluetooth.gattcallbacks.firstNotNullOfOrNull { callback ->
+            (callback as? MedtrumBleManager)?.takeIf {
+                SensorIdentity.matches(it.SerialNumber, sensorId) || it.matchesManagedSensorId(sensorId)
+            }
+        }
+
+    /**
+     * Persistence holds one Medtrum serial, so a driver for any other serial is a leftover — most
+     * often a mistyped serial the patch rejected in setup. Left running it would keep its own
+     * address and reconnect loop alongside the new one.
+     */
+    private fun retireOtherDrivers(sensorId: String) {
+        SensorBluetooth.gattcallbacks
+            .filterIsInstance<MedtrumBleManager>()
+            .filterNot { SensorIdentity.matches(it.SerialNumber, sensorId) || it.matchesManagedSensorId(sensorId) }
+            .forEach { stale ->
+                Log.i(TAG, "Retiring Medtrum driver ${stale.SerialNumber} for $sensorId")
+                runCatching { stale.terminateManagedSensor(wipeData = false) }
+                    .onFailure { Log.stack(TAG, "retireOtherDrivers", it) }
+                SensorBluetooth.gattcallbacks.remove(stale)
+            }
     }
 }

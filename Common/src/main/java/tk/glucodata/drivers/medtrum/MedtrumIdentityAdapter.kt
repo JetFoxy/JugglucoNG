@@ -10,7 +10,7 @@ import tk.glucodata.drivers.ManagedSensorUiFamily
 
 object MedtrumIdentityAdapter : ManagedSensorIdentityAdapter {
 
-    override val uiFamily: ManagedSensorUiFamily = ManagedSensorUiFamily.GENERIC
+    override val uiFamily: ManagedSensorUiFamily = ManagedSensorUiFamily.MEDTRUM
 
     override fun matchesCallbackId(callbackId: String?, sensorId: String): Boolean {
         val normalized = callbackId?.trim().takeIf { !it.isNullOrEmpty() } ?: return false

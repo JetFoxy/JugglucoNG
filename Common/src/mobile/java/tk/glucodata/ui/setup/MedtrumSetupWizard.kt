@@ -17,17 +17,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,16 +40,43 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import tk.glucodata.Log
 import tk.glucodata.R
+import tk.glucodata.ui.components.AppTopBar
 import tk.glucodata.drivers.medtrum.MedtrumPersistence
 import tk.glucodata.drivers.medtrum.MedtrumRegistry
 
 private const val TAG = "MedtrumSetupWizard"
 
-private enum class MedtrumSetupStep { ENTRY, CONNECTING, SUCCESS }
+/** How long setup waits for an authenticated link before reporting "saved, still searching". */
+private const val CONNECT_CONFIRM_TIMEOUT_MS = 90_000L
+private const val CONNECT_POLL_MS = 500L
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * SUCCESS is shown only once the patch accepted AUTH; SAVED when it did not come up in time (out
+ * of range, still busy with another app) — the driver keeps trying in the background either way.
+ */
+private enum class MedtrumSetupStep { ENTRY, CONNECTING, SUCCESS, SAVED }
+
+private enum class MedtrumAttachResult { CONNECTED, REJECTED, TIMED_OUT }
+
+private suspend fun awaitMedtrumLink(sensorId: String): MedtrumAttachResult =
+    withTimeoutOrNull(CONNECT_CONFIRM_TIMEOUT_MS) {
+        var result: MedtrumAttachResult? = null
+        while (result == null) {
+            val driver = MedtrumRegistry.findDriver(sensorId)
+            result = when {
+                driver?.isAuthRejected() == true -> MedtrumAttachResult.REJECTED
+                driver?.isConnected() == true -> MedtrumAttachResult.CONNECTED
+                else -> null
+            }
+            if (result == null) delay(CONNECT_POLL_MS)
+        }
+        result
+    } ?: MedtrumAttachResult.TIMED_OUT
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MedtrumSetupWizard(
     onDismiss: () -> Unit,
@@ -66,6 +90,7 @@ fun MedtrumSetupWizard(
     var serialInput by remember { mutableStateOf("") }
     var attachedSerial by remember { mutableStateOf("") }
     var pendingSerial by remember { mutableStateOf<Long?>(null) }
+    var serialRejected by remember { mutableStateOf(false) }
 
     val normalized = serialInput.trim()
     val serialNumber = MedtrumPersistence.parseSerialNumber(normalized)
@@ -73,12 +98,21 @@ fun MedtrumSetupWizard(
 
     fun startAttach(serial: Long) {
         attachedSerial = MedtrumPersistence.formatSerialHex(serial)
+        serialRejected = false
         step = MedtrumSetupStep.CONNECTING
         scope.launch {
             try {
-                MedtrumRegistry.addSensor(context, serial)
-                delay(2000)
-                step = MedtrumSetupStep.SUCCESS
+                val sensorId = MedtrumRegistry.addSensor(context, serial)
+                val result = if (sensorId == null) MedtrumAttachResult.TIMED_OUT else awaitMedtrumLink(sensorId)
+                Log.i(TAG, "Medtrum setup $attachedSerial: $result")
+                when (result) {
+                    MedtrumAttachResult.CONNECTED -> step = MedtrumSetupStep.SUCCESS
+                    MedtrumAttachResult.TIMED_OUT -> step = MedtrumSetupStep.SAVED
+                    MedtrumAttachResult.REJECTED -> {
+                        serialRejected = true
+                        step = MedtrumSetupStep.ENTRY
+                    }
+                }
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to add Medtrum sensor: ${t.message}")
                 step = MedtrumSetupStep.ENTRY
@@ -119,13 +153,10 @@ fun MedtrumSetupWizard(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.medtrum_sensor)) },
-                navigationIcon = {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cancel))
-                    }
-                }
+            AppTopBar(
+                title = stringResource(R.string.medtrum_sensor),
+                onNavigateBack = onDismiss,
+                navigationContentDescription = stringResource(R.string.cancel),
             )
         }
     ) { padding ->
@@ -160,6 +191,7 @@ fun MedtrumSetupWizard(
                     OutlinedTextField(
                         value = serialInput,
                         onValueChange = { input ->
+                            serialRejected = false
                             serialInput = input.filter {
                                 it.isDigit() || it in 'a'..'f' || it in 'A'..'F'
                             }.take(8).uppercase()
@@ -168,11 +200,15 @@ fun MedtrumSetupWizard(
                         placeholder = { Text(stringResource(R.string.medtrum_serial_hint)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                        isError = normalized.isNotEmpty() && !isValid,
-                        supportingText = if (isValid && serialNumber != null) {
-                            { Text(stringResource(R.string.medtrum_serial_echo, normalized, serialNumber)) }
-                        } else {
-                            null
+                        isError = (normalized.isNotEmpty() && !isValid) || serialRejected,
+                        supportingText = when {
+                            serialRejected -> {
+                                { Text(stringResource(R.string.medtrum_setup_auth_failed)) }
+                            }
+                            isValid && serialNumber != null -> {
+                                { Text(stringResource(R.string.medtrum_serial_echo, normalized, serialNumber)) }
+                            }
+                            else -> null
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -182,6 +218,7 @@ fun MedtrumSetupWizard(
                     OutlinedButton(
                         onClick = { serialNumber?.let { requestPermissionsAndAttach(it) } },
                         enabled = isValid,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(ui.buttonHeight),
@@ -202,6 +239,33 @@ fun MedtrumSetupWizard(
                     contentAlignment = Alignment.Center,
                 ) {
                     SensorSetupSuccessScreen(ui = ui, sensorLabel = attachedSerial.ifBlank { null })
+                }
+
+                MedtrumSetupStep.SAVED -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = ui.horizontalPadding),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        SensorSetupConnectingScreen(
+                            ui = ui,
+                            sensorLabel = attachedSerial.ifBlank { null },
+                            title = stringResource(R.string.medtrum_setup_saved_title),
+                            supportingText = stringResource(R.string.medtrum_setup_searching),
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onComplete,
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(ui.buttonHeight),
+                    ) {
+                        Text(stringResource(R.string.ok))
+                    }
+                    Spacer(Modifier.height(ui.spacerLarge))
                 }
             }
         }

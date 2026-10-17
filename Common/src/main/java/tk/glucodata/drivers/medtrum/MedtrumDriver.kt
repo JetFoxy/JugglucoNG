@@ -36,7 +36,7 @@ interface MedtrumDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenance
             serial = sn,
             displayName = "Medtrum EasySense",
             deviceAddress = address.ifBlank { "Unknown" },
-            uiFamily = ManagedSensorUiFamily.GENERIC,
+            uiFamily = ManagedSensorUiFamily.MEDTRUM,
             connectionStatus = runCatching { getConnectionStatus() }.getOrDefault(""),
             detailedStatus = runCatching { getDetailedBleStatus() }.getOrDefault(""),
             isActive = activeSensorId?.takeIf { it.isNotBlank() }?.let { it == sn } ?: false,
