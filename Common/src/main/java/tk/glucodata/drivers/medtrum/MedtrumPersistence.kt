@@ -11,6 +11,7 @@ object MedtrumPersistence {
     private const val KEY_SENSOR_ID = "medtrum_sensor_id"
     private const val KEY_LEGACY_AUTH = "medtrum_legacy_auth"
     private const val KEY_SENSOR_START_MS = "medtrum_sensor_start_ms"
+    private const val KEY_SESSION_KEY = "medtrum_sensor_session_key"
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -42,6 +43,14 @@ object MedtrumPersistence {
 
     fun setSensorStartMs(context: Context, startMs: Long) {
         prefs(context).edit().putLong(KEY_SENSOR_START_MS, startMs).apply()
+    }
+
+    /** Which disposable sensor the stored start belongs to (see [MedtrumSensorSession]). */
+    fun getSessionKey(context: Context): String =
+        prefs(context).getString(KEY_SESSION_KEY, "") ?: ""
+
+    fun setSessionKey(context: Context, key: String) {
+        prefs(context).edit().putString(KEY_SESSION_KEY, key).apply()
     }
 
     fun clear(context: Context) {

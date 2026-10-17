@@ -16,7 +16,7 @@ object MedtrumSensorLife {
     private const val MIN_ELAPSED_SECONDS = 1L
 
     /** A recomputed start within this of the stored one is the same start with a few seconds of jitter. */
-    private const val RESTART_TOLERANCE_MS = 2L * 60L * 1000L
+    internal const val RESTART_TOLERANCE_MS = 2L * 60L * 1000L
 
     fun startFromElapsed(nowMs: Long, elapsedSeconds: Long): Long {
         if (elapsedSeconds < MIN_ELAPSED_SECONDS) return 0L
@@ -46,19 +46,48 @@ object MedtrumSensorLife {
 }
 
 /**
+ * The serial of the transmitter outlives one disposable sensor, so a replaced sensor is told apart
+ * by its insertion. Software calibration belongs to the electrode it was taken on: carried over, an
+ * old single-point offset would be applied to the replacement until the user cleared it.
+ */
+object MedtrumSensorSession {
+
+    fun key(sensorId: Int, insertTime: Long): String = "$sensorId:$insertTime"
+
+    /**
+     * A new disposable sensor needs both signs: the insertion key changed, and the elapsed time
+     * restarted, so the recomputed start is later than the stored one by more than clock jitter.
+     * Either alone could be a drifting counter, and archiving calibrations on a false positive
+     * would silently drop the user's work.
+     */
+    fun isNewSession(storedKey: String, key: String, storedStartMs: Long, candidateStartMs: Long): Boolean {
+        if (storedKey.isBlank() || storedKey == key) return false
+        if (storedStartMs <= 0L || candidateStartMs <= 0L) return false
+        return candidateStartMs - storedStartMs > MedtrumSensorLife.RESTART_TOLERANCE_MS
+    }
+
+    /** The id the previous session's calibrations are filed under, which no live sensor matches. */
+    fun archiveId(serial: String, previousStartMs: Long): String = "$serial@$previousStartMs"
+}
+
+/**
  * The native layer keeps a mirror of a patch under a shortened name: the serial 2329895446 came
  * back as `95446`. Unrecognised, that name was built into a generic Libre callback, which showed
- * up as a second, phantom sensor. A trailing part of the serial is the same patch.
+ * up as a second, phantom sensor.
+ *
+ * Only that name is an alias. Every valid serial has at least [MIN_SERIAL_LENGTH] digits, so a
+ * five-digit name cannot be another patch's full serial, whereas treating any shorter numeric
+ * ending as the same patch would merge `2329895446` with `329895446`.
  */
 object MedtrumSerialAlias {
 
-    /** Short enough to be a truncation, long enough that a stray digit run does not match. */
-    private const val MIN_ALIAS_LENGTH = 5
+    const val NATIVE_SHORT_NAME_LENGTH = 5
+    const val MIN_SERIAL_LENGTH = 6
 
     fun isShortForm(candidate: String?, serial: String?): Boolean {
         val short = candidate?.trim().orEmpty()
         val full = serial?.trim().orEmpty()
-        if (short.length < MIN_ALIAS_LENGTH || short.length >= full.length) return false
+        if (short.length != NATIVE_SHORT_NAME_LENGTH || full.length < MIN_SERIAL_LENGTH) return false
         if (!short.all { it.isDigit() } || !full.all { it.isDigit() }) return false
         return full.endsWith(short)
     }

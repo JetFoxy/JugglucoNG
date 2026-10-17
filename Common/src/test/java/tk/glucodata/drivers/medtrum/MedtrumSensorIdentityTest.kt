@@ -78,6 +78,15 @@ class MedtrumSerialAliasTest {
     }
 
     @Test
+    fun aLongerNumericEndingIsAnotherPatchNotAnAlias() {
+        // Both are valid serials. Matching any numeric ending would merge them, and replacing one
+        // patch with the other would keep the old driver.
+        assertFalse(MedtrumSerialAlias.isShortForm("329895446", "2329895446"))
+        assertFalse(MedtrumSerialAlias.isShortForm("895446", "2329895446"))
+        assertFalse(MedtrumIdentityAdapterProbe.matches("329895446", "2329895446"))
+    }
+
+    @Test
     fun theSerialItselfAndTooShortOrNonNumericNamesAreNotAliases() {
         assertFalse(MedtrumSerialAlias.isShortForm("2329895446", "2329895446"))
         assertFalse(MedtrumSerialAlias.isShortForm("5446", "2329895446"))
@@ -146,5 +155,46 @@ class MedtrumIdentityAliasTest {
         } finally {
             driver.terminateManagedSensor(wipeData = true)
         }
+    }
+}
+
+/** The adapter's id matching, without a driver. */
+private object MedtrumIdentityAdapterProbe {
+    fun matches(a: String, b: String) = MedtrumIdentityAdapter.matchesCallbackId(a, b)
+}
+
+class MedtrumSensorSessionTest {
+
+    private val start = 1_000_000_000_000L
+    private val keyA = MedtrumSensorSession.key(7, 1_000L)
+    private val keyB = MedtrumSensorSession.key(8, 2_000L)
+
+    @Test
+    fun aNewInsertionWithARestartedElapsedTimeIsANewSensor() {
+        assertTrue(MedtrumSensorSession.isNewSession(keyA, keyB, start, start + 5 * 24 * 3_600_000L))
+    }
+
+    @Test
+    fun theSameInsertionIsTheSameSensor() {
+        assertFalse(MedtrumSensorSession.isNewSession(keyA, keyA, start, start + 5 * 24 * 3_600_000L))
+    }
+
+    @Test
+    fun aChangedKeyAloneDoesNotArchiveCalibrations() {
+        // A drifting counter would otherwise drop the user's calibration.
+        assertFalse(MedtrumSensorSession.isNewSession(keyA, keyB, start, start + 30_000L))
+        assertFalse(MedtrumSensorSession.isNewSession(keyA, keyB, start, start - 5 * 24 * 3_600_000L))
+    }
+
+    @Test
+    fun theFirstSightOfASensorIsNotAReplacement() {
+        assertFalse(MedtrumSensorSession.isNewSession("", keyB, 0L, start))
+        assertFalse(MedtrumSensorSession.isNewSession(keyA, keyB, 0L, start))
+    }
+
+    @Test
+    fun theArchiveIdMatchesNoLiveSensor() {
+        assertEquals("2329895446@1000", MedtrumSensorSession.archiveId("2329895446", 1_000L))
+        assertFalse(MedtrumSerialAlias.isShortForm(MedtrumSensorSession.archiveId("2329895446", 1_000L), "2329895446"))
     }
 }

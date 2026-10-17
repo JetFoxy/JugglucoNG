@@ -91,6 +91,13 @@ interface CalibrationProvider {
     /** Delete every stored calibration; false when no engine handled it. */
     fun clearAllBlocking(): Boolean = false
 
+    /**
+     * File every calibration of [sensorId] under [archiveId], so a new disposable sensor on the same
+     * transmitter starts with none while the old points stay in the database. False when no engine
+     * handled it.
+     */
+    fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Boolean = false
+
     /** Delete the calibration recorded at [timestamp]; false when none matched or none handled it. */
     fun deleteCalibrationAtBlocking(timestamp: Long): Boolean = false
 

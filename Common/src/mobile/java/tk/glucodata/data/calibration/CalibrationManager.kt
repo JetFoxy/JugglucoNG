@@ -1488,6 +1488,34 @@ object CalibrationManager {
         Log.i(TAG, "Cleared all calibrations")
     }
 
+    /** Blocking entry point for a driver on its own thread (see [archiveSensorCalibrations]). */
+    fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Int =
+        kotlinx.coroutines.runBlocking { archiveSensorCalibrations(sensorId, archiveId) }
+
+    /**
+     * Re-files every calibration of [sensorId] under [archiveId]. Nothing is deleted: the rows keep
+     * their values and only stop matching the live sensor, so the replacement electrode is not
+     * corrected by an offset measured on the previous one. Returns how many rows moved.
+     */
+    suspend fun archiveSensorCalibrations(sensorId: String, archiveId: String): Int {
+        if (!ensureInitialized() || archiveId.isBlank()) return 0
+        val target = normalizeSensorId(sensorId)
+        if (target.isBlank()) return 0
+        val moved = withContext(Dispatchers.IO) {
+            dao.getAllSync()
+                .filter { sensorMatches(it.sensorId, target) }
+                .sumOf { dao.updateSensorId(it.id, archiveId) }
+        }
+        if (moved == 0) return 0
+        deferGlucoseAlertsUntilNextReading()
+        loadCalibrations()
+        refreshDiagnosticsPreview(isRawMode = true, force = true)
+        refreshDiagnosticsPreview(isRawMode = false, force = true)
+        requestMirrorCalibrationSync(target)
+        Log.i(TAG, "Archived $moved calibrations of $target as $archiveId")
+        return moved
+    }
+
     suspend fun restoreAll(calibrations: List<CalibrationEntity>) {
         withContext(Dispatchers.IO) { dao.insertAll(calibrations) }
         deferGlucoseAlertsUntilNextReading()

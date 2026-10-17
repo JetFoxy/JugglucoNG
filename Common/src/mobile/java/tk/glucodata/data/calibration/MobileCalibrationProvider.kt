@@ -73,6 +73,9 @@ object MobileCalibrationProvider : CalibrationProvider {
         return true
     }
 
+    override fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Boolean =
+        CalibrationManager.archiveSensorCalibrationsBlocking(sensorId, archiveId) > 0
+
     override fun deleteCalibrationAtBlocking(timestamp: Long): Boolean =
         CalibrationManager.deleteCalibrationAtBlocking(timestamp)
 

@@ -24,6 +24,7 @@ import tk.glucodata.Applic
 import tk.glucodata.Natives
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SuperGattCallback
+import tk.glucodata.drivers.VirtualGlucoseSensorBridge
 
 /**
  * After a disconnect the patch has to come back on its own. These cover the ways the first
@@ -80,7 +81,7 @@ class MedtrumReconnectLifecycleTest {
     @Test
     fun aLostLinkKeepsTheDeviceForADirectReconnect() {
         val gatt = newGatt()
-        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+        connect(gatt)
 
         manager.onConnectionStateChange(gatt, 8 /* supervision timeout */, BluetoothProfile.STATE_DISCONNECTED)
 
@@ -109,7 +110,7 @@ class MedtrumReconnectLifecycleTest {
     @Test
     fun aStaleDisconnectDoesNotTearDownTheLiveLink() {
         val live = newGatt()
-        manager.onConnectionStateChange(live, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+        connect(live)
         val stale = newGatt()
 
         manager.onConnectionStateChange(stale, 133, BluetoothProfile.STATE_DISCONNECTED)
@@ -121,7 +122,7 @@ class MedtrumReconnectLifecycleTest {
     @Test
     fun bluetoothOffResetsTheSessionSoTheReconnectIsNotSkipped() {
         val gatt = newGatt()
-        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+        connect(gatt)
 
         // What SensorBluetooth does on STATE_OFF for a managed driver; no DISCONNECTED follows.
         manager.closeGattTransport()
@@ -157,7 +158,7 @@ class MedtrumReconnectLifecycleTest {
     @Test
     fun aLinkThatConnectedButDidNotFinishSetupKeepsADeadline() {
         val gatt = newGatt()
-        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+        connect(gatt)
 
         // Discovery, subscription and AUTH are all still ahead: without a pending deadline a stuck
         // step would leave the phase busy and every later connectDevice() a duplicate.
@@ -168,7 +169,7 @@ class MedtrumReconnectLifecycleTest {
     @Test
     fun aDeviceWithoutTheMedtrumServiceIsRejectedAndNotRetried() {
         val gatt = newGatt()
-        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+        connect(gatt)
 
         // The scanned or remembered address answered but carries no CGMS service: a wrong device.
         manager.onServicesDiscovered(gatt, BluetoothGatt.GATT_SUCCESS)
@@ -181,7 +182,7 @@ class MedtrumReconnectLifecycleTest {
     @Test
     fun aCgmReadingBeforeAuthIsNotPublishedOrStreaming() {
         val gatt = newGatt()
-        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+        connect(gatt)
 
         // The patch can push CGM_DATA as soon as notifications are enabled, before AUTH.
         invokeOnCgmData(hex("0f09005f12000d005d064606390641060000f230"))
@@ -236,6 +237,103 @@ class MedtrumReconnectLifecycleTest {
         }
     }
 
+    @Test
+    fun aRetiredConnectedCallbackDoesNotMoveTheLocalConnectionClaim() {
+        val live = newGatt()
+        connect(live)
+        assertTrue(manager.hasLocallyConnectedGatt())
+
+        val retired = newGatt()
+        manager.onConnectionStateChange(retired, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+
+        // The superclass used to record the retired handle first, so the claim consumed by Wear
+        // and Clone read "not connected" while the live link was fine.
+        assertSame(live, gattOf(manager))
+        assertTrue(manager.hasLocallyConnectedGatt())
+    }
+
+    @Test
+    fun aQueuedConnectedForAClosedHandleDoesNotReinstallIt() {
+        val old = newGatt()
+        connect(old)
+        manager.closeGattTransport()
+        assertNull(gattOf(manager))
+        val phase = manager.phase
+
+        manager.onConnectionStateChange(old, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+
+        assertNull("a closed handle must not become the current one again", gattOf(manager))
+        assertEquals(phase, manager.phase)
+    }
+
+    @Test
+    fun aReadingBlockedOnTheMirrorLockIsWrittenBeforeTerminationFinishesTheShell() {
+        MedtrumTestNatives.events.clear()
+        val gatt = newGatt()
+        connect(gatt)
+        setAuthAccepted(true)
+        val record = hex("0f09005f12000d005d064606390641060000f230")
+        assertNotNull(MedtrumProtocol.parseCgmRecord(record)?.glucoseMgdl)
+        val mirrorLock = VirtualGlucoseSensorBridge::class.java.getDeclaredField("mirrorLock")
+            .apply { isAccessible = true }.get(null)!!
+
+        val reading = Thread { invokeOnCgmData(record) }
+        val terminate = Thread { manager.terminateManagedSensor(wipeData = false) }
+        synchronized(mirrorLock) {
+            reading.start()
+            awaitBlocked(reading)
+            terminate.start()
+            Thread.sleep(300)
+            assertFalse(
+                "termination must wait for the reading that is already being stored",
+                MedtrumTestNatives.events.contains("finish")
+            )
+        }
+        reading.join(5_000)
+        terminate.join(5_000)
+
+        val events = MedtrumTestNatives.events.toList()
+        assertTrue("the reading reached native: $events", events.contains("mirror"))
+        assertTrue("the shell is finished: $events", events.contains("finish"))
+        assertTrue(
+            "the shell must be finished after the last write, got $events",
+            events.lastIndexOf("mirror") < events.indexOf("finish")
+        )
+    }
+
+    @Test
+    fun aReadingAfterTerminationIsNotPublished() {
+        val gatt = newGatt()
+        connect(gatt)
+        setAuthAccepted(true)
+        manager.terminateManagedSensor(wipeData = false)
+        MedtrumTestNatives.events.clear()
+
+        invokeOnCgmData(hex("0f09005f12000d005d064606390641060000f230"))
+
+        assertFalse(
+            "a removed sensor's mirror must not be written again",
+            MedtrumTestNatives.events.contains("mirror")
+        )
+    }
+
+    private fun connect(gatt: BluetoothGatt) {
+        setGatt(manager, gatt)
+        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+    }
+
+    private fun setAuthAccepted(value: Boolean) {
+        MedtrumBleManager::class.java.getDeclaredField("authAccepted")
+            .apply { isAccessible = true }
+            .set(manager, value)
+    }
+
+    private fun awaitBlocked(thread: Thread) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (thread.state != Thread.State.BLOCKED && System.currentTimeMillis() < deadline) Thread.sleep(10)
+        assertEquals(Thread.State.BLOCKED, thread.state)
+    }
+
     private fun failAttempt() {
         val gatt = newGatt()
         setGatt(manager, gatt)
@@ -275,7 +373,22 @@ class MedtrumTestApplication : Applic() {
 @Implements(value = Natives::class, callThroughByDefault = false)
 class MedtrumTestNatives {
     companion object {
+        /** The native calls that matter to ordering: the first touch of a mirror write, and the finish. */
+        val events: MutableList<String> = java.util.concurrent.CopyOnWriteArrayList()
+
         @JvmStatic @Implementation
         fun __staticInitializer__() {}
+
+        @JvmStatic @Implementation
+        fun str2sensorptr(name: String): Long {
+            events.add("mirror")
+            return 0L
+        }
+
+        @JvmStatic @Implementation
+        fun finishSensorById(sensorId: String): Boolean {
+            events.add("finish")
+            return true
+        }
     }
 }

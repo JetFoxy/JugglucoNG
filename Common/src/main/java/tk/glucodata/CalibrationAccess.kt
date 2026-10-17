@@ -52,6 +52,16 @@ object CalibrationAccess {
             .onFailure { Log.stack(TAG, "clearAll failed", it) }
             .getOrNull() ?: false
 
+    /**
+     * Move one sensor's calibrations to [archiveId]. For a driver whose serial outlives its disposable
+     * sensor: the old electrode's calibration must not apply to the replacement.
+     */
+    @JvmStatic
+    fun archiveSensorCalibrations(sensorId: String, archiveId: String): Boolean =
+        runCatching { provider?.archiveSensorCalibrationsBlocking(sensorId, archiveId) }
+            .onFailure { Log.stack(TAG, "archiveSensorCalibrations failed", it) }
+            .getOrNull() ?: false
+
     @JvmStatic
     fun deleteCalibrationAt(timestamp: Long): Boolean =
         runCatching { provider?.deleteCalibrationAtBlocking(timestamp) }

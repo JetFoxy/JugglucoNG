@@ -35,6 +35,7 @@ import android.os.HandlerThread
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import tk.glucodata.Applic
+import tk.glucodata.CalibrationAccess
 import tk.glucodata.HistorySyncAccess
 import tk.glucodata.LiveReadingLanes
 import tk.glucodata.Log
@@ -261,12 +262,42 @@ class MedtrumBleManager(
 
     @Volatile private var sensorStartMs = 0L
 
+    /** Orders a reading's final writes against [terminateManagedSensor]. */
+    private val readingLock = Any()
+
     override fun getStartTimeMs(): Long {
         if (sensorStartMs > 0L) return sensorStartMs
         // Known from an earlier session, so the card has its dates before the first readState.
         val stored = Applic.app?.let { MedtrumPersistence.getSensorStartMs(it) } ?: 0L
         if (stored > 0L) sensorStartMs = stored
         return sensorStartMs
+    }
+
+    /**
+     * The transmitter's serial outlives one disposable sensor. When a readState shows a new
+     * insertion, the previous electrode's software calibration is filed away, so it does not keep
+     * correcting the replacement.
+     */
+    private fun noteSensorSession(state: MedtrumProtocol.StateRecord) {
+        val ctx = Applic.app
+        val candidate = MedtrumSensorLife.startFromElapsed(System.currentTimeMillis(), state.elapsedSeconds)
+        val key = MedtrumSensorSession.key(state.sensorId, state.insertTime)
+        val storedKey = ctx?.let { MedtrumPersistence.getSessionKey(it) }.orEmpty()
+        val previousStart = getStartTimeMs()
+        if (MedtrumSensorSession.isNewSession(storedKey, key, previousStart, candidate)) {
+            val serial = serialLong.toString()
+            val archiveId = MedtrumSensorSession.archiveId(serial, previousStart)
+            Log.i(TAG, "New Medtrum sensor on $serial (was started ${previousStart}): archiving calibrations as $archiveId")
+            // A database call: off the BLE callback thread.
+            handler.post {
+                runCatching { CalibrationAccess.archiveSensorCalibrations(serial, archiveId) }
+                    .onFailure { Log.stack(TAG, "archiveSensorCalibrations", it) }
+            }
+            sensorStartMs = 0L
+            ctx?.let { MedtrumPersistence.setSensorStartMs(it, 0L) }
+        }
+        if (ctx != null && storedKey != key) MedtrumPersistence.setSessionKey(ctx, key)
+        recordSensorStart(state.elapsedSeconds)
     }
 
     private fun recordSensorStart(elapsedSeconds: Long) {
@@ -529,24 +560,26 @@ class MedtrumBleManager(
 
     override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
         noteFirstGattCallback("onConnectionStateChange", gatt)
-        super.onConnectionStateChange(gatt, status, newState)
-        if (stop) return
-        val current = mBluetoothGatt
-        // A callback from a GATT we already retired must not tear down the one in use. A
-        // DISCONNECTED with no current GATT is the echo of our own closeGattTransport().
-        val retired = if (newState == BluetoothProfile.STATE_DISCONNECTED) current !== gatt
-            else current != null && current !== gatt
-        if (retired) {
-            Log.d(TAG, "Ignoring state=$newState status=$status from a retired GATT")
-            if (newState == BluetoothProfile.STATE_CONNECTED) runCatching { gatt.disconnect() }
-            if (newState == BluetoothProfile.STATE_DISCONNECTED) runCatching { gatt.close() }
+        // Ownership is decided before anything shared changes, the superclass included: its
+        // local-connection claim would otherwise move to a retired handle. The check runs under the
+        // callback monitor, so it also waits for connectGatt()'s handle to be stored, and it refuses
+        // a closed handle while the current one is null after a transient close.
+        if (!acceptConnectionAttemptCallback(gatt, newState)) {
+            if (!stop) retireStaleGatt(gatt, status, newState)
             return
         }
+        super.onConnectionStateChange(gatt, status, newState)
         when (newState) {
             BluetoothProfile.STATE_CONNECTED -> onLinkConnected(gatt)
             BluetoothProfile.STATE_DISCONNECTED -> onLinkDisconnected(gatt, status)
             else -> if (phase == Phase.CONNECTING && status != BluetoothGatt.GATT_SUCCESS) phase = Phase.IDLE
         }
+    }
+
+    private fun retireStaleGatt(gatt: BluetoothGatt, status: Int, newState: Int) {
+        Log.d(TAG, "Ignoring state=$newState status=$status from a retired GATT")
+        if (newState == BluetoothProfile.STATE_CONNECTED) runCatching { gatt.disconnect() }
+        if (newState == BluetoothProfile.STATE_DISCONNECTED) runCatching { gatt.close() }
     }
 
     private fun onLinkConnected(gatt: BluetoothGatt) {
@@ -767,7 +800,7 @@ class MedtrumBleManager(
         insertTime = state.insertTime
         runningTime = state.runningTime
         batteryMillivolts = state.batteryMillivolts
-        recordSensorStart(state.elapsedSeconds)
+        noteSensorSession(state)
         Log.d(TAG, "readState: ${state.phase} seq=${state.sequence} battery=${state.batteryMillivolts / 512.0}V elapsed=${state.elapsedSeconds}s nextCal=${state.nextCalibrationSequence}")
         val pending = pendingCalibrationMgdl ?: return
         pendingCalibrationMgdl = null
@@ -875,30 +908,43 @@ class MedtrumBleManager(
         }
 
         Log.i(TAG, "Medtrum glucose: ${glucose} mg/dL (signal=${record.signal} calibFactor=${record.calibrationFactor})")
-        val nowMs = System.currentTimeMillis()
-        val sensorSerial = serialLong.toString()
-        val mgdl = glucose.toFloat()
-        // The reading is real and local: without this the shared "last successful glucose" slot
-        // stays 0 and a co-active Libre sensor's freshness checks reconnect this healthy link.
-        markLocalReadingAccepted(nowMs)
-        HistorySyncAccess.storeCurrentReadingAsync(nowMs, mgdl, 0f, 0f, sensorSerial)
-        // The same value Room gets: the patch's own, before this app's calibration.
-        VirtualGlucoseSensorBridge.mirrorToNative(
-            sensorSerial,
-            listOf(VirtualGlucoseSensorBridge.Reading(timestampMs = nowMs, glucoseMgdl = mgdl)),
-            "Medtrum",
-            ManagedSensorUiFamily.MEDTRUM,
-        )
-        // Stock lane, as every BLE driver publishes: the patch's own value is before this app's
-        // software calibration, which is applied once downstream. The follower bridge used before
-        // marked it resolved, so live readings and alerts skipped that calibration.
-        SuperGattCallback.processExternalCurrentReading(
-            sensorSerial,
-            liveLane(mgdl, Applic.unit),
-            0f,
-            nowMs,
-            SENSOR_GEN,
-        )
+        publishReading(glucose.toFloat())
+    }
+
+    /**
+     * The final storage and publication of one reading, serialised with [terminateManagedSensor]
+     * by [readingLock]. The entry checks in [onCgmData] cannot cover this: a callback can pass them,
+     * block on the bridge's mirror lock, and resume after the sensor was removed, where its native
+     * write would revive the shell that removal had just finished and bring the old serial back as
+     * a generic Libre callback. The state is checked again under the lock.
+     */
+    private fun publishReading(mgdl: Float) {
+        synchronized(readingLock) {
+            if (stop || !authAccepted) return
+            val nowMs = System.currentTimeMillis()
+            val sensorSerial = serialLong.toString()
+            // The reading is real and local: without this the shared "last successful glucose" slot
+            // stays 0 and a co-active Libre sensor's freshness checks reconnect this healthy link.
+            markLocalReadingAccepted(nowMs)
+            HistorySyncAccess.storeCurrentReadingAsync(nowMs, mgdl, 0f, 0f, sensorSerial)
+            // The same value Room gets: the patch's own, before this app's calibration.
+            VirtualGlucoseSensorBridge.mirrorToNative(
+                sensorSerial,
+                listOf(VirtualGlucoseSensorBridge.Reading(timestampMs = nowMs, glucoseMgdl = mgdl)),
+                "Medtrum",
+                ManagedSensorUiFamily.MEDTRUM,
+            )
+            // Stock lane, as every BLE driver publishes: the patch's own value is before this app's
+            // software calibration, which is applied once downstream. The follower bridge used before
+            // marked it resolved, so live readings and alerts skipped that calibration.
+            SuperGattCallback.processExternalCurrentReading(
+                sensorSerial,
+                liveLane(mgdl, Applic.unit),
+                0f,
+                nowMs,
+                SENSOR_GEN,
+            )
+        }
         UiRefreshBus.requestDataRefresh()
     }
 
@@ -1005,14 +1051,18 @@ class MedtrumBleManager(
     }
 
     override fun terminateManagedSensor(wipeData: Boolean) {
-        setPause(true)
-        phase = Phase.IDLE
-        runCatching { close() }.onFailure { Log.stack(TAG, "terminateManagedSensor(close)", it) }
-        // Finish the native mirror while the persisted record still claims it: an active shell
-        // with no owner comes back as a generic Libre callback (the Ottai removal bug).
-        runCatching { Natives.finishSensorById(serialLong.toString()) }
-            .onFailure { Log.stack(TAG, "terminateManagedSensor(finishSensorById)", it) }
-        if (wipeData) Applic.app?.let { MedtrumPersistence.clear(it) }
+        // Waits for a reading that is already being stored, and keeps later ones out (see
+        // publishReading): the shell is finished only after the last write that will ever happen.
+        synchronized(readingLock) {
+            setPause(true)
+            phase = Phase.IDLE
+            runCatching { close() }.onFailure { Log.stack(TAG, "terminateManagedSensor(close)", it) }
+            // Finish the native mirror while the persisted record still claims it: an active shell
+            // with no owner comes back as a generic Libre callback (the Ottai removal bug).
+            runCatching { Natives.finishSensorById(serialLong.toString()) }
+                .onFailure { Log.stack(TAG, "terminateManagedSensor(finishSensorById)", it) }
+            if (wipeData) Applic.app?.let { MedtrumPersistence.clear(it) }
+        }
     }
 
     /**
