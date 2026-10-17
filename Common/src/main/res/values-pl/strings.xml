@@ -378,8 +378,8 @@
     <string name="humaninsulin">Insulina ludzka /Humulin R/Novolin R</string>
     <string name="afrezza">Afrezza</string>
 
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="hematonix">Hematonix - com.sisensing.rusibionics</string>
     <string name="sibionics2">Sibionics 2</string>
     <string name="gs3">Sibionics GS3</string>
@@ -628,6 +628,7 @@
     <string name="scheduled_backup_run_success">Kopia zapasowa utworzona pomyślnie</string>
     <string name="scheduled_backup_run_failed">Tworzenie kopii nie powiodło się. Sprawdź stan poniżej.</string>
     <string name="scheduled_backup_still_running">Tworzenie kopii nadal trwa. Stan zostanie tutaj zaktualizowany po zakończeniu.</string>
+    <string name="scheduled_backup_stopped_by_system">Android zatrzymał tworzenie kopii zapasowej przed jego zakończeniem. Próba zostanie ponowiona później.</string>
     <string name="scheduled_backup_last_success">Ostatnia udana kopia: %1$s</string>
     <string name="scheduled_backup_never">Brak udanej kopii zapasowej</string>
     <string name="scheduled_backup_last_error">Ostatni błąd: %1$s</string>
@@ -2513,6 +2514,11 @@
     <string name="ottai_cloud_unbind_confirm">Odłącz trwale</string>
     <string name="ottai_cloud_unbind_success">Sensor został trwale odłączony od Ottai. Sensor i zapisane dane w JugglucoNG nie zostały zmienione.</string>
     <string name="ottai_cloud_unbind_failed">Nie udało się odłączyć sensora od Ottai.</string>
+    <string name="ottai_disconnect_forget_unbind">Usuń dane logowania i odłącz</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Usuwa zapisane klucze i odłącza sensor od konta Ottai. Nie będzie można go ponownie połączyć.</string>
+    <string name="ottai_disconnect_unbind_failed">Dane logowania usunięte, ale sensor jest nadal powiązany z kontem Ottai. Odłącz go w konfiguracji Ottai.</string>
+    <string name="ottai_unused_binding_title">Sensor nadal powiązany z tym kontem</string>
+    <string name="ottai_unused_binding_desc">%1$s jest powiązany z tym kontem Ottai, ale nie jest połączony w JugglucoNG. Jeśli się zakończył, odłącz go, aby konto mogło aktywować nowy sensor.</string>
     <string name="ottai_cloud_binding_checking">Sprawdzanie powiązania z chmurą Ottai…</string>
     <string name="ottai_cloud_binding_bound">Stan chmury: powiązany z tym kontem Ottai</string>
     <string name="ottai_cloud_binding_not_bound">Stan chmury: niepowiązany z tym kontem Ottai</string>
@@ -2980,6 +2986,15 @@
     <string name="ssl_port">Port SSL</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Przesunięcie: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Kalibracja fabryczna</string>
+    <string name="aidex_stock_calibration_desc">Używaj odczytów glukozy z czujnika</string>
+    <string name="aidex_adaptive_v2_desc">Adaptacyjne oszacowanie surowego sygnału z prawdopodobnym zakresem</string>
+    <string name="aidex_algorithm_rebuilding">Ponowne przeliczanie historii czujnika</string>
+    <string name="aidex_algorithm_failed">Nie udało się przeliczyć historii czujnika</string>
+    <string name="voice_chime_title">Sygnał przed glukozą</string>
+    <string name="voice_chime_desc">Najpierw krótki dźwięk, aby zdążyć się wsłuchać w wartość</string>
     <string name="choose_color">Wybierz kolor</string>
     <string name="data_smoothing_window_desc">Dłuższe okno mocniej wygładza wahania</string>
     <string name="data_smoothing_scope_all">Wszystkie wartości</string>
@@ -3001,4 +3016,6 @@
     <string name="medtrum_setup_saved_title">Sensor zapisany</string>
     <string name="medtrum_setup_searching">Jeszcze nie połączono. Plaster połączy się sam, gdy będzie w zasięgu.</string>
     <string name="medtrum_setup_auth_failed">Plaster odrzucił ten numer seryjny. Sprawdź numer wydrukowany na plastrze.</string>
+
+    <string name="alert_sound_volume">Głośność dźwięku alarmu</string>
 </resources>

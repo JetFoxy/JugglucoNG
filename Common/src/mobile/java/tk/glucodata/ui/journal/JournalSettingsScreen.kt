@@ -100,7 +100,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -399,8 +398,7 @@ private fun JournalActionButton(
         Spacer(modifier = Modifier.width(if (prominent) 8.dp else 8.dp))
         Text(
             text = text,
-            style = if (prominent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
-            fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Medium,
+            style = if (prominent) MaterialTheme.typography.titleMediumEmphasized else MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -478,7 +476,7 @@ private fun JournalIntelligenceRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMediumEmphasized,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
@@ -1099,7 +1097,7 @@ private fun JournalFoodImportRow(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = food.displayName,
-                        style = MaterialTheme.typography.titleMediumEmphasized,
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -2124,7 +2122,7 @@ private fun JournalCompactSwitchRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMediumEmphasized,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(

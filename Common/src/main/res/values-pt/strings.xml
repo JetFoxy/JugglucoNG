@@ -453,6 +453,7 @@
     <string name="scheduled_backup_run_success">Cópia concluída com sucesso</string>
     <string name="scheduled_backup_run_failed">A cópia falhou. Verifique o estado abaixo.</string>
     <string name="scheduled_backup_still_running">A cópia ainda está em curso. O estado será atualizado aqui quando terminar.</string>
+    <string name="scheduled_backup_stopped_by_system">O Android interrompeu a cópia de segurança antes de terminar. Será feita uma nova tentativa mais tarde.</string>
     <string name="scheduled_backup_last_success">Última cópia bem-sucedida: %1$s</string>
     <string name="scheduled_backup_never">Ainda não há cópias bem-sucedidas</string>
     <string name="scheduled_backup_last_error">Último erro: %1$s</string>
@@ -647,7 +648,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="caresens_air_setup_title">Configuração de ar CareSens</string>
     <string name="changeinsulin">"Change insulin type to "</string>
     <string name="changestartbutton">Change start</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="clampnow">Now clamp</string>
     <string name="clean_data_confirm">Clear App Data?</string>
     <string name="clean_history_confirm">Clear History?</string>
@@ -693,7 +694,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="enabled_status">Enabled</string>
     <string name="endstime">" ends at this time"</string>
     <string name="enternums">Enter amounts on</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
     <string name="exclude">Exclude</string>
     <string name="expired">Expired</string>
     <string name="factory_reset_alert">Remove EVERYTHING. Cannot be undone!</string>
@@ -2480,6 +2481,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_unbind_confirm">Desassociar permanentemente</string>
     <string name="ottai_cloud_unbind_success">Sensor desassociado permanentemente do Ottai. O sensor e as credenciais guardadas no JugglucoNG não foram alterados.</string>
     <string name="ottai_cloud_unbind_failed">Não foi possível desassociar o sensor do Ottai.</string>
+    <string name="ottai_disconnect_forget_unbind">Remover credenciais e desvincular</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Apaga as chaves guardadas e desvincula o sensor da conta Ottai. Não poderá voltar a ser ligado.</string>
+    <string name="ottai_disconnect_unbind_failed">Credenciais removidas, mas o sensor continua vinculado à conta Ottai. Desvincule-o na configuração Ottai.</string>
+    <string name="ottai_unused_binding_title">Sensor ainda vinculado a esta conta</string>
+    <string name="ottai_unused_binding_desc">%1$s está vinculado a esta conta Ottai, mas não está ligado no JugglucoNG. Se já terminou, desvincule-o para que a conta possa ativar um novo sensor.</string>
     <string name="ottai_cloud_binding_checking">A verificar a associação à nuvem Ottai…</string>
     <string name="ottai_cloud_binding_bound">Estado da nuvem: associado a esta conta Ottai</string>
     <string name="ottai_cloud_binding_not_bound">Estado da nuvem: não associado a esta conta Ottai</string>
@@ -2939,6 +2945,15 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ssl_port">Porta SSL</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Deslocamento: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Calibração de fábrica</string>
+    <string name="aidex_stock_calibration_desc">Usar as leituras de glicose do sensor</string>
+    <string name="aidex_adaptive_v2_desc">Estimativa adaptativa do sinal bruto com um intervalo provável</string>
+    <string name="aidex_algorithm_rebuilding">A recalcular o histórico do sensor</string>
+    <string name="aidex_algorithm_failed">Não foi possível recalcular o histórico do sensor</string>
+    <string name="voice_chime_title">Sinal antes da glicose</string>
+    <string name="voice_chime_desc">Primeiro um som curto, para estar atento quando o valor for falado</string>
     <string name="choose_color">Escolher cor</string>
     <string name="data_smoothing_window_desc">Uma janela maior suaviza mais as oscilações</string>
     <string name="data_smoothing_scope_all">Todos os valores</string>
@@ -2960,4 +2975,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">Sensor guardado</string>
     <string name="medtrum_setup_searching">Ainda não ligado. O adesivo liga-se sozinho quando estiver ao alcance.</string>
     <string name="medtrum_setup_auth_failed">O adesivo recusou este número de série. Verifique o número impresso no adesivo.</string>
+
+    <string name="alert_sound_volume">Volume do som de alerta</string>
 </resources>

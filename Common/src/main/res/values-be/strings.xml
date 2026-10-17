@@ -495,6 +495,7 @@
     <string name="scheduled_backup_run_success">Рэзервовая копія паспяхова створана</string>
     <string name="scheduled_backup_run_failed">Не ўдалося стварыць копію. Праверце стан ніжэй.</string>
     <string name="scheduled_backup_still_running">Рэзервовае капіраванне яшчэ выконваецца. Пасля завяршэння стан абновіцца тут.</string>
+    <string name="scheduled_backup_stopped_by_system">Android спыніў рэзервовае капіраванне да яго завяршэння. Пазней спроба будзе паўторана.</string>
     <string name="scheduled_backup_last_success">Апошняя паспяховая копія: %1$s</string>
     <string name="scheduled_backup_never">Паспяховых копій пакуль няма</string>
     <string name="scheduled_backup_last_error">Апошняя памылка: %1$s</string>
@@ -728,7 +729,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="calibrations">Calibrations</string>
     <string name="caresens_air_scan_instruction">Адсканіруйце код датчыка на ўпакоўцы CareSens Air</string>
     <string name="caresens_air_setup_title">Налада CareSens Air</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="clean_data_confirm">Clear App Data?</string>
     <string name="clean_history_confirm">Clear History?</string>
     <string name="clear">Clear</string>
@@ -764,7 +765,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="disconnect_sensor_title">Disconnect Sensor?</string>
     <string name="enabled_status">Enabled</string>
     <string name="enternums">Enter amounts on</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
     <string name="exclude">Exclude</string>
     <string name="expired">Expired</string>
     <string name="factory_reset_alert">Remove EVERYTHING. Cannot be undone!</string>
@@ -2546,6 +2547,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_unbind_confirm">Адвязаць назаўсёды</string>
     <string name="ottai_cloud_unbind_success">Датчык назаўсёды адвязаны ад Ottai. Датчык і захаваныя даныя ў JugglucoNG не былі зменены.</string>
     <string name="ottai_cloud_unbind_failed">Не ўдалося адвязаць датчык ад Ottai.</string>
+    <string name="ottai_disconnect_forget_unbind">Выдаліць уліковыя даныя і адвязаць</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Выдаляе захаваныя ключы і адвязвае сэнсар ад уліковага запісу Ottai. Падключыць яго зноў не атрымаецца.</string>
+    <string name="ottai_disconnect_unbind_failed">Уліковыя даныя выдалены, але сэнсар усё яшчэ прывязаны да ўліковага запісу Ottai. Адвяжыце яго ў наладах Ottai.</string>
+    <string name="ottai_unused_binding_title">Сэнсар усё яшчэ прывязаны да гэтага ўліковага запісу</string>
+    <string name="ottai_unused_binding_desc">%1$s прывязаны да гэтага ўліковага запісу Ottai, але не падключаны ў JugglucoNG. Калі ён скончыўся, адвяжыце яго, каб уліковы запіс мог актываваць новы сэнсар.</string>
     <string name="ottai_cloud_binding_checking">Праверка прывязкі ў воблаку Ottai…</string>
     <string name="ottai_cloud_binding_bound">Статус воблака: прывязаны да гэтага ўліковага запісу Ottai</string>
     <string name="ottai_cloud_binding_not_bound">Статус воблака: не прывязаны да гэтага ўліковага запісу Ottai</string>
@@ -3013,6 +3019,15 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ssl_port">Порт SSL</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Зрушэнне: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Заводская каліброўка</string>
+    <string name="aidex_stock_calibration_desc">Выкарыстоўваць паказанні глюкозы датчыка</string>
+    <string name="aidex_adaptive_v2_desc">Адаптыўная ацэнка па зыходным сігнале з верагодным дыяпазонам</string>
+    <string name="aidex_algorithm_rebuilding">Пералік гісторыі датчыка</string>
+    <string name="aidex_algorithm_failed">Не ўдалося пералічыць гісторыю датчыка</string>
+    <string name="voice_chime_title">Сігнал перад глюкозай</string>
+    <string name="voice_chime_desc">Кароткі гук перад значэннем, каб паспець прыслухацца</string>
     <string name="choose_color">Выбраць колер</string>
     <string name="data_smoothing_window_desc">Чым большае акно, тым мацнейшае згладжванне</string>
     <string name="data_smoothing_scope_all">Усюды</string>
@@ -3034,4 +3049,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">Сэнсар захаваны</string>
     <string name="medtrum_setup_searching">Пакуль не падключаны. Патч падключыцца сам, калі будзе побач.</string>
     <string name="medtrum_setup_auth_failed">Патч адхіліў гэты серыйны нумар. Праверце нумар на патчы.</string>
+
+    <string name="alert_sound_volume">Гучнасць гуку трывогі</string>
 </resources>

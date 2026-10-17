@@ -645,6 +645,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="scheduled_backup_run_success">Back-up voltooid</string>
     <string name="scheduled_backup_run_failed">Back-up mislukt. Controleer de status hieronder.</string>
     <string name="scheduled_backup_still_running">De back-up wordt nog uitgevoerd. De status wordt hier bijgewerkt zodra deze klaar is.</string>
+    <string name="scheduled_backup_stopped_by_system">Android heeft de back-up gestopt voordat deze was voltooid. Er wordt later opnieuw geprobeerd.</string>
     <string name="scheduled_backup_last_success">Laatste geslaagde back-up: %1$s</string>
     <string name="scheduled_backup_never">Nog geen geslaagde back-up</string>
     <string name="scheduled_backup_last_error">Laatste fout: %1$s</string>
@@ -820,7 +821,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="calibration_algorithm">Calibration Algorithm</string>
     <string name="caresens_air_scan_instruction">Scan de sensorcode op uw CareSens Air-pakket</string>
     <string name="caresens_air_setup_title">CareSens Air-installatie</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="clean_data_confirm">Clear App Data?</string>
     <string name="clean_history_confirm">Clear History?</string>
     <string name="clear_history_desc_long">Remove all glucose readings. Cannot be undone.</string>
@@ -849,7 +850,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="disconnect_sensor_failed">De sensor kon niet worden verwijderd en is nog actief. Probeer het opnieuw.</string>
     <string name="disconnect_sensor_title">Disconnect Sensor?</string>
     <string name="enabled_status">Enabled</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
     <string name="expired">Expired</string>
     <string name="factory_reset_alert">Remove EVERYTHING. Cannot be undone!</string>
     <string name="factory_reset_confirm">Factory Reset?</string>
@@ -2522,6 +2523,11 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="ottai_cloud_unbind_confirm">Permanent ontkoppelen</string>
     <string name="ottai_cloud_unbind_success">Sensor permanent ontkoppeld van Ottai. De sensor en opgeslagen referenties in JugglucoNG zijn niet gewijzigd.</string>
     <string name="ottai_cloud_unbind_failed">De sensor kon niet van Ottai worden ontkoppeld.</string>
+    <string name="ottai_disconnect_forget_unbind">Inloggegevens verwijderen en ontkoppelen</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Verwijdert de opgeslagen sleutels en ontkoppelt de sensor van het Ottai-account. Hij kan daarna niet meer worden verbonden.</string>
+    <string name="ottai_disconnect_unbind_failed">Inloggegevens verwijderd, maar de sensor is nog gekoppeld aan het Ottai-account. Ontkoppel hem in de Ottai-instellingen.</string>
+    <string name="ottai_unused_binding_title">Sensor nog gekoppeld aan dit account</string>
+    <string name="ottai_unused_binding_desc">%1$s is gekoppeld aan dit Ottai-account maar niet verbonden in JugglucoNG. Als hij is afgelopen, ontkoppel hem zodat het account een nieuwe sensor kan activeren.</string>
     <string name="ottai_cloud_binding_checking">Ottai-cloudkoppeling controleren…</string>
     <string name="ottai_cloud_binding_bound">Cloudstatus: gekoppeld aan dit Ottai-account</string>
     <string name="ottai_cloud_binding_not_bound">Cloudstatus: niet gekoppeld aan dit Ottai-account</string>
@@ -2981,6 +2987,15 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="ssl_port">SSL-poort</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Offset: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Fabriekskalibratie</string>
+    <string name="aidex_stock_calibration_desc">Gebruik de glucosemetingen van de sensor</string>
+    <string name="aidex_adaptive_v2_desc">Adaptieve schatting uit het ruwe signaal met een waarschijnlijk bereik</string>
+    <string name="aidex_algorithm_rebuilding">Sensorgeschiedenis wordt opnieuw berekend</string>
+    <string name="aidex_algorithm_failed">Sensorgeschiedenis kon niet opnieuw worden berekend</string>
+    <string name="voice_chime_title">Signaal vóór glucose</string>
+    <string name="voice_chime_desc">Eerst een korte toon, zodat je luistert als de waarde wordt uitgesproken</string>
     <string name="choose_color">Kleur kiezen</string>
     <string name="data_smoothing_window_desc">Een langer venster vlakt schommelingen sterker af</string>
     <string name="data_smoothing_scope_all">Alle waarden</string>
@@ -3002,4 +3017,6 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="medtrum_setup_saved_title">Sensor opgeslagen</string>
     <string name="medtrum_setup_searching">Nog niet verbonden. De patch maakt vanzelf verbinding zodra hij binnen bereik is.</string>
     <string name="medtrum_setup_auth_failed">De patch heeft dit serienummer geweigerd. Controleer het nummer op de patch.</string>
+
+    <string name="alert_sound_volume">Volume van het alarmgeluid</string>
 </resources>

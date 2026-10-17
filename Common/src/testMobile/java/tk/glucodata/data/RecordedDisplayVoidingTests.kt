@@ -156,6 +156,45 @@ class RecordedDisplayVoidingTests {
     }
 
     @Test
+    fun aStockReplayOfUnchangedNumbersKeepsCalibratedRecords() {
+        // AiDex Stock replays the same factory numbers. The records hold the
+        // app's calibration of them, so they differ from the stored number and
+        // must still stand: nothing the record was drawn from changed.
+        val records = listOf(record(0, 112f), record(1, 116f), record(2, 120f))
+        val rewritten = listOf(reading(0, 100f), reading(1, 104f), reading(2, 108f))
+        val before = rewritten.associate { ReadingDisplay.minuteOf(it.timestamp) to it.value }
+        assertTrue(RecordedDisplayVoiding.changedAutoMinutes(records, SERIAL, rewritten, before).isEmpty())
+    }
+
+    @Test
+    fun restoringStockVoidsOnlyTheMinutesItRewrote() {
+        // Minutes 1-2 held Adaptive values and go back to factory; minute 0 was
+        // already factory. A raw-lane record is never an Auto rewrite.
+        val records = listOf(record(0, 112f), record(1, 90f), record(2, 95f), record(3, 50f, viewMode = 1))
+        val rewritten = listOf(reading(0, 100f), reading(1, 104f), reading(2, 108f), reading(3, 109f))
+        val before = mapOf(
+            ReadingDisplay.minuteOf(T0) to 100f,
+            ReadingDisplay.minuteOf(T0 + MINUTE) to 90f,
+            ReadingDisplay.minuteOf(T0 + 2 * MINUTE) to 95f,
+            ReadingDisplay.minuteOf(T0 + 3 * MINUTE) to 99f,
+        )
+        assertEquals(
+            listOf(records[1].timestamp, records[2].timestamp),
+            RecordedDisplayVoiding.changedAutoMinutes(records, SERIAL, rewritten, before),
+        )
+    }
+
+    @Test
+    fun theBeforeReadCoversWholeMinutes() {
+        // The write replaces whole minutes, so a stored row earlier in an edge
+        // minute than the incoming reading must still be read as "before".
+        val repo = java.io.File("src/mobile/java/tk/glucodata/data/HistoryRepository.kt").readText()
+        val read = repo.substringAfter("suspend fun storedAutoByMinute").substringBefore("\n    }\n")
+        assertTrue(read.contains("ReadingDisplay.minuteOf(readings.minOf { it.timestamp })"))
+        assertTrue(read.contains("ReadingDisplay.minuteOf(readings.maxOf { it.timestamp }) + ReadingDisplay.MINUTE_MS"))
+    }
+
+    @Test
     fun theRepositoryVoidsOnlyAfterADriversBatchReplacedItsHistory() {
         // The voiding is wired to the one write a driver uses to replace its
         // own history, and to nothing else — recording, revising, and the

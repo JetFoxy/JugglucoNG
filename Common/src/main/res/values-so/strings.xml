@@ -396,8 +396,8 @@
     <string name="humaninsulin">Insulin bini\'aadamka/Humulin R/Novolin R</string>
     <string name="afrezza">Afrezza</string>
     <string name="not">Maya</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="hematonix">Hematonix</string>
     <string name="sibionics2">Sibionics 2</string>
     <string name="gs3">Sibionics GS3</string>
@@ -809,6 +809,7 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="scheduled_backup_run_success">Kaydka si guul leh ayaa loo dhammeeyay</string>
     <string name="scheduled_backup_run_failed">Kaydku wuu fashilmay. Hoos ka eeg xaaladda.</string>
     <string name="scheduled_backup_still_running">Kaydku weli wuu socdaa. Xaaladdiisa halkan ayaa lagu cusboonaysiin doonaa marka uu dhammaado.</string>
+    <string name="scheduled_backup_stopped_by_system">Android ayaa joojiyay kaydinta ka hor intaanay dhammaan. Mar kale ayaa la isku dayi doonaa goor dambe.</string>
     <string name="scheduled_backup_last_success">Kaydkii ugu dambeeyay ee guulaystay: %1$s</string>
     <string name="scheduled_backup_never">Weli kayd guulaystay ma jiro</string>
     <string name="scheduled_backup_last_error">Khaladkii ugu dambeeyay: %1$s</string>
@@ -2670,6 +2671,11 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="ottai_cloud_unbind_confirm">Si joogto ah uga fur</string>
     <string name="ottai_cloud_unbind_success">Dareemaha si joogto ah ayaa looga furay Ottai. Dareemaha iyo aqoonsiyada ku kaydsan JugglucoNG lama beddelin.</string>
     <string name="ottai_cloud_unbind_failed">Dareemaha lagama furi karin Ottai.</string>
+    <string name="ottai_disconnect_forget_unbind">Tirtir aqoonsiga oo ka saar isku-xidhka</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Waxay tirtiraysaa furayaasha la keydiyay waxayna dareemaha ka saaraysaa akoonka Ottai. Mar dambe lama xidhi karo.</string>
+    <string name="ottai_disconnect_unbind_failed">Aqoonsiga waa la tirtiray, laakiin dareemuhu weli wuxuu ku xidhan yahay akoonka Ottai. Ka saar isku-xidhka habaynta Ottai.</string>
+    <string name="ottai_unused_binding_title">Dareemuhu weli wuxuu ku xidhan yahay akoonkan</string>
+    <string name="ottai_unused_binding_desc">%1$s wuxuu ku xidhan yahay akoonkan Ottai laakiin kuma xidhna JugglucoNG. Haddii uu dhammaaday, ka saar isku-xidhka si akoonku u hawlgelin karo dareeme cusub.</string>
     <string name="ottai_cloud_binding_checking">Xiriirka daruurta Ottai waa la hubinayaa…</string>
     <string name="ottai_cloud_binding_bound">Xaaladda daruurta: waxay ku xiran tahay koontadan Ottai</string>
     <string name="ottai_cloud_binding_not_bound">Xaaladda daruurta: kuma xirna koontadan Ottai</string>
@@ -3123,6 +3129,15 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="ssl_port">Dekedda SSL</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Deminta: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Qiyaasidda warshadda</string>
+    <string name="aidex_stock_calibration_desc">Isticmaal akhrisyada gulukoosta ee dareemaha</string>
+    <string name="aidex_adaptive_v2_desc">Qiyaas la qabsanaysa calaamadda ceeriin oo leh baaxad suurtagal ah</string>
+    <string name="aidex_algorithm_rebuilding">Taariikhda dareemaha ayaa dib loo xisaabinayaa</string>
+    <string name="aidex_algorithm_failed">Taariikhda dareemaha dib looma xisaabin karin</string>
+    <string name="voice_chime_title">Dhawaaq ka hor sonkorta</string>
+    <string name="voice_chime_desc">Marka hore cod gaaban, si aad u dhegaysato marka qiimaha la sheegayo</string>
     <string name="choose_color">Dooro midab</string>
     <string name="data_smoothing_window_desc">Waqti dheer wuxuu si ka badan u simaa isbeddellada</string>
     <string name="data_smoothing_scope_all">Dhammaan qiimayaasha</string>
@@ -3144,4 +3159,6 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="medtrum_setup_saved_title">Dareemaha waa la keydiyay</string>
     <string name="medtrum_setup_searching">Weli lama xiriirin. Balastarku wuu isku xiri doonaa marka uu u dhow yahay.</string>
     <string name="medtrum_setup_auth_failed">Balastarku wuu diiday lambarkan taxanaha. Hubi lambarka ku daabacan balastarka.</string>
+
+    <string name="alert_sound_volume">Codka digniinta</string>
 </resources>

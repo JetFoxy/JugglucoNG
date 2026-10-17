@@ -560,6 +560,7 @@
     <string name="scheduled_backup_run_success">备份成功完成</string>
     <string name="scheduled_backup_run_failed">备份失败。请检查下方状态。</string>
     <string name="scheduled_backup_still_running">备份仍在运行。完成后，状态将在此处更新。</string>
+    <string name="scheduled_backup_stopped_by_system">Android 在备份完成前停止了备份。稍后将重试。</string>
     <string name="scheduled_backup_last_success">上次成功备份：%1$s</string>
     <string name="scheduled_backup_never">尚无成功备份</string>
     <string name="scheduled_backup_last_error">上次错误：%1$s</string>
@@ -749,7 +750,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="calibrations">Calibrations</string>
     <string name="caresens_air_scan_instruction">扫描 CareSens Air 包装上的传感器代码</string>
     <string name="caresens_air_setup_title">CareSens 空气设置</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="clean_data_confirm">Clear App Data?</string>
     <string name="clean_history_confirm">Clear History?</string>
     <string name="clear_history_desc_long">Remove all glucose readings. Cannot be undone.</string>
@@ -782,7 +783,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="disconnect_sensor_title">Disconnect Sensor?</string>
     <string name="enabled_status">Enabled</string>
     <string name="enternums">Enter amounts on</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
     <string name="exchangedata">交换数据</string>
     <string name="exclude">Exclude</string>
     <string name="expired">Expired</string>
@@ -2495,6 +2496,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_unbind_confirm">永久解除绑定</string>
     <string name="ottai_cloud_unbind_success">已从 Ottai 永久解除传感器绑定。JugglucoNG 中的传感器和已保存凭据未被更改。</string>
     <string name="ottai_cloud_unbind_failed">无法从 Ottai 解除传感器绑定。</string>
+    <string name="ottai_disconnect_forget_unbind">删除凭据并解除绑定</string>
+    <string name="ottai_disconnect_forget_unbind_desc">删除已保存的密钥，并将传感器从 Ottai 账户解除绑定。之后将无法再连接。</string>
+    <string name="ottai_disconnect_unbind_failed">凭据已删除，但传感器仍绑定在 Ottai 账户上。请在 Ottai 设置中解除绑定。</string>
+    <string name="ottai_unused_binding_title">传感器仍绑定在此账户上</string>
+    <string name="ottai_unused_binding_desc">%1$s 绑定在此 Ottai 账户上，但未在 JugglucoNG 中连接。如果它已结束，请解除绑定，以便账户可以激活新的传感器。</string>
     <string name="ottai_cloud_binding_checking">正在检查 Ottai 云端绑定…</string>
     <string name="ottai_cloud_binding_bound">云端状态：已绑定到此 Ottai 账户</string>
     <string name="ottai_cloud_binding_not_bound">云端状态：未绑定到此 Ottai 账户</string>
@@ -2953,6 +2959,15 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ssl_port">SSL 端口</string>
     <string name="calibration_cf_value">CF：%1$s</string>
     <string name="calibration_offset_value">偏移量：%1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">出厂校准</string>
+    <string name="aidex_stock_calibration_desc">使用传感器的葡萄糖读数</string>
+    <string name="aidex_adaptive_v2_desc">根据原始信号进行自适应估计并显示可能范围</string>
+    <string name="aidex_algorithm_rebuilding">正在重新计算传感器历史记录</string>
+    <string name="aidex_algorithm_failed">无法重新计算传感器历史记录</string>
+    <string name="voice_chime_title">播报血糖前提示音</string>
+    <string name="voice_chime_desc">先播放一声短促提示音，让您在播报数值时已在聆听</string>
     <string name="choose_color">选择颜色</string>
     <string name="data_smoothing_window_desc">时间窗口越长，平滑效果越强</string>
     <string name="data_smoothing_scope_all">所有读数</string>
@@ -2974,4 +2989,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">传感器已保存</string>
     <string name="medtrum_setup_searching">尚未连接。贴片进入范围后会自动连接。</string>
     <string name="medtrum_setup_auth_failed">贴片拒绝了此序列号。请检查贴片上印的号码。</string>
+
+    <string name="alert_sound_volume">警报音量</string>
 </resources>

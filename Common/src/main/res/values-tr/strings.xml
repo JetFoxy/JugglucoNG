@@ -373,8 +373,8 @@
     <string name="glulisine">Insülin Glulisine/Apidra</string>
     <string name="humaninsulin">Human Insülin/Humulin R/Novolin R</string>
     <string name="not">Değil</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="hematonix">Hematonix - com.sisensing.rusibionics</string>
     <string name="sibionics2">Sibionics 2</string>
     <string name="gs3">Sibionics GS3</string>
@@ -605,6 +605,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="scheduled_backup_run_success">Yedekleme başarıyla tamamlandı</string>
     <string name="scheduled_backup_run_failed">Yedekleme başarısız oldu. Aşağıdaki durumu kontrol edin.</string>
     <string name="scheduled_backup_still_running">Yedekleme hâlâ sürüyor. Tamamlandığında durum burada güncellenecek.</string>
+    <string name="scheduled_backup_stopped_by_system">Android, yedekleme tamamlanmadan işlemi durdurdu. Daha sonra yeniden denenecek.</string>
     <string name="scheduled_backup_last_success">Son başarılı yedekleme: %1$s</string>
     <string name="scheduled_backup_never">Henüz başarılı yedekleme yok</string>
     <string name="scheduled_backup_last_error">Son hata: %1$s</string>
@@ -2507,6 +2508,11 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="ottai_cloud_unbind_confirm">Kalıcı olarak kaldır</string>
     <string name="ottai_cloud_unbind_success">Sensörün Ottai bağlantısı kalıcı olarak kaldırıldı. JugglucoNG’deki sensör ve kayıtlı bilgiler değiştirilmedi.</string>
     <string name="ottai_cloud_unbind_failed">Sensörün Ottai bağlantısı kaldırılamadı.</string>
+    <string name="ottai_disconnect_forget_unbind">Kimlik bilgilerini sil ve bağlantıyı kaldır</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Kayıtlı anahtarları siler ve sensörü Ottai hesabından ayırır. Daha sonra yeniden bağlanamaz.</string>
+    <string name="ottai_disconnect_unbind_failed">Kimlik bilgileri silindi ancak sensör hâlâ Ottai hesabına bağlı. Ottai kurulumunda bağlantısını kaldırın.</string>
+    <string name="ottai_unused_binding_title">Sensör hâlâ bu hesaba bağlı</string>
+    <string name="ottai_unused_binding_desc">%1$s bu Ottai hesabına bağlı ancak JugglucoNG\'de bağlı değil. Süresi dolduysa, hesabın yeni bir sensörü etkinleştirebilmesi için bağlantısını kaldırın.</string>
     <string name="ottai_cloud_binding_checking">Ottai bulut bağlantısı denetleniyor…</string>
     <string name="ottai_cloud_binding_bound">Bulut durumu: bu Ottai hesabına bağlı</string>
     <string name="ottai_cloud_binding_not_bound">Bulut durumu: bu Ottai hesabına bağlı değil</string>
@@ -2966,6 +2972,15 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="ssl_port">SSL portu</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Ofset: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Fabrika kalibrasyonu</string>
+    <string name="aidex_stock_calibration_desc">Sensörün glikoz okumalarını kullan</string>
+    <string name="aidex_adaptive_v2_desc">Olası aralıkla ham sinyalden uyarlanabilir tahmin</string>
+    <string name="aidex_algorithm_rebuilding">Sensör geçmişi yeniden hesaplanıyor</string>
+    <string name="aidex_algorithm_failed">Sensör geçmişi yeniden hesaplanamadı</string>
+    <string name="voice_chime_title">Glikozdan önce sinyal</string>
+    <string name="voice_chime_desc">Önce kısa bir ses, böylece değer okunurken dinliyor olursunuz</string>
     <string name="choose_color">Renk seç</string>
     <string name="data_smoothing_window_desc">Daha uzun pencereler dalgalanmaları daha fazla yumuşatır</string>
     <string name="data_smoothing_scope_all">Tüm değerler</string>
@@ -2987,4 +3002,6 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="medtrum_setup_saved_title">Sensör kaydedildi</string>
     <string name="medtrum_setup_searching">Henüz bağlanmadı. Yama menzile girdiğinde kendiliğinden bağlanacak.</string>
     <string name="medtrum_setup_auth_failed">Yama bu seri numarasını reddetti. Yama üzerindeki numarayı kontrol edin.</string>
+
+    <string name="alert_sound_volume">Uyarı sesi düzeyi</string>
 </resources>

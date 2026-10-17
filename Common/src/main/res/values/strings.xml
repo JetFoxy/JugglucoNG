@@ -398,8 +398,8 @@
     <string name="humaninsulin">Human Insulin/Humulin R/Novolin R</string>
     <string name="afrezza">Afrezza</string>
     <string name="not">Not</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="hematonix">Hematonix</string>
     <string name="sibionics2">Sibionics 2</string>
     <string name="gs3">Sibionics GS3</string>
@@ -830,6 +830,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="scheduled_backup_run_success">Backup completed successfully</string>
     <string name="scheduled_backup_run_failed">Backup failed. Check the status below.</string>
     <string name="scheduled_backup_still_running">Backup is still running. Its status will update here when it finishes.</string>
+    <string name="scheduled_backup_stopped_by_system">Android stopped the backup before it finished. It will try again later.</string>
     <string name="scheduled_backup_last_success">Last successful backup: %1$s</string>
     <string name="scheduled_backup_never">No successful backup yet</string>
     <string name="scheduled_backup_last_error">Last error: %1$s</string>
@@ -1115,6 +1116,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_unbind_confirm">Unbind permanently</string>
     <string name="ottai_cloud_unbind_success">Sensor permanently unbound from Ottai. The sensor and saved credentials in JugglucoNG were not changed.</string>
     <string name="ottai_cloud_unbind_failed">Could not unbind the sensor from Ottai.</string>
+    <string name="ottai_disconnect_forget_unbind">Remove credentials and unbind</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Deletes the saved keys and releases the sensor from the Ottai account. It cannot be connected again.</string>
+    <string name="ottai_disconnect_unbind_failed">Credentials removed, but the sensor is still bound to the Ottai account. Unbind it in Ottai setup.</string>
+    <string name="ottai_unused_binding_title">Sensor still bound to this account</string>
+    <string name="ottai_unused_binding_desc">%1$s is bound to this Ottai account but not connected in JugglucoNG. If it has ended, unbind it so the account can activate a new sensor.</string>
     <string name="ottai_cloud_binding_checking">Checking Ottai cloud binding…</string>
     <string name="ottai_cloud_binding_bound">Cloud status: bound to this Ottai account</string>
     <string name="ottai_cloud_binding_not_bound">Cloud status: not bound to this Ottai account</string>
@@ -3197,6 +3203,15 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ssl_port">SSL port</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Offset: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Stock calibration</string>
+    <string name="aidex_stock_calibration_desc">Use the sensor’s glucose readings</string>
+    <string name="aidex_adaptive_v2_desc">Adaptive raw-signal estimate with a likely range</string>
+    <string name="aidex_algorithm_rebuilding">Rebuilding sensor history</string>
+    <string name="aidex_algorithm_failed">Unable to rebuild sensor history</string>
+    <string name="voice_chime_title">Chime before glucose</string>
+    <string name="voice_chime_desc">A short tone first, so you are listening when the value is spoken</string>
     <string name="choose_color">Choose color</string>
     <string name="data_smoothing_window_desc">Longer windows smooth out more fluctuations</string>
     <string name="data_smoothing_scope_all">Everywhere</string>
@@ -3214,4 +3229,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">API secret or access token</string>
     <string name="nightscout_api_help">Use an API secret with v1, or a Nightscout access token with v3.</string>
     <string name="nightscout_iob_help">eIOB and COB are sent in the jugglucong field of devicestatus, separately from standard IOB.</string>
+
+    <string name="alert_sound_volume">Alert sound volume</string>
 </resources>

@@ -3288,23 +3288,25 @@ class ICanHealthBleManager(
             persistedCoveredSequence >= 0 &&
             persistedCoveredTimestampMs > 0L &&
             currentSequenceNumber >= persistedCoveredSequence) {
-            val deltaMinutes = currentSequenceNumber - persistedCoveredSequence
-            val persistedAnchorTimeMs = persistedCoveredTimestampMs + deltaMinutes.toLong() * SEQUENCE_UNIT_MS
-            // The plausibility window is hours wide, so an edge that is merely an hour off
-            // passes it and then re-seeds itself with every reading. The counter read is a
-            // fresh wall-clock fix for currentSequenceNumber; the edge must agree with it.
-            val divergentFromCounter = ICanHealthConstants.isAnchorDivergentFromObservedSequence(
-                anchorMs = persistedAnchorTimeMs,
-                sequenceObservedAtMs = currentSequenceObservedAtMs,
-                toleranceMs = MAX_LIVE_TIMESTAMP_LAG_MS,
+            val persistedAnchorTimeMs = ICanHealthConstants.persistedCoveredAnchorMs(
+                persistedCoveredSequence = persistedCoveredSequence,
+                persistedCoveredTimestampMs = persistedCoveredTimestampMs,
+                currentSequenceNumber = currentSequenceNumber,
+                sequenceUnitMs = SEQUENCE_UNIT_MS,
             )
-            if (!divergentFromCounter && isPlausibleHistoryAnchor(persistedAnchorTimeMs, fallbackNowMs)) {
+            if (ICanHealthConstants.isPersistedCoveredAnchorUsable(
+                    anchorMs = persistedAnchorTimeMs,
+                    sequenceObservedAtMs = currentSequenceObservedAtMs,
+                    divergenceToleranceMs = MAX_LIVE_TIMESTAMP_LAG_MS,
+                    plausibleRange = earliestObservedHistoryTimeMs(fallbackNowMs)..
+                        latestObservedHistoryTimeMs(fallbackNowMs),
+                )) {
                 return persistedAnchorTimeMs
             }
             invalidatePersistedCoveredEdge(
                 "persisted seq=$persistedCoveredSequence time=$persistedCoveredTimestampMs " +
                     "reconstructed anchor=$persistedAnchorTimeMs current=$currentSequenceNumber now=$fallbackNowMs " +
-                    "counterObservedAt=$currentSequenceObservedAtMs divergent=$divergentFromCounter"
+                    "counterObservedAt=$currentSequenceObservedAtMs"
             )
         }
         return when {

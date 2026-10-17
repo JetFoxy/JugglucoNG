@@ -420,9 +420,12 @@ fun SensorCard(
     var showWipeDialog by remember { mutableStateOf(false) }
     var wipeDataChecked by remember { mutableStateOf(false) }
     var removeHistoryChecked by remember { mutableStateOf(false) }
+    // Ottai: Disconnect keeps the credentials and the account binding unless this is chosen.
+    var forgetOttaiChecked by remember { mutableStateOf(false) }
 
     // Sibionics Calibration Bottom Sheet
     var showSibionicsCalSheet by remember { mutableStateOf(false) }
+    var showAiDexAlgorithmSheet by remember { mutableStateOf(false) }
     var showColorSheet by remember { mutableStateOf(false) }
 
     // AiDex Maintenance Dialogs
@@ -631,7 +634,7 @@ fun SensorCard(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = stringResource(R.string.unbind_sensor),
-                                        style = MaterialTheme.typography.titleMediumEmphasized,)
+                                        style = MaterialTheme.typography.titleMedium)
                                     Text(
                                         text = stringResource(R.string.unbind_sensor_desc),
                                         style = MaterialTheme.typography.bodySmall,
@@ -673,6 +676,7 @@ fun SensorCard(
                 onDismissRequest = {
                     showTerminateDialog = false
                     removeHistoryChecked = false
+                    forgetOttaiChecked = false
                 },
                 title = { Text(stringResource(R.string.disconnect_sensor_title)) },
                 text = {
@@ -686,13 +690,45 @@ fun SensorCard(
                             )
                             Text(stringResource(R.string.remove_sensor_history))
                         }
+                        if (sensor.vendor == SensorVendor.OTTAI) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(MaterialTheme.shapes.large)
+                                    .toggleable(
+                                        value = forgetOttaiChecked,
+                                        role = Role.Checkbox,
+                                        onValueChange = { forgetOttaiChecked = it }
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = forgetOttaiChecked,
+                                    onCheckedChange = null,
+                                    modifier = Modifier.minimumInteractiveComponentSize()
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(stringResource(R.string.ottai_disconnect_forget_unbind))
+                                    Text(
+                                        text = stringResource(R.string.ottai_disconnect_forget_unbind_desc),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        val removed = viewModel.terminateSensor(sensor.serial, removeHistoryChecked)
+                        val removed = if (sensor.vendor == SensorVendor.OTTAI) {
+                            viewModel.disconnectOttaiSensor(sensor.serial, removeHistoryChecked, forgetOttaiChecked)
+                        } else {
+                            viewModel.terminateSensor(sensor.serial, removeHistoryChecked)
+                        }
                         showTerminateDialog = false
                         removeHistoryChecked = false
+                        forgetOttaiChecked = false
                         if (!removed) {
                             android.widget.Toast.makeText(
                                 context,
@@ -708,6 +744,7 @@ fun SensorCard(
                     TextButton(onClick = {
                         showTerminateDialog = false
                         removeHistoryChecked = false
+                        forgetOttaiChecked = false
                     },
                     shapes = ButtonDefaults.shapes(),
                     contentPadding = ButtonDefaults.TextButtonContentPadding) { Text(stringResource(R.string.cancel)) }
@@ -988,7 +1025,7 @@ fun SensorCard(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 stringResource(R.string.bias_correction),
-                                style = MaterialTheme.typography.titleMediumEmphasized,)
+                                style = MaterialTheme.typography.titleMedium)
                             Text(
                                 if (sensor.resetCompensationActive && sensor.resetCompensationStatus.isNotEmpty())
                                     sensor.resetCompensationStatus
@@ -1043,7 +1080,7 @@ fun SensorCard(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 stringResource(R.string.hardware_reset),
-                                style = MaterialTheme.typography.titleMediumEmphasized,
+                                style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.error
                             )
                             Text(
@@ -1088,6 +1125,12 @@ fun SensorCard(
                 showColorSheet = false
             },
         )
+    }
+
+    if (showAiDexAlgorithmSheet && sensor.isAidex && sensor.viewMode != 1) {
+        AiDexAlgorithmSheet(sensor.serial, sensor.customCalIndex,
+            onSelect = { viewModel.setAiDexAlgorithmMode(sensor.serial, it) },
+            onDismiss = { showAiDexAlgorithmSheet = false })
     }
 
     // Independent, immediately applied sensor-algorithm features.
@@ -1169,7 +1212,7 @@ fun SensorCard(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         stringResource(titleRes),
-                                        style = MaterialTheme.typography.titleMediumEmphasized,
+                                        style = MaterialTheme.typography.titleMedium,
                                     )
                                     Text(
                                         stringResource(subtitleRes),
@@ -1218,7 +1261,7 @@ fun SensorCard(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     stringResource(R.string.sibionics_sensitivity),
-                                    style = MaterialTheme.typography.titleMediumEmphasized,
+                                    style = MaterialTheme.typography.titleMedium,
                                 )
                                 Text(
                                     stringResource(
@@ -2230,8 +2273,8 @@ fun SensorCard(
                                 Text(stringResource(R.string.sensor_life), style = labelStyle)
                                 Text(
                                     remainText,
-                                    style = valueStyle.copy(color = remainColor),
-                                    fontWeight = if (sensor.sensorRemainingHours <= 24) FontWeight.Bold else FontWeight.Normal
+                                    style = (if (sensor.sensorRemainingHours <= 24) MaterialTheme.typography.bodyMediumEmphasized else valueStyle)
+                                        .copy(color = remainColor)
                                 )
                             }
                         }
@@ -2270,8 +2313,7 @@ fun SensorCard(
                                 Text(stringResource(R.string.status), style = labelStyle)
                                 Text(
                                     stringResource(R.string.sensor_expired_text),
-                                    style = valueStyle.copy(color = MaterialTheme.colorScheme.error),
-                                    fontWeight = FontWeight.Bold
+                                    style = MaterialTheme.typography.bodyMediumEmphasized.copy(color = MaterialTheme.colorScheme.error)
                                 )
                             }
                         }
@@ -2367,10 +2409,12 @@ fun SensorCard(
                 )
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Auto-calibration entry — Sibionics only, hidden when Raw mode selected (viewMode == 1)
-                if (sensor.isSibionics && sensor.viewMode != 1) {
+                // Both managed algorithms replace the Auto lane; pure Raw hides this entry.
+                if ((sensor.isSibionics || sensor.isAidex) && sensor.viewMode != 1) {
                     val calibrationEnabled = sensor.customCalIndex and 1 != 0
-                    val baseAlgorithm = stringResource(
+                    val baseAlgorithm = if (sensor.isAidex) stringResource(
+                        if (sensor.customCalIndex and 8 != 0) R.string.sibionics_adaptive_v2 else R.string.aidex_stock_calibration
+                    ) else stringResource(
                         when (sensor.customCalIndex and 14) {
                             2 -> R.string.sibionics_state_algorithm
                             4 -> R.string.sibionics_balanced_algorithm
@@ -2383,7 +2427,9 @@ fun SensorCard(
                         "$baseAlgorithm • ${stringResource(R.string.calibration)}"
                     } else baseAlgorithm
                     Surface(
-                        onClick = { showSibionicsCalSheet = true },
+                        onClick = {
+                            if (sensor.isAidex) showAiDexAlgorithmSheet = true else showSibionicsCalSheet = true
+                        },
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier.fillMaxWidth()
@@ -2401,7 +2447,7 @@ fun SensorCard(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     stringResource(R.string.auto_calibration_mode),
-                                    style = MaterialTheme.typography.titleMediumEmphasized,)
+                                    style = MaterialTheme.typography.titleMedium)
                                 Text(
                                     calSubtitle,
                                     style = MaterialTheme.typography.bodySmall,
@@ -2505,7 +2551,6 @@ fun SensorCard(
                                         Text(
                                             text = displayGlucose,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         val timeText = if (cal.timestampMs > 0) {
@@ -2934,7 +2979,6 @@ fun SensorCard(
                                         Text(
                                             text = displayGlucose,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         val timeText = if (cal.timestampMs > 0) {

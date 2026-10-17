@@ -140,7 +140,7 @@ The Actions App token needs the PR scope even though timeline comments use the
 
 **Nightly prerelease** runs daily at **00:23 UTC / 05:23 Asia/Yekaterinburg**.
 GitHub's scheduler can run late. Only the captured official main SHA is eligible;
-its push CI must have passed. If that SHA matches the last successfully published
+its push or manually dispatched CI must have passed. If that SHA matches the last successfully published
 nightly, the expensive build and signing jobs are skipped. A queued older snapshot
 is also skipped; divergent main history fails for inspection. All commits merged
 to main count as changes, including build/documentation changes. A failed build
@@ -204,6 +204,46 @@ existing `make-update-manifest.sh`, and validates manifest contents against APKs
 The schema remains 1, with only the two phone entries; Wear stays out of the
 phone updater. Names match existing releases exactly. The default release is
 latest even with an `-Alpha` name, matching 1.2.2; prerelease is explicit.
+Generated release notes compare against GitHub's latest published non-prerelease,
+including when the new version is marked prerelease. Nightlies and other
+prereleases cannot become that changelog baseline. Nightly notes keep their
+separate previous-nightly comparison.
+
+After successful versioned publication, the workflow refreshes the README's
+marked download links and version button. The primary download is the newest
+published versioned release, **including prereleases** and excluding nightlies or
+drafts; all four links use the existing versioned APK names from that release.
+The download button shows that release's version. A secondary button links to
+nightly builds. Promoting a prerelease keeps the same version and APK links,
+so the README needs no change for promotion.
+
+The existing updater filters out GitHub prereleases but scans **all** non-prereleases,
+not just GitHub's "Latest" release. Keeping a version prerelease is the compatible
+way to hold it back from installed clients while offering it for manual download.
+`--latest=false` is not an updater holdback, and removing the manifest is insufficient
+because older clients can fall back to APK filenames. README selection does not
+change release flags or updater eligibility. Release-note comparison continues to
+use the last non-prerelease, independently of manual download selection.
+
+To promote an existing release, open GitHub Releases, edit it, clear **This is a
+pre-release**, and choose **Update release**. This makes the same APK eligible for
+the app updater without rebuilding or renaming it.
+
+**Refresh README downloads** handles manual publication/promotion and independent
+retries. Both update paths read the README and version button at the same main
+commit, preserve unrelated edits, and publish both files in one commit. A
+non-fast-forward ref update fails safely if main changes concurrently. They use
+`contents: write` and `actions: write` to dispatch the existing read-only main CI
+for a bot README commit; no new credentials or signing secrets are involved.
+Nightlies still require passing CI at the exact main SHA. For a local documentation
+edit, run `python3 scripts/dist/update-readme-downloads.py --local`.
+
+The post-publication refresh and standalone refresh share the `readme-downloads`
+job concurrency group. Each selects the latest release after acquiring that
+lock, so a delayed older event cannot roll links back after a newer refresh.
+The helper also captures main before reading releases. CI retry uses the newest
+matching main push/dispatch run, as nightly selection does: a newer failed or
+cancelled run requires a retry even when an older run succeeded.
 
 Signing has `contents: read`. Only the separate approved publication job has
 `contents: write`. That job creates a draft at the captured SHA, uploads the four

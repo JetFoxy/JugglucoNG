@@ -649,6 +649,7 @@
     <string name="scheduled_backup_run_success">Резервная копия успешно создана</string>
     <string name="scheduled_backup_run_failed">Не удалось создать копию. Проверьте состояние ниже.</string>
     <string name="scheduled_backup_still_running">Резервное копирование ещё выполняется. После завершения состояние обновится здесь.</string>
+    <string name="scheduled_backup_stopped_by_system">Android остановил резервное копирование до его завершения. Позже будет выполнена повторная попытка.</string>
     <string name="scheduled_backup_last_success">Последняя успешная копия: %1$s</string>
     <string name="scheduled_backup_never">Успешных копий пока нет</string>
     <string name="scheduled_backup_last_error">Последняя ошибка: %1$s</string>
@@ -853,7 +854,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="calibrations">Calibrations</string>
     <string name="caresens_air_scan_instruction">Отсканируйте код датчика на упаковке CareSens Air.</string>
     <string name="caresens_air_setup_title">Настройка CareSens Air</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="clampnow">Now clamp</string>
     <string name="clean_data_confirm">Clear App Data?</string>
     <string name="clean_history_confirm">Clear History?</string>
@@ -876,7 +877,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="delete_calibration">Delete calibration?</string>
     <string name="dexfuture">Predict (Dexcom)</string>
     <string name="enternums">Enter amounts on</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
     <string name="exclude">Exclude</string>
     <string name="factory_reset_alert">Remove EVERYTHING. Cannot be undone!</string>
     <string name="factory_reset_confirm">Factory Reset?</string>
@@ -2174,6 +2175,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_unbind_confirm">Отвязать навсегда</string>
     <string name="ottai_cloud_unbind_success">Сенсор навсегда отвязан от Ottai. Сенсор и сохранённые данные в JugglucoNG не изменены.</string>
     <string name="ottai_cloud_unbind_failed">Не удалось отвязать сенсор от Ottai.</string>
+    <string name="ottai_disconnect_forget_unbind">Удалить учётные данные и отвязать</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Удаляет сохранённые ключи и отвязывает сенсор от аккаунта Ottai. Подключить его снова не получится.</string>
+    <string name="ottai_disconnect_unbind_failed">Учётные данные удалены, но сенсор всё ещё привязан к аккаунту Ottai. Отвяжите его в настройке Ottai.</string>
+    <string name="ottai_unused_binding_title">Сенсор всё ещё привязан к этому аккаунту</string>
+    <string name="ottai_unused_binding_desc">%1$s привязан к этому аккаунту Ottai, но не подключён в JugglucoNG. Если он закончился, отвяжите его, чтобы аккаунт мог активировать новый сенсор.</string>
     <string name="ottai_cloud_binding_checking">Проверка привязки в облаке Ottai…</string>
     <string name="ottai_cloud_binding_bound">Статус облака: привязан к этому аккаунту Ottai</string>
     <string name="ottai_cloud_binding_not_bound">Статус облака: не привязан к этому аккаунту Ottai</string>
@@ -2989,6 +2995,15 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ssl_port">Порт SSL</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Смещение: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Заводская калибровка</string>
+    <string name="aidex_stock_calibration_desc">Использовать показания глюкозы датчика</string>
+    <string name="aidex_adaptive_v2_desc">Адаптивная оценка по исходному сигналу с вероятным диапазоном</string>
+    <string name="aidex_algorithm_rebuilding">Пересчёт истории датчика</string>
+    <string name="aidex_algorithm_failed">Не удалось пересчитать историю датчика</string>
+    <string name="voice_chime_title">Сигнал перед глюкозой</string>
+    <string name="voice_chime_desc">Короткий звук перед значением, чтобы успеть прислушаться</string>
     <string name="choose_color">Выбрать цвет</string>
     <string name="data_smoothing_window_desc">Чем больше окно, тем сильнее сглаживание</string>
     <string name="data_smoothing_scope_all">Везде</string>
@@ -3010,4 +3025,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">Сенсор сохранён</string>
     <string name="medtrum_setup_searching">Пока не подключён. Патч подключится сам, когда окажется рядом.</string>
     <string name="medtrum_setup_auth_failed">Патч отклонил этот серийный номер. Проверьте номер на патче.</string>
+
+    <string name="alert_sound_volume">Громкость звука тревоги</string>
 </resources>

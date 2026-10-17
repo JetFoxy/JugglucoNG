@@ -657,6 +657,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="scheduled_backup_run_success">Sicherung erfolgreich abgeschlossen</string>
     <string name="scheduled_backup_run_failed">Sicherung fehlgeschlagen. Prüfen Sie den Status unten.</string>
     <string name="scheduled_backup_still_running">Die Sicherung läuft noch. Der Status wird hier nach Abschluss aktualisiert.</string>
+    <string name="scheduled_backup_stopped_by_system">Android hat die Sicherung vorzeitig beendet. Sie wird später erneut versucht.</string>
     <string name="scheduled_backup_last_success">Letzte erfolgreiche Sicherung: %1$s</string>
     <string name="scheduled_backup_never">Noch keine erfolgreiche Sicherung</string>
     <string name="scheduled_backup_last_error">Letzter Fehler: %1$s</string>
@@ -872,7 +873,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="restart">Neu starten</string>
     <string name="caresens_air_scan_instruction">Scannen Sie den Sensorcode auf Ihrem CareSens Air-Paket</string>
     <string name="caresens_air_setup_title">CareSens Air einrichten</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="clean_data_confirm">App-Daten löschen?</string>
     <string name="clean_history_confirm">Verlauf löschen?</string>
     <string name="clear_history_desc_long">Alle Glukosewerte entfernen. Kann nicht rückgängig gemacht werden.</string>
@@ -901,7 +902,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="disconnect_sensor_failed">Der Sensor konnte nicht entfernt werden und ist weiterhin aktiv. Versuchen Sie es erneut.</string>
     <string name="disconnect_sensor_title">Sensor trennen?</string>
     <string name="enabled_status">Aktiviert</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
     <string name="expired">Abgelaufen</string>
     <string name="days_short">%1$d T</string>
     <string name="hours_short">%1$d S</string>
@@ -2592,6 +2593,11 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="ottai_cloud_unbind_confirm">Dauerhaft entkoppeln</string>
     <string name="ottai_cloud_unbind_success">Sensor dauerhaft von Ottai entkoppelt. Sensor und gespeicherte Zugangsdaten in JugglucoNG wurden nicht verändert.</string>
     <string name="ottai_cloud_unbind_failed">Der Sensor konnte nicht von Ottai entkoppelt werden.</string>
+    <string name="ottai_disconnect_forget_unbind">Zugangsdaten entfernen und entkoppeln</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Löscht die gespeicherten Schlüssel und entkoppelt den Sensor vom Ottai-Konto. Er kann danach nicht mehr verbunden werden.</string>
+    <string name="ottai_disconnect_unbind_failed">Zugangsdaten entfernt, aber der Sensor ist noch mit dem Ottai-Konto gekoppelt. Entkopple ihn in der Ottai-Einrichtung.</string>
+    <string name="ottai_unused_binding_title">Sensor noch mit diesem Konto gekoppelt</string>
+    <string name="ottai_unused_binding_desc">%1$s ist mit diesem Ottai-Konto gekoppelt, aber nicht in JugglucoNG verbunden. Wenn er abgelaufen ist, entkopple ihn, damit das Konto einen neuen Sensor aktivieren kann.</string>
     <string name="ottai_cloud_binding_checking">Ottai-Cloud-Bindung wird geprüft…</string>
     <string name="ottai_cloud_binding_bound">Cloud-Status: mit diesem Ottai-Konto verbunden</string>
     <string name="ottai_cloud_binding_not_bound">Cloud-Status: nicht mit diesem Ottai-Konto verbunden</string>
@@ -3054,6 +3060,15 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="ssl_port">SSL-Port</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Versatz: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Werkskalibrierung</string>
+    <string name="aidex_stock_calibration_desc">Glukosewerte des Sensors verwenden</string>
+    <string name="aidex_adaptive_v2_desc">Adaptive Schätzung aus dem Rohsignal mit wahrscheinlichem Bereich</string>
+    <string name="aidex_algorithm_rebuilding">Sensorverlauf wird neu berechnet</string>
+    <string name="aidex_algorithm_failed">Sensorverlauf konnte nicht neu berechnet werden</string>
+    <string name="voice_chime_title">Signalton vor Glukose</string>
+    <string name="voice_chime_desc">Erst ein kurzer Ton, damit du zuhörst, wenn der Wert vorgelesen wird</string>
     <string name="choose_color">Farbe wählen</string>
     <string name="data_smoothing_window_desc">Längere Zeitfenster glätten Schwankungen stärker</string>
     <string name="data_smoothing_scope_all">Alle Werte</string>
@@ -3075,4 +3090,6 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="medtrum_setup_saved_title">Sensor gespeichert</string>
     <string name="medtrum_setup_searching">Noch nicht verbunden. Der Patch verbindet sich selbst, sobald er in Reichweite ist.</string>
     <string name="medtrum_setup_auth_failed">Der Patch hat diese Seriennummer abgelehnt. Prüfe die Nummer auf dem Patch.</string>
+
+    <string name="alert_sound_volume">Lautstärke des Alarmtons</string>
 </resources>

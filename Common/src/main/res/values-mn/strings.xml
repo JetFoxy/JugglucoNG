@@ -380,8 +380,8 @@
     <string name="humaninsulin">Human Insulin/Humulin R/Novolin R</string>
     <string name="afrezza">Afrezza</string>
     <string name="not">Биш</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="hematonix">Hematonix</string>
     <string name="sibionics2">Sibionics 2</string>
     <string name="datapresent">"Өгөгдөл байгаа: "</string>
@@ -751,6 +751,7 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="scheduled_backup_run_success">Нөөцлөлт амжилттай дууслаа</string>
     <string name="scheduled_backup_run_failed">Нөөцлөлт амжилтгүй боллоо. Доорх төлөвийг шалгана уу.</string>
     <string name="scheduled_backup_still_running">Нөөцлөлт үргэлжилж байна. Дуусмагц төлөв энд шинэчлэгдэнэ.</string>
+    <string name="scheduled_backup_stopped_by_system">Android нөөцлөлтийг дуусахаас нь өмнө зогсоосон. Дараа дахин оролдоно.</string>
     <string name="scheduled_backup_last_success">Сүүлийн амжилттай нөөц: %1$s</string>
     <string name="scheduled_backup_never">Амжилттай нөөц хараахан алга</string>
     <string name="scheduled_backup_last_error">Сүүлийн алдаа: %1$s</string>
@@ -2586,6 +2587,11 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="ottai_cloud_unbind_confirm">Бүрмөсөн салгах</string>
     <string name="ottai_cloud_unbind_success">Мэдрэгчийг Ottai-аас бүрмөсөн салгалаа. JugglucoNG дахь мэдрэгч болон хадгалсан мэдээлэл өөрчлөгдөөгүй.</string>
     <string name="ottai_cloud_unbind_failed">Мэдрэгчийг Ottai-аас салгаж чадсангүй.</string>
+    <string name="ottai_disconnect_forget_unbind">Нэвтрэх мэдээллийг устгаж салгах</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Хадгалсан түлхүүрүүдийг устгаж, мэдрэгчийг Ottai бүртгэлээс салгана. Дахин холбох боломжгүй болно.</string>
+    <string name="ottai_disconnect_unbind_failed">Нэвтрэх мэдээлэл устсан ч мэдрэгч Ottai бүртгэлд холбогдсон хэвээр байна. Ottai тохиргоонд салгана уу.</string>
+    <string name="ottai_unused_binding_title">Мэдрэгч энэ бүртгэлд холбогдсон хэвээр байна</string>
+    <string name="ottai_unused_binding_desc">%1$s энэ Ottai бүртгэлд холбогдсон боловч JugglucoNG-д холбогдоогүй байна. Хугацаа нь дууссан бол бүртгэл шинэ мэдрэгч идэвхжүүлэхийн тулд салгана уу.</string>
     <string name="ottai_cloud_binding_checking">Ottai үүлэн холболтыг шалгаж байна…</string>
     <string name="ottai_cloud_binding_bound">Үүлэн төлөв: энэ Ottai бүртгэлтэй холбогдсон</string>
     <string name="ottai_cloud_binding_not_bound">Үүлэн төлөв: энэ Ottai бүртгэлтэй холбогдоогүй</string>
@@ -3039,6 +3045,15 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="ssl_port">SSL порт</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Шилжилт: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Үйлдвэрийн тохируулга</string>
+    <string name="aidex_stock_calibration_desc">Мэдрэгчийн глюкозын заалтыг ашиглах</string>
+    <string name="aidex_adaptive_v2_desc">Түүхий дохионы дасан зохицох тооцоо, магадлалтай хүрээтэй</string>
+    <string name="aidex_algorithm_rebuilding">Мэдрэгчийн түүхийг дахин тооцоолж байна</string>
+    <string name="aidex_algorithm_failed">Мэдрэгчийн түүхийг дахин тооцоолж чадсангүй</string>
+    <string name="voice_chime_title">Глюкозын өмнө дохио</string>
+    <string name="voice_chime_desc">Эхлээд богино дуу, ингэснээр утгыг хэлэхэд та сонсож байна</string>
     <string name="choose_color">Өнгө сонгох</string>
     <string name="data_smoothing_window_desc">Урт хугацааны цонх хэлбэлзлийг илүү жигдрүүлнэ</string>
     <string name="data_smoothing_scope_all">Бүх утга</string>
@@ -3060,4 +3075,6 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="medtrum_setup_saved_title">Мэдрэгч хадгалагдлаа</string>
     <string name="medtrum_setup_searching">Одоогоор холбогдоогүй. Наалт ойр байх үед өөрөө холбогдоно.</string>
     <string name="medtrum_setup_auth_failed">Наалт энэ серийн дугаарыг хүлээн аваагүй. Наалт дээрх дугаарыг шалгана уу.</string>
+
+    <string name="alert_sound_volume">Дохиоллын дууны түвшин</string>
 </resources>

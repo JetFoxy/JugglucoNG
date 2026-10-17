@@ -553,6 +553,7 @@
     <string name="scheduled_backup_run_success">Säkerhetskopieringen slutfördes</string>
     <string name="scheduled_backup_run_failed">Säkerhetskopieringen misslyckades. Kontrollera statusen nedan.</string>
     <string name="scheduled_backup_still_running">Säkerhetskopieringen pågår fortfarande. Statusen uppdateras här när den är klar.</string>
+    <string name="scheduled_backup_stopped_by_system">Android stoppade säkerhetskopieringen innan den var klar. Ett nytt försök görs senare.</string>
     <string name="scheduled_backup_last_success">Senaste lyckade säkerhetskopiering: %1$s</string>
     <string name="scheduled_backup_never">Ingen lyckad säkerhetskopiering ännu</string>
     <string name="scheduled_backup_last_error">Senaste fel: %1$s</string>
@@ -737,7 +738,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="calibrations">Calibrations</string>
     <string name="caresens_air_scan_instruction">Skanna sensorkoden på ditt CareSens Air-paket</string>
     <string name="caresens_air_setup_title">CareSens Air Setup</string>
-    <string name="chsibionics">Sibionics GS1 (CN)</string>
+    <string name="chsibionics">Sibionics GS1 CN</string>
     <string name="clean_data_confirm">Clear App Data?</string>
     <string name="clean_history_confirm">Clear History?</string>
     <string name="clear_history_desc_long">Remove all glucose readings. Cannot be undone.</string>
@@ -770,7 +771,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="disconnect_sensor_title">Disconnect Sensor?</string>
     <string name="enabled_status">Enabled</string>
     <string name="enternums">Enter amounts on</string>
-    <string name="eusibionics">Sibionics GS1 (EU)</string>
+    <string name="eusibionics">Sibionics GS1 EU</string>
     <string name="exchangedata">Utbyta data</string>
     <string name="exclude">Exclude</string>
     <string name="expired">Expired</string>
@@ -2479,6 +2480,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_unbind_confirm">Koppla bort permanent</string>
     <string name="ottai_cloud_unbind_success">Sensorn har kopplats bort permanent från Ottai. Sensorn och sparade uppgifter i JugglucoNG ändrades inte.</string>
     <string name="ottai_cloud_unbind_failed">Det gick inte att koppla bort sensorn från Ottai.</string>
+    <string name="ottai_disconnect_forget_unbind">Ta bort inloggningsuppgifter och koppla från</string>
+    <string name="ottai_disconnect_forget_unbind_desc">Raderar de sparade nycklarna och kopplar bort sensorn från Ottai-kontot. Den kan inte anslutas igen.</string>
+    <string name="ottai_disconnect_unbind_failed">Inloggningsuppgifterna har tagits bort, men sensorn är fortfarande kopplad till Ottai-kontot. Koppla från den i Ottai-inställningen.</string>
+    <string name="ottai_unused_binding_title">Sensorn är fortfarande kopplad till kontot</string>
+    <string name="ottai_unused_binding_desc">%1$s är kopplad till detta Ottai-konto men inte ansluten i JugglucoNG. Om den har gått ut, koppla från den så att kontot kan aktivera en ny sensor.</string>
     <string name="ottai_cloud_binding_checking">Kontrollerar Ottai-molnkopplingen…</string>
     <string name="ottai_cloud_binding_bound">Molnstatus: kopplad till detta Ottai-konto</string>
     <string name="ottai_cloud_binding_not_bound">Molnstatus: inte kopplad till detta Ottai-konto</string>
@@ -2938,6 +2944,15 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ssl_port">SSL-port</string>
     <string name="calibration_cf_value">CF: %1$s</string>
     <string name="calibration_offset_value">Offset: %1$s</string>
+
+    <!-- AiDex Auto algorithm selection -->
+    <string name="aidex_stock_calibration">Fabrikskalibrering</string>
+    <string name="aidex_stock_calibration_desc">Använd sensorns glukosavläsningar</string>
+    <string name="aidex_adaptive_v2_desc">Adaptiv uppskattning från råsignalen med ett sannolikt intervall</string>
+    <string name="aidex_algorithm_rebuilding">Räknar om sensorhistoriken</string>
+    <string name="aidex_algorithm_failed">Kunde inte räkna om sensorhistoriken</string>
+    <string name="voice_chime_title">Signal före glukos</string>
+    <string name="voice_chime_desc">Först en kort ton, så att du lyssnar när värdet läses upp</string>
     <string name="choose_color">Välj färg</string>
     <string name="data_smoothing_window_desc">Ett längre tidsfönster jämnar ut fler svängningar</string>
     <string name="data_smoothing_scope_all">Alla värden</string>
@@ -2959,4 +2974,6 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">Sensorn sparad</string>
     <string name="medtrum_setup_searching">Inte ansluten än. Plåstret ansluter av sig själv när det är inom räckhåll.</string>
     <string name="medtrum_setup_auth_failed">Plåstret avvisade serienumret. Kontrollera numret som står på plåstret.</string>
+
+    <string name="alert_sound_volume">Volym för larmljud</string>
 </resources>
