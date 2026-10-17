@@ -74,7 +74,8 @@ object MobileCalibrationProvider : CalibrationProvider {
     }
 
     override fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Boolean =
-        CalibrationManager.archiveSensorCalibrationsBlocking(sensorId, archiveId) > 0
+        // Handled even when the sensor had nothing to move; only an engine that is not ready yet fails.
+        CalibrationManager.archiveSensorCalibrationsBlocking(sensorId, archiveId) >= 0
 
     override fun deleteCalibrationAtBlocking(timestamp: Long): Boolean =
         CalibrationManager.deleteCalibrationAtBlocking(timestamp)

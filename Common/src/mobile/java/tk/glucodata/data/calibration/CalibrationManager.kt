@@ -1495,12 +1495,13 @@ object CalibrationManager {
     /**
      * Re-files every calibration of [sensorId] under [archiveId]. Nothing is deleted: the rows keep
      * their values and only stop matching the live sensor, so the replacement electrode is not
-     * corrected by an offset measured on the previous one. Returns how many rows moved.
+     * corrected by an offset measured on the previous one. Returns how many rows moved, or -1 when
+     * the engine could not do it yet, so a caller that must not lose the request can retry.
      */
     suspend fun archiveSensorCalibrations(sensorId: String, archiveId: String): Int {
-        if (!ensureInitialized() || archiveId.isBlank()) return 0
+        if (!ensureInitialized()) return -1
         val target = normalizeSensorId(sensorId)
-        if (target.isBlank()) return 0
+        if (archiveId.isBlank() || target.isBlank()) return 0
         val moved = withContext(Dispatchers.IO) {
             dao.getAllSync()
                 .filter { sensorMatches(it.sensorId, target) }

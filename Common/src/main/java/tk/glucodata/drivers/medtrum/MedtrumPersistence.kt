@@ -12,6 +12,7 @@ object MedtrumPersistence {
     private const val KEY_LEGACY_AUTH = "medtrum_legacy_auth"
     private const val KEY_SENSOR_START_MS = "medtrum_sensor_start_ms"
     private const val KEY_SESSION_KEY = "medtrum_sensor_session_key"
+    private const val KEY_PENDING_ARCHIVE = "medtrum_pending_calibration_archive"
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -51,6 +52,17 @@ object MedtrumPersistence {
 
     fun setSessionKey(context: Context, key: String) {
         prefs(context).edit().putString(KEY_SESSION_KEY, key).apply()
+    }
+
+    /**
+     * The id the previous sensor's calibrations are still to be filed under. Kept until the move has
+     * actually happened, so a disconnect between noticing the new sensor and doing it cannot lose it.
+     */
+    fun getPendingArchive(context: Context): String =
+        prefs(context).getString(KEY_PENDING_ARCHIVE, "") ?: ""
+
+    fun setPendingArchive(context: Context, archiveId: String) {
+        prefs(context).edit().putString(KEY_PENDING_ARCHIVE, archiveId).apply()
     }
 
     fun clear(context: Context) {

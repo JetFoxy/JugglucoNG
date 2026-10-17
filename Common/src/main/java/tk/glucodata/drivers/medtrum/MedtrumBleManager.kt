@@ -108,6 +108,11 @@ class MedtrumBleManager(
 
         private const val MGDL_PER_MMOL = 18.0182f
 
+        private val ARCHIVE_EXECUTOR: java.util.concurrent.Executor =
+            java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+                Thread(r, "Medtrum-calibration-archive").apply { isDaemon = true }
+            }
+
         /** The live reading in display units, as a stock lane (calibrated once downstream). */
         internal fun liveLane(glucoseMgdl: Float, unit: Int): LiveReadingLanes =
             LiveReadingLanes.stock(if (unit == 1) glucoseMgdl / MGDL_PER_MMOL else glucoseMgdl, Float.NaN)
@@ -262,6 +267,8 @@ class MedtrumBleManager(
 
     @Volatile private var sensorStartMs = 0L
 
+    private val archiveRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
     /** Orders a reading's final writes against [terminateManagedSensor]. */
     private val readingLock = Any()
 
@@ -288,16 +295,50 @@ class MedtrumBleManager(
             val serial = serialLong.toString()
             val archiveId = MedtrumSensorSession.archiveId(serial, previousStart)
             Log.i(TAG, "New Medtrum sensor on $serial (was started ${previousStart}): archiving calibrations as $archiveId")
-            // A database call: off the BLE callback thread.
-            handler.post {
-                runCatching { CalibrationAccess.archiveSensorCalibrations(serial, archiveId) }
-                    .onFailure { Log.stack(TAG, "archiveSensorCalibrations", it) }
-            }
+            // Recorded before the session key below, and kept until the move has happened.
+            ctx?.let { MedtrumPersistence.setPendingArchive(it, archiveId) }
             sensorStartMs = 0L
             ctx?.let { MedtrumPersistence.setSensorStartMs(it, 0L) }
         }
         if (ctx != null && storedKey != key) MedtrumPersistence.setSessionKey(ctx, key)
         recordSensorStart(state.elapsedSeconds)
+        flushPendingArchive()
+    }
+
+    /**
+     * Files the previous sensor's calibrations away, off the BLE callback thread and off the driver
+     * thread: a disconnect clears the driver's queue, and the session key is already saved, so
+     * nothing would ever ask again. The request stays persisted until the move succeeded and is
+     * retried by every later readState.
+     */
+    private fun flushPendingArchive() {
+        val ctx = Applic.app ?: return
+        val archiveId = MedtrumPersistence.getPendingArchive(ctx)
+        if (archiveId.isBlank()) return
+        if (!CalibrationAccess.isRegistered()) {
+            // No calibration engine on this device (the watch): there is nothing to move.
+            MedtrumPersistence.setPendingArchive(ctx, "")
+            return
+        }
+        if (!archiveRunning.compareAndSet(false, true)) return
+        val serial = serialLong.toString()
+        ARCHIVE_EXECUTOR.execute {
+            try {
+                if (CalibrationAccess.archiveSensorCalibrations(serial, archiveId)) {
+                    Applic.app?.let {
+                        if (MedtrumPersistence.getPendingArchive(it) == archiveId) {
+                            MedtrumPersistence.setPendingArchive(it, "")
+                        }
+                    }
+                } else {
+                    Log.w(TAG, "Calibration archive $archiveId not done yet; will retry")
+                }
+            } catch (t: Throwable) {
+                Log.stack(TAG, "archiveSensorCalibrations", t)
+            } finally {
+                archiveRunning.set(false)
+            }
+        }
     }
 
     private fun recordSensorStart(elapsedSeconds: Long) {

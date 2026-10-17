@@ -198,3 +198,128 @@ class MedtrumSensorSessionTest {
         assertFalse(MedtrumSerialAlias.isShortForm(MedtrumSensorSession.archiveId("2329895446", 1_000L), "2329895446"))
     }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = MedtrumTestApplication::class, shadows = [MedtrumTestNatives::class])
+class MedtrumCalibrationArchiveTest {
+    private val serial = "2329895446"
+    private lateinit var context: Context
+    private lateinit var driver: MedtrumBleManager
+    private val calls = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
+    private val results = java.util.concurrent.ConcurrentLinkedQueue<Boolean>()
+
+    private val provider = object : tk.glucodata.CalibrationProvider {
+        override fun hasActiveCalibration(isRawMode: Boolean, sensorId: String?) = false
+        override fun getCalibratedValue(
+            value: Float, timestamp: Long, isRawMode: Boolean, emitDiagnostics: Boolean, sensorId: String?,
+        ) = value
+
+        override fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Boolean {
+            calls.add(sensorId to archiveId)
+            return results.poll() ?: true
+        }
+    }
+
+    @Before
+    fun setUp() {
+        context = RuntimeEnvironment.getApplication()
+        Applic.app = context as Applic
+        MedtrumPersistence.clear(context)
+        calls.clear()
+        results.clear()
+        tk.glucodata.CalibrationAccess.register(provider)
+        MedtrumPersistence.setSensorId(context, serial)
+        MedtrumPersistence.setSessionKey(context, MedtrumSensorSession.key(7, 1_000L))
+        MedtrumPersistence.setSensorStartMs(context, OLD_START)
+        driver = MedtrumBleManager(serial, 0L)
+    }
+
+    @org.junit.After
+    fun tearDown() {
+        driver.terminateManagedSensor(wipeData = true)
+        tk.glucodata.CalibrationAccess.unregisterForTests()
+    }
+
+    @Test
+    fun aNewSensorFilesTheOldCalibrationsAndClearsTheRequest() {
+        noteState(sensorId = 8, insertTime = 2_000L)
+
+        awaitCalls(1)
+        assertEquals(serial to "$serial@$OLD_START", calls.first())
+        awaitPendingCleared()
+    }
+
+    @Test
+    fun aFailedMoveStaysPendingAndAnyLaterReadStateRetriesIt() {
+        results.add(false)
+        noteState(sensorId = 8, insertTime = 2_000L)
+        awaitCalls(1)
+        assertEquals("a move that did not happen must stay requested", "$serial@$OLD_START", MedtrumPersistence.getPendingArchive(context))
+
+        // The session key is already stored, so only the persisted request can ask again.
+        driver.softDisconnect()
+        noteState(sensorId = 8, insertTime = 2_000L)
+
+        awaitCalls(2)
+        awaitPendingCleared()
+    }
+
+    @Test
+    fun theRequestSurvivesADisconnectBeforeItRuns() {
+        MedtrumPersistence.setPendingArchive(context, "$serial@$OLD_START")
+
+        driver.softDisconnect()
+        noteState(sensorId = 7, insertTime = 1_000L)
+
+        awaitCalls(1)
+        assertEquals("$serial@$OLD_START", calls.first().second)
+    }
+
+    @Test
+    fun withoutACalibrationEngineTheRequestIsDroppedWithoutACall() {
+        tk.glucodata.CalibrationAccess.unregisterForTests()
+        MedtrumPersistence.setPendingArchive(context, "$serial@$OLD_START")
+
+        noteState(sensorId = 7, insertTime = 1_000L)
+
+        assertEquals("", MedtrumPersistence.getPendingArchive(context))
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test
+    fun theSameSensorNeverArchivesAnything() {
+        noteState(sensorId = 7, insertTime = 1_000L)
+
+        Thread.sleep(200)
+        assertTrue(calls.isEmpty())
+        assertEquals("", MedtrumPersistence.getPendingArchive(context))
+    }
+
+    private fun noteState(sensorId: Int, insertTime: Long) {
+        // A new sensor reports an elapsed time that restarted; the same one keeps counting.
+        val elapsed = if (insertTime == 1_000L) 5L * 24 * 3600 else 3_600L
+        val state = MedtrumProtocol.StateRecord(
+            version = 1, phase = MedtrumProtocol.Phase.MEASURING, status = 0, sensorId = sensorId,
+            sequence = 10, signal = 1_500, calibrationFactor = 13_476,
+            runningTime = insertTime + elapsed, insertTime = insertTime,
+            nextCalibrationSequence = 0, batteryMillivolts = 2_000,
+        )
+        MedtrumBleManager::class.java.getDeclaredMethod("noteSensorSession", MedtrumProtocol.StateRecord::class.java)
+            .apply { isAccessible = true }
+            .invoke(driver, state)
+    }
+
+    private fun awaitCalls(n: Int) = await { calls.size >= n }
+
+    private fun awaitPendingCleared() = await { MedtrumPersistence.getPendingArchive(context).isEmpty() }
+
+    private fun await(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (!condition() && System.currentTimeMillis() < deadline) Thread.sleep(10)
+        assertTrue("condition not reached in time; calls=$calls", condition())
+    }
+
+    private companion object {
+        val OLD_START = System.currentTimeMillis() - 10L * 24 * 3_600_000L
+    }
+}

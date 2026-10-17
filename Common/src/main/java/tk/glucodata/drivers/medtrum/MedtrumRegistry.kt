@@ -29,6 +29,7 @@ object MedtrumRegistry {
             MedtrumPersistence.setLegacyAuth(context, false)
             MedtrumPersistence.setSensorStartMs(context, 0L)
             MedtrumPersistence.setSessionKey(context, "")
+            MedtrumPersistence.setPendingArchive(context, "")
             // Its native mirror can outlive its driver (turning Bluetooth collection off clears
             // the callbacks without finishing the shell). Finish it by id, or the next rebuild
             // adopts it as a generic Libre callback that can stay selected.
