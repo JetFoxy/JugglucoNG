@@ -379,8 +379,7 @@ class SensorViewModel : ViewModel() {
         val isMq = snapshot.uiFamily == ManagedSensorUiFamily.MQ
         val isIcan = snapshot.uiFamily == ManagedSensorUiFamily.ICAN
         val isAnytime = snapshot.uiFamily == ManagedSensorUiFamily.ANYTIME
-        // Medtrum is the only managed sensor on the GENERIC family today.
-        val isMedtrum = snapshot.uiFamily == ManagedSensorUiFamily.GENERIC
+        val isMedtrum = snapshot.uiFamily == ManagedSensorUiFamily.MEDTRUM
         val isSibionics = snapshot.uiFamily == ManagedSensorUiFamily.SIBIONICS
         val isSibionics2 = isSibionics && snapshot.vendorModel.equals("Sibionics 2", ignoreCase = true)
         val detailsConnectionStatus = if (snapshot.showConnectionStatusInDetails) {

@@ -38,6 +38,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -91,6 +93,8 @@ fun MedtrumSetupWizard(
     var attachedSerial by remember { mutableStateOf("") }
     var pendingSerial by remember { mutableStateOf<Long?>(null) }
     var serialRejected by remember { mutableStateOf(false) }
+    var attachJob by remember { mutableStateOf<Job?>(null) }
+    var attachAttempt by remember { mutableStateOf(0) }
 
     val normalized = serialInput.trim()
     val serialNumber = MedtrumPersistence.parseSerialNumber(normalized)
@@ -100,11 +104,16 @@ fun MedtrumSetupWizard(
         attachedSerial = MedtrumPersistence.formatSerialHex(serial)
         serialRejected = false
         step = MedtrumSetupStep.CONNECTING
-        scope.launch {
+        // A replaced attempt must not touch the wizard any more: its timeout would otherwise
+        // interrupt the new serial under the new label.
+        val attempt = ++attachAttempt
+        attachJob?.cancel()
+        attachJob = scope.launch {
             try {
                 val sensorId = MedtrumRegistry.addSensor(context, serial)
                 val result = if (sensorId == null) MedtrumAttachResult.TIMED_OUT else awaitMedtrumLink(sensorId)
                 Log.i(TAG, "Medtrum setup $attachedSerial: $result")
+                if (attempt != attachAttempt) return@launch
                 when (result) {
                     MedtrumAttachResult.CONNECTED -> step = MedtrumSetupStep.SUCCESS
                     MedtrumAttachResult.TIMED_OUT -> step = MedtrumSetupStep.SAVED
@@ -113,8 +122,11 @@ fun MedtrumSetupWizard(
                         step = MedtrumSetupStep.ENTRY
                     }
                 }
+            } catch (c: CancellationException) {
+                throw c
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to add Medtrum sensor: ${t.message}")
+                if (attempt != attachAttempt) return@launch
                 step = MedtrumSetupStep.ENTRY
             }
         }
@@ -141,7 +153,15 @@ fun MedtrumSetupWizard(
     }
 
     BackHandler {
-        if (step == MedtrumSetupStep.ENTRY) onDismiss() else step = MedtrumSetupStep.ENTRY
+        if (step == MedtrumSetupStep.ENTRY) {
+            onDismiss()
+        } else {
+            // Stop waiting on the old patch: its timeout must not interrupt the next attempt.
+            attachJob?.cancel()
+            attachJob = null
+            attachAttempt++
+            step = MedtrumSetupStep.ENTRY
+        }
     }
 
     LaunchedEffect(step) {

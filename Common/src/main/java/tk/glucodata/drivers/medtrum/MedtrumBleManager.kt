@@ -84,6 +84,13 @@ class MedtrumBleManager(
          */
         private const val ATTEMPT_TIMEOUT_MS = 60_000L
 
+        /**
+         * A link that connected but never finished discovery, subscription and AUTH counts as a
+         * failed attempt after this long. Without it a stuck step left the phase busy and every
+         * later connectDevice() was skipped as a duplicate, so nothing recovered the sensor.
+         */
+        private const val SETUP_TIMEOUT_MS = 60_000L
+
         /** Glucose plausibility bounds (mg/dL). */
         private const val GLUCOSE_MIN_MGDL = 1.0
         private const val GLUCOSE_MAX_MGDL = 600.0
@@ -170,6 +177,13 @@ class MedtrumBleManager(
     private val txQueue = ArrayDeque<ByteArray>()
     @Volatile private var txInFlight = false
 
+    /**
+     * Guards the write queue and the CTRLPT reassembly buffer. Notifications and write
+     * completions arrive on binder threads while the driver thread queues the next command, and
+     * a disconnect can clear both from either side.
+     */
+    private val stateLock = Any()
+
     /** Incoming CTRLPT reassembly. */
     private val rxBuffer = ByteArrayOutputStream()
     private var rxExpected = -1
@@ -186,6 +200,9 @@ class MedtrumBleManager(
 
     /** Set once AUTH failed MAX_AUTH_FAILURES times; only a user reconnect clears it. */
     @Volatile private var authGaveUp = false
+
+    /** Set when the connected device has no Medtrum service; only a user reconnect clears it. */
+    @Volatile private var deviceRejected = false
 
     /** STATE_CONNECTED arrived for the current attempt. Decides link-lost vs attempt-failed. */
     @Volatile private var linkUp = false
@@ -266,12 +283,22 @@ class MedtrumBleManager(
     /** When the pending attempt deadline fires; 0 when none is armed. */
     @Volatile private var attemptDeadlineAtMs = 0L
 
-    private val attemptDeadlineRunnable = Runnable {
+    private val attemptDeadlineRunnable = Runnable { onAttemptDeadlineExpired() }
+
+    /**
+     * The deadline covers the whole attempt, not just the connect: discovery, the CCCD writes and
+     * AUTH all have to finish before the link is usable. A streaming link is the only thing that
+     * ends it, so a setup that gets stuck in one of those steps is retried instead of leaving the
+     * phase busy forever.
+     */
+    internal fun onAttemptDeadlineExpired() {
         attemptDeadlineAtMs = 0L
-        if (stop || linkUp) return@Runnable
+        if (stop) return
+        if (phase == Phase.STREAMING || phase == Phase.SYNCING) return
         val route = reconnectPolicy.onAttemptFailed()
-        Log.w(TAG, "Medtrum attempt did not connect within ${ATTEMPT_TIMEOUT_MS / 1000}s — next route $route")
+        Log.w(TAG, "Medtrum attempt did not complete in phase=$phase — next route $route")
         closeGattTransport()
+        linkUp = false
         resetSession()
         phase = Phase.IDLE
         applyRoute(route)
@@ -280,15 +307,28 @@ class MedtrumBleManager(
     }
 
     /**
-     * Arm once per attempt: SensorBluetooth calls connectDevice again on its own cadence, and
-     * re-arming each time would keep pushing the deadline back.
+     * Arm once per connect attempt: SensorBluetooth calls connectDevice again on its own cadence,
+     * and re-arming each time would keep pushing the deadline back.
      */
     private fun armAttemptDeadline() {
-        val now = System.currentTimeMillis()
-        if (attemptDeadlineAtMs > now) return
-        attemptDeadlineAtMs = now + ATTEMPT_TIMEOUT_MS
-        handler.postDelayed(attemptDeadlineRunnable, ATTEMPT_TIMEOUT_MS)
+        if (attemptDeadlineAtMs > System.currentTimeMillis()) return
+        armDeadline(ATTEMPT_TIMEOUT_MS)
     }
+
+    /**
+     * A fresh, full window for the setup that follows a connection. The connect deadline is
+     * already running down, and discovery plus AUTH legitimately outlast it.
+     */
+    private fun armSetupDeadline() = armDeadline(SETUP_TIMEOUT_MS)
+
+    private fun armDeadline(timeoutMs: Long) {
+        attemptDeadlineAtMs = System.currentTimeMillis() + timeoutMs
+        handler.removeCallbacks(attemptDeadlineRunnable)
+        handler.postDelayed(attemptDeadlineRunnable, timeoutMs)
+    }
+
+    /** True while a connect or setup deadline is pending. */
+    internal fun isAttemptDeadlineArmed(): Boolean = attemptDeadlineAtMs > 0L
 
     /** Drop every pending handler task, the attempt deadline included. */
     private fun clearHandlerTasks() {
@@ -318,10 +358,33 @@ class MedtrumBleManager(
         charCtrlPoint = null
         pendingCccd = null
         authSession = null
-        txQueue.clear()
-        txInFlight = false
-        rxBuffer.reset()
-        rxExpected = -1
+        // The queue and the reassembly buffer are touched from callback threads too, so they are
+        // cleared under the same lock the commands are queued with.
+        synchronized(stateLock) {
+            txQueue.clear()
+            txInFlight = false
+            rxBuffer.reset()
+            rxExpected = -1
+        }
+    }
+
+    /**
+     * The device connected but does not carry the CGM service. It is not a Medtrum patch — the
+     * EasyTouch pump shares the advertised name — so retrying its address only loops. Stop until
+     * the user reconnects, and forget the address so the next attempt scans by advertised serial.
+     */
+    private fun rejectDevice(reason: String, gatt: BluetoothGatt) {
+        Log.e(TAG, "Rejecting device ${gatt.device?.address}: $reason")
+        deviceRejected = true
+        clearHandlerTasks()
+        linkUp = false
+        phase = Phase.ERROR
+        mActiveBluetoothDevice = null
+        mActiveDeviceAddress = null
+        Applic.app?.let { MedtrumPersistence.setLastBtAddress(it, "") }
+        runCatching { closeGattTransport() }
+        resetSession()
+        UiRefreshBus.requestStatusRefresh()
     }
 
     /**
@@ -356,7 +419,7 @@ class MedtrumBleManager(
     }
 
     private fun scheduleReconnect(delayMs: Long) {
-        if (stop) return
+        if (stop || authGaveUp || deviceRejected) return
         handler.removeCallbacks(reconnectRunnable)
         handler.postDelayed(reconnectRunnable, delayMs)
     }
@@ -403,8 +466,8 @@ class MedtrumBleManager(
     @Synchronized
     override fun connectDevice(delayMillis: Long): Boolean {
         if (stop) return false
-        if (authGaveUp) {
-            Log.i(TAG, "Not connecting: AUTH gave up, waiting for a user reconnect")
+        if (authGaveUp || deviceRejected) {
+            Log.i(TAG, "Not connecting: ${if (deviceRejected) "device rejected" else "AUTH gave up"}, waiting for a user reconnect")
             return false
         }
         if (phase != Phase.IDLE && phase != Phase.ERROR) {
@@ -458,8 +521,9 @@ class MedtrumBleManager(
         val address = gatt.device?.address
         Log.i(TAG, "Medtrum connected to $address")
         val h = handler
-        attemptDeadlineAtMs = 0L
-        h.removeCallbacks(attemptDeadlineRunnable)
+        // Keep a deadline through setup: if discovery, subscription or AUTH never finishes, the
+        // phase would stay busy and every later connectDevice() would be skipped as a duplicate.
+        armSetupDeadline()
         cancelReconnect()
         linkUp = true
         reconnectPolicy.onConnected()
@@ -499,6 +563,13 @@ class MedtrumBleManager(
 
     override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
         if (stop) return
+        // A discovery result from a GATT we already retired must not install its handles over
+        // the live link's.
+        if (mBluetoothGatt !== gatt) {
+            Log.d(TAG, "Ignoring onServicesDiscovered from a retired GATT")
+            runCatching { gatt.close() }
+            return
+        }
         if (status != BluetoothGatt.GATT_SUCCESS) {
             Log.e(TAG, "Service discovery failed status=$status")
             runCatching { gatt.disconnect() }
@@ -507,15 +578,13 @@ class MedtrumBleManager(
 
         val service = gatt.getService(SERVICE_UUID)
         if (service == null) {
-            Log.e(TAG, "Medtrum service not found on ${gatt.device?.address}")
-            runCatching { gatt.disconnect() }
+            rejectDevice("Medtrum service not found on ${gatt.device?.address}", gatt)
             return
         }
         val cgmData = service.getCharacteristic(CHAR_CGM_DATA_UUID)
         val ctrlPoint = service.getCharacteristic(CHAR_CTRL_POINT_UUID)
         if (cgmData == null || ctrlPoint == null) {
-            Log.e(TAG, "Required characteristics missing: cgmData=$cgmData ctrlPoint=$ctrlPoint")
-            runCatching { gatt.disconnect() }
+            rejectDevice("required characteristics missing: cgmData=$cgmData ctrlPoint=$ctrlPoint", gatt)
             return
         }
         charCgmData = cgmData
@@ -533,6 +602,10 @@ class MedtrumBleManager(
 
     override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
         if (stop) return
+        if (mBluetoothGatt !== gatt) {
+            Log.d(TAG, "Ignoring onDescriptorWrite from a retired GATT")
+            return
+        }
         if (descriptor.uuid != CCCD_UUID) return
         val charUuid = descriptor.characteristic?.uuid ?: return
         if (charUuid != CHAR_CGM_DATA_UUID && charUuid != CHAR_CTRL_POINT_UUID) return
@@ -568,6 +641,12 @@ class MedtrumBleManager(
 
     override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
         if (stop) return
+        // A completion from a retired link must not clear the write in flight on the replacement
+        // link or start another one for it.
+        if (mBluetoothGatt !== gatt) {
+            Log.d(TAG, "Ignoring onCharacteristicWrite from a retired GATT")
+            return
+        }
         if (characteristic.uuid != CHAR_CTRL_POINT_UUID) return
         if (status != BluetoothGatt.GATT_SUCCESS) {
             Log.w(TAG, "write failed status=$status — reconnecting")
@@ -577,14 +656,21 @@ class MedtrumBleManager(
         // The queue is owned by the handler thread; pumping from the binder thread could start
         // two writes at once.
         handler.post {
-            txInFlight = false
-            pumpTxQueue()
+            if (stop || mBluetoothGatt !== gatt) return@post
+            synchronized(stateLock) {
+                txInFlight = false
+                pumpTxQueueLocked()
+            }
         }
     }
 
     @Deprecated("Deprecated in Java")
     override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
         if (stop) return
+        if (mBluetoothGatt !== gatt) {
+            Log.d(TAG, "Ignoring notification from a retired GATT")
+            return
+        }
         val data = characteristic.value ?: return
         when (characteristic.uuid) {
             CHAR_CGM_DATA_UUID -> onCgmData(data)
@@ -596,27 +682,36 @@ class MedtrumBleManager(
     // ---- CTRLPT reassembly (mirrors BLEBaseCentral.parseCharacteristicValue) ----
 
     private fun onCtrlPointPdu(pdu: ByteArray) {
-        if (rxExpected < 0) {
-            val declared = MedtrumProtocol.declaredLength(pdu)
-            if (declared < 0 || pdu.size < 2) return
-            val available = minOf(declared, pdu.size - 2)
-            rxBuffer.write(pdu, 2, available)
-            if (rxBuffer.size() >= declared) {
-                finishResponse()
+        // Reassemble under the lock, dispatch outside it: a callback that answers here re-enters
+        // the driver's synchronized BLE state, and holding this lock across that would invert the
+        // lock order against the driver thread.
+        val complete = synchronized(stateLock) {
+            if (rxExpected < 0) {
+                val declared = MedtrumProtocol.declaredLength(pdu)
+                if (declared < 0 || pdu.size < 2) return
+                val available = minOf(declared, pdu.size - 2)
+                rxBuffer.write(pdu, 2, available)
+                if (rxBuffer.size() >= declared) takeBufferedResponse() else {
+                    rxExpected = declared
+                    null
+                }
             } else {
-                rxExpected = declared
+                // Continuation PDU: raw bytes, no header.
+                rxBuffer.write(pdu, 0, pdu.size)
+                if (rxBuffer.size() >= rxExpected) takeBufferedResponse() else null
             }
-            return
-        }
-        // Continuation PDU: raw bytes, no header.
-        rxBuffer.write(pdu, 0, pdu.size)
-        if (rxBuffer.size() >= rxExpected) finishResponse()
+        } ?: return
+        finishResponse(complete)
     }
 
-    private fun finishResponse() {
+    private fun takeBufferedResponse(): ByteArray {
         val value = rxBuffer.toByteArray()
         rxBuffer.reset()
         rxExpected = -1
+        return value
+    }
+
+    private fun finishResponse(value: ByteArray) {
         val response = MedtrumProtocol.parseResponse(value)
         if (response == null) {
             Log.w(TAG, "Unparseable CTRLPT response (${value.size} bytes)")
@@ -681,6 +776,10 @@ class MedtrumBleManager(
             return
         }
         authFailureCount = 0
+        // AUTH accepted: the link is up and usable, so the setup deadline is done. The watchdog
+        // takes over once streaming starts.
+        attemptDeadlineAtMs = 0L
+        handler.removeCallbacks(attemptDeadlineRunnable)
         Applic.app?.let { ctx ->
             if (MedtrumPersistence.isLegacyAuth(ctx) != session.legacy) {
                 MedtrumPersistence.setLegacyAuth(ctx, session.legacy)
@@ -738,6 +837,9 @@ class MedtrumBleManager(
         val nowMs = System.currentTimeMillis()
         val sensorSerial = serialLong.toString()
         val mgdl = glucose.toFloat()
+        // The reading is real and local: without this the shared "last successful glucose" slot
+        // stays 0 and a co-active Libre sensor's freshness checks reconnect this healthy link.
+        markLocalReadingAccepted(nowMs)
         HistorySyncAccess.storeCurrentReadingAsync(nowMs, mgdl, 0f, 0f, sensorSerial)
         // The same value Room gets: the patch's own, before this app's calibration.
         VirtualGlucoseSensorBridge.mirrorToNative(
@@ -789,12 +891,16 @@ class MedtrumBleManager(
 
     private fun enqueue(commandData: ByteArray) {
         handler.post {
-            MedtrumProtocol.encode(commandData).forEach { txQueue.addLast(it) }
-            pumpTxQueue()
+            if (stop) return@post
+            synchronized(stateLock) {
+                MedtrumProtocol.encode(commandData).forEach { txQueue.addLast(it) }
+                pumpTxQueueLocked()
+            }
         }
     }
 
-    private fun pumpTxQueue() {
+    /** Only called while holding [stateLock]. */
+    private fun pumpTxQueueLocked() {
         if (stop || txInFlight) return
         val gatt = mBluetoothGatt ?: return
         val ch = charCtrlPoint ?: return
@@ -810,7 +916,7 @@ class MedtrumBleManager(
             }
         } catch (t: Throwable) {
             txInFlight = false
-            Log.stack(TAG, "pumpTxQueue", t)
+            Log.stack(TAG, "pumpTxQueueLocked", t)
         }
     }
 
@@ -847,6 +953,7 @@ class MedtrumBleManager(
         // A user-driven reconnect gets a fresh budget after a mistyped serial stopped us.
         authFailureCount = 0
         authGaveUp = false
+        deviceRejected = false
         linkUp = false
         runCatching { closeGattTransport() }.onFailure { Log.stack(TAG, "softReconnect(close)", it) }
         resetSession()

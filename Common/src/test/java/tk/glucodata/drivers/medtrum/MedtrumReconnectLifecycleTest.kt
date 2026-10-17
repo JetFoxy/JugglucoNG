@@ -155,6 +155,30 @@ class MedtrumReconnectLifecycleTest {
     }
 
     @Test
+    fun aLinkThatConnectedButDidNotFinishSetupKeepsADeadline() {
+        val gatt = newGatt()
+        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+
+        // Discovery, subscription and AUTH are all still ahead: without a pending deadline a stuck
+        // step would leave the phase busy and every later connectDevice() a duplicate.
+        assertEquals(MedtrumBleManager.Phase.DISCOVERING, manager.phase)
+        assertTrue(manager.isAttemptDeadlineArmed())
+    }
+
+    @Test
+    fun aDeviceWithoutTheMedtrumServiceIsRejectedAndNotRetried() {
+        val gatt = newGatt()
+        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+
+        // The scanned or remembered address answered but carries no CGMS service: a wrong device.
+        manager.onServicesDiscovered(gatt, BluetoothGatt.GATT_SUCCESS)
+
+        assertEquals(MedtrumBleManager.Phase.ERROR, manager.phase)
+        assertFalse("a rejected device must not be retried automatically", manager.connectDevice(0))
+        assertEquals("", MedtrumPersistence.getLastBtAddress(context))
+    }
+
+    @Test
     fun liveReadingIsAStockLaneSoSoftwareCalibrationStillApplies() {
         val mgdl = MedtrumBleManager.liveLane(144f, unit = 0)
         assertFalse(mgdl.isResolved)
