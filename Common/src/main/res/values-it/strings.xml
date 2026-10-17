@@ -2964,6 +2964,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">Sensore salvato</string>
     <string name="medtrum_setup_searching">Non ancora connesso. Il cerotto si connetterà da solo quando sarà nel raggio d\'azione.</string>
     <string name="medtrum_setup_auth_failed">Il cerotto ha rifiutato questo numero di serie. Controlla il numero stampato sul cerotto.</string>
+    <string name="medtrum_setup_device_rejected">Questo dispositivo non è un cerotto Medtrum. Assicurati che il cerotto sia vicino e riprova.</string>
 
     <string name="alert_sound_volume">Volume del suono di avviso</string>
 </resources>

@@ -3017,6 +3017,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="medtrum_setup_saved_title">Sensor opgeslagen</string>
     <string name="medtrum_setup_searching">Nog niet verbonden. De patch maakt vanzelf verbinding zodra hij binnen bereik is.</string>
     <string name="medtrum_setup_auth_failed">De patch heeft dit serienummer geweigerd. Controleer het nummer op de patch.</string>
+    <string name="medtrum_setup_device_rejected">Dit apparaat is geen Medtrum-patch. Zorg dat de patch binnen bereik is en probeer het opnieuw.</string>
 
     <string name="alert_sound_volume">Volume van het alarmgeluid</string>
 </resources>

@@ -2975,6 +2975,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">Sensor guardado</string>
     <string name="medtrum_setup_searching">Ainda não ligado. O adesivo liga-se sozinho quando estiver ao alcance.</string>
     <string name="medtrum_setup_auth_failed">O adesivo recusou este número de série. Verifique o número impresso no adesivo.</string>
+    <string name="medtrum_setup_device_rejected">Este dispositivo não é um adesivo Medtrum. Verifique se o adesivo está por perto e tente novamente.</string>
 
     <string name="alert_sound_volume">Volume do som de alerta</string>
 </resources>

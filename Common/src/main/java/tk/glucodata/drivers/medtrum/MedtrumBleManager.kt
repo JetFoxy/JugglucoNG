@@ -201,6 +201,13 @@ class MedtrumBleManager(
     /** Set once AUTH failed MAX_AUTH_FAILURES times; only a user reconnect clears it. */
     @Volatile private var authGaveUp = false
 
+    /**
+     * The patch accepted AUTH on this link. The patch can start pushing CGM_DATA as soon as the
+     * notification is enabled, which is before AUTH; a reading is only published once this is set.
+     * Cleared with the session on every disconnect.
+     */
+    @Volatile private var authAccepted = false
+
     /** Set when the connected device has no Medtrum service; only a user reconnect clears it. */
     @Volatile private var deviceRejected = false
 
@@ -254,6 +261,9 @@ class MedtrumBleManager(
 
     /** AUTH failed with both dialects MAX_AUTH_FAILURES times: the serial does not fit the patch. */
     fun isAuthRejected(): Boolean = authGaveUp
+
+    /** The connected device has no Medtrum service: it is not this patch. */
+    fun isDeviceRejected(): Boolean = deviceRejected
 
     // ---- Watchdog / reconnect ----
 
@@ -358,6 +368,10 @@ class MedtrumBleManager(
         charCtrlPoint = null
         pendingCccd = null
         authSession = null
+        // A fingerstick waiting for a readState must not be applied to the patch's state after a
+        // reconnect: the elapsed time in its calibrate command would then be the new link's.
+        pendingCalibrationMgdl = null
+        authAccepted = false
         // The queue and the reassembly buffer are touched from callback threads too, so they are
         // cleared under the same lock the commands are queued with.
         synchronized(stateLock) {
@@ -776,6 +790,7 @@ class MedtrumBleManager(
             return
         }
         authFailureCount = 0
+        authAccepted = true
         // AUTH accepted: the link is up and usable, so the setup deadline is done. The watchdog
         // takes over once streaming starts.
         attemptDeadlineAtMs = 0L
@@ -808,6 +823,13 @@ class MedtrumBleManager(
     // ---- CGM data ----
 
     private fun onCgmData(data: ByteArray) {
+        // The patch can push CGM_DATA as soon as the notification is enabled, before AUTH is
+        // accepted. Such a record is not trusted: publishing it would also flip the phase to
+        // STREAMING, which setup reads as Connected.
+        if (!authAccepted) {
+            Log.d(TAG, "Ignoring CGM_DATA before AUTH")
+            return
+        }
         val record = MedtrumProtocol.parseCgmRecord(data)
         if (record == null) {
             Log.d(TAG, "Short CGM_DATA record (${data.size} bytes)")

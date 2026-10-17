@@ -61,7 +61,7 @@ private const val CONNECT_POLL_MS = 500L
  */
 private enum class MedtrumSetupStep { ENTRY, CONNECTING, SUCCESS, SAVED }
 
-private enum class MedtrumAttachResult { CONNECTED, REJECTED, TIMED_OUT }
+private enum class MedtrumAttachResult { CONNECTED, REJECTED_AUTH, REJECTED_DEVICE, TIMED_OUT }
 
 private suspend fun awaitMedtrumLink(sensorId: String): MedtrumAttachResult =
     withTimeoutOrNull(CONNECT_CONFIRM_TIMEOUT_MS) {
@@ -69,7 +69,10 @@ private suspend fun awaitMedtrumLink(sensorId: String): MedtrumAttachResult =
         while (result == null) {
             val driver = MedtrumRegistry.findDriver(sensorId)
             result = when {
-                driver?.isAuthRejected() == true -> MedtrumAttachResult.REJECTED
+                // A device without the Medtrum service has stopped reconnecting on its own, so
+                // waiting for the timeout would promise a connection that cannot come.
+                driver?.isDeviceRejected() == true -> MedtrumAttachResult.REJECTED_DEVICE
+                driver?.isAuthRejected() == true -> MedtrumAttachResult.REJECTED_AUTH
                 driver?.isConnected() == true -> MedtrumAttachResult.CONNECTED
                 else -> null
             }
@@ -92,7 +95,7 @@ fun MedtrumSetupWizard(
     var serialInput by remember { mutableStateOf("") }
     var attachedSerial by remember { mutableStateOf("") }
     var pendingSerial by remember { mutableStateOf<Long?>(null) }
-    var serialRejected by remember { mutableStateOf(false) }
+    var rejection by remember { mutableStateOf<MedtrumAttachResult?>(null) }
     var attachJob by remember { mutableStateOf<Job?>(null) }
     var attachAttempt by remember { mutableStateOf(0) }
 
@@ -102,7 +105,7 @@ fun MedtrumSetupWizard(
 
     fun startAttach(serial: Long) {
         attachedSerial = MedtrumPersistence.formatSerialHex(serial)
-        serialRejected = false
+        rejection = null
         step = MedtrumSetupStep.CONNECTING
         // A replaced attempt must not touch the wizard any more: its timeout would otherwise
         // interrupt the new serial under the new label.
@@ -117,8 +120,9 @@ fun MedtrumSetupWizard(
                 when (result) {
                     MedtrumAttachResult.CONNECTED -> step = MedtrumSetupStep.SUCCESS
                     MedtrumAttachResult.TIMED_OUT -> step = MedtrumSetupStep.SAVED
-                    MedtrumAttachResult.REJECTED -> {
-                        serialRejected = true
+                    MedtrumAttachResult.REJECTED_AUTH,
+                    MedtrumAttachResult.REJECTED_DEVICE -> {
+                        rejection = result
                         step = MedtrumSetupStep.ENTRY
                     }
                 }
@@ -211,7 +215,7 @@ fun MedtrumSetupWizard(
                     OutlinedTextField(
                         value = serialInput,
                         onValueChange = { input ->
-                            serialRejected = false
+                            rejection = null
                             serialInput = input.filter {
                                 it.isDigit() || it in 'a'..'f' || it in 'A'..'F'
                             }.take(8).uppercase()
@@ -220,9 +224,12 @@ fun MedtrumSetupWizard(
                         placeholder = { Text(stringResource(R.string.medtrum_serial_hint)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                        isError = (normalized.isNotEmpty() && !isValid) || serialRejected,
+                        isError = (normalized.isNotEmpty() && !isValid) || rejection != null,
                         supportingText = when {
-                            serialRejected -> {
+                            rejection == MedtrumAttachResult.REJECTED_DEVICE -> {
+                                { Text(stringResource(R.string.medtrum_setup_device_rejected)) }
+                            }
+                            rejection == MedtrumAttachResult.REJECTED_AUTH -> {
                                 { Text(stringResource(R.string.medtrum_setup_auth_failed)) }
                             }
                             isValid && serialNumber != null -> {

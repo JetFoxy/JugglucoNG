@@ -27,6 +27,11 @@ object MedtrumRegistry {
             // The old patch's address would be tried first and its auth dialect reused.
             MedtrumPersistence.setLastBtAddress(context, "")
             MedtrumPersistence.setLegacyAuth(context, false)
+            // Its native mirror can outlive its driver (turning Bluetooth collection off clears
+            // the callbacks without finishing the shell). Finish it by id, or the next rebuild
+            // adopts it as a generic Libre callback that can stay selected.
+            runCatching { Natives.finishSensorById(previousSerial.toString()) }
+                .onFailure { Log.stack(TAG, "addSensor(finishSensorById)", it) }
         }
         MedtrumPersistence.setSerialNumber(context, serialNumber)
         MedtrumPersistence.setSensorId(context, sensorId)
@@ -40,7 +45,15 @@ object MedtrumRegistry {
             runCatching { Natives.setmaxsensors(SensorBluetooth.gattcallbacks.size) }
         }
         if (SensorBluetooth.blueone === blue) {
-            callback.connectDevice(0)
+            if (existing != null && (existing.isAuthRejected() || existing.isDeviceRejected())) {
+                // A reused driver can be parked after a wrong serial or a rejected address, and
+                // connectDevice() refuses while that holds. Re-confirming the serial is the user's
+                // retry, so take the explicit retry path that clears those flags.
+                Log.i(TAG, "Retrying blocked Medtrum driver for $sensorId")
+                existing.softReconnect()
+            } else {
+                callback.connectDevice(0)
+            }
         }
         return sensorId
     }

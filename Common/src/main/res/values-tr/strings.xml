@@ -3002,6 +3002,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="medtrum_setup_saved_title">Sensör kaydedildi</string>
     <string name="medtrum_setup_searching">Henüz bağlanmadı. Yama menzile girdiğinde kendiliğinden bağlanacak.</string>
     <string name="medtrum_setup_auth_failed">Yama bu seri numarasını reddetti. Yama üzerindeki numarayı kontrol edin.</string>
+    <string name="medtrum_setup_device_rejected">Bu cihaz bir Medtrum yaması değil. Yamanın yakında olduğundan emin olun ve tekrar deneyin.</string>
 
     <string name="alert_sound_volume">Uyarı sesi düzeyi</string>
 </resources>

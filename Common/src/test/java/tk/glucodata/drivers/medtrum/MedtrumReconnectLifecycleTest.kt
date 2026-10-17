@@ -179,6 +179,28 @@ class MedtrumReconnectLifecycleTest {
     }
 
     @Test
+    fun aCgmReadingBeforeAuthIsNotPublishedOrStreaming() {
+        val gatt = newGatt()
+        manager.onConnectionStateChange(gatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+
+        // The patch can push CGM_DATA as soon as notifications are enabled, before AUTH.
+        invokeOnCgmData(hex("0f09005f12000d005d064606390641060000f230"))
+
+        assertEquals(MedtrumBleManager.Phase.DISCOVERING, manager.phase)
+    }
+
+    @Test
+    fun aPendingFingerstickDoesNotSurviveADisconnect() {
+        // With no readState yet, calibrateSensor parks the value until one arrives.
+        assertTrue(manager.calibrateSensor(120))
+        assertEquals(120, pendingCalibration())
+
+        manager.softDisconnect()
+
+        assertNull(pendingCalibration())
+    }
+
+    @Test
     fun liveReadingIsAStockLaneSoSoftwareCalibrationStillApplies() {
         val mgdl = MedtrumBleManager.liveLane(144f, unit = 0)
         assertFalse(mgdl.isResolved)
@@ -219,6 +241,20 @@ class MedtrumReconnectLifecycleTest {
         setGatt(manager, gatt)
         manager.onConnectionStateChange(gatt, 133, BluetoothProfile.STATE_DISCONNECTED)
     }
+
+    private fun hex(s: String) = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+    private fun invokeOnCgmData(data: ByteArray) {
+        MedtrumBleManager::class.java
+            .getDeclaredMethod("onCgmData", ByteArray::class.java)
+            .apply { isAccessible = true }
+            .invoke(manager, data)
+    }
+
+    private fun pendingCalibration(): Int? =
+        MedtrumBleManager::class.java.getDeclaredField("pendingCalibrationMgdl")
+            .apply { isAccessible = true }
+            .get(manager) as Int?
 
     private fun adapterDevice() =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter.getRemoteDevice(address)

@@ -3049,6 +3049,7 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="medtrum_setup_saved_title">Szenzor mentve</string>
     <string name="medtrum_setup_searching">Még nincs kapcsolat. A tapasz magától csatlakozik, ha hatótávon belül van.</string>
     <string name="medtrum_setup_auth_failed">A tapasz elutasította ezt a sorozatszámot. Ellenőrizze a tapaszon lévő számot.</string>
+    <string name="medtrum_setup_device_rejected">Ez az eszköz nem Medtrum tapasz. Ellenőrizze, hogy a tapasz a közelben van-e, majd próbálja újra.</string>
 
     <string name="alert_sound_volume">Riasztási hang hangereje</string>
 </resources>

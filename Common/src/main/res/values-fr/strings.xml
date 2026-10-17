@@ -2980,6 +2980,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_saved_title">Capteur enregistré</string>
     <string name="medtrum_setup_searching">Pas encore connecté. Le patch se connectera seul dès qu\'il sera à portée.</string>
     <string name="medtrum_setup_auth_failed">Le patch a refusé ce numéro de série. Vérifiez le numéro imprimé sur le patch.</string>
+    <string name="medtrum_setup_device_rejected">Cet appareil n\'est pas un capteur Medtrum. Vérifiez que le capteur est à portée, puis réessayez.</string>
 
     <string name="alert_sound_volume">Volume du son d’alerte</string>
 </resources>
