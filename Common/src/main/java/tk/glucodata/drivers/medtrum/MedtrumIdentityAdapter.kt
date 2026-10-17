@@ -14,7 +14,9 @@ object MedtrumIdentityAdapter : ManagedSensorIdentityAdapter {
 
     override fun matchesCallbackId(callbackId: String?, sensorId: String): Boolean {
         val normalized = callbackId?.trim().takeIf { !it.isNullOrEmpty() } ?: return false
-        return normalized.equals(sensorId, ignoreCase = true)
+        return normalized.equals(sensorId, ignoreCase = true) ||
+            MedtrumSerialAlias.isShortForm(normalized, sensorId) ||
+            MedtrumSerialAlias.isShortForm(sensorId, normalized)
     }
 
     override fun resolveCanonicalSensorId(sensorId: String?): String? {
@@ -25,12 +27,17 @@ object MedtrumIdentityAdapter : ManagedSensorIdentityAdapter {
     private fun isPersistedSensor(sensorId: String?, context: Context): Boolean {
         val normalized = sensorId?.trim().takeIf { !it.isNullOrEmpty() } ?: return false
         val storedId = MedtrumPersistence.getSensorId(context)
-        return storedId.isNotBlank() && storedId.equals(normalized, ignoreCase = true)
+        if (storedId.isBlank()) return false
+        return storedId.equals(normalized, ignoreCase = true)
     }
+
+    /** The native mirror's shortened name, which must not become a callback of its own. */
+    private fun isPersistedAlias(sensorId: String?, context: Context): Boolean =
+        MedtrumSerialAlias.isShortForm(sensorId, MedtrumPersistence.getSensorId(context))
 
     override fun hasPersistedManagedRecord(sensorId: String?): Boolean {
         val ctx = Applic.app ?: return false
-        return isPersistedSensor(sensorId, ctx)
+        return isPersistedSensor(sensorId, ctx) || isPersistedAlias(sensorId, ctx)
     }
 
     override fun persistedSensorIds(context: Context): List<String> {

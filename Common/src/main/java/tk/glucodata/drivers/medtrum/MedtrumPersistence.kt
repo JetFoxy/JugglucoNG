@@ -10,6 +10,7 @@ object MedtrumPersistence {
     private const val KEY_BT_ADDRESS = "medtrum_bt_address"
     private const val KEY_SENSOR_ID = "medtrum_sensor_id"
     private const val KEY_LEGACY_AUTH = "medtrum_legacy_auth"
+    private const val KEY_SENSOR_START_MS = "medtrum_sensor_start_ms"
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -33,6 +34,14 @@ object MedtrumPersistence {
 
     fun setSensorId(context: Context, id: String) {
         prefs(context).edit().putString(KEY_SENSOR_ID, id).apply()
+    }
+
+    /** When the patch was inserted, from the elapsed time of its readState record. 0 = not known yet. */
+    fun getSensorStartMs(context: Context): Long =
+        prefs(context).getLong(KEY_SENSOR_START_MS, 0L)
+
+    fun setSensorStartMs(context: Context, startMs: Long) {
+        prefs(context).edit().putLong(KEY_SENSOR_START_MS, startMs).apply()
     }
 
     fun clear(context: Context) {

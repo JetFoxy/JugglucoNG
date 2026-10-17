@@ -259,6 +259,24 @@ class MedtrumBleManager(
 
     override fun getBatteryMillivolts(): Int = batteryMillivolts
 
+    @Volatile private var sensorStartMs = 0L
+
+    override fun getStartTimeMs(): Long {
+        if (sensorStartMs > 0L) return sensorStartMs
+        // Known from an earlier session, so the card has its dates before the first readState.
+        val stored = Applic.app?.let { MedtrumPersistence.getSensorStartMs(it) } ?: 0L
+        if (stored > 0L) sensorStartMs = stored
+        return sensorStartMs
+    }
+
+    private fun recordSensorStart(elapsedSeconds: Long) {
+        val candidate = MedtrumSensorLife.startFromElapsed(System.currentTimeMillis(), elapsedSeconds)
+        if (!MedtrumSensorLife.shouldReplaceStart(getStartTimeMs(), candidate)) return
+        sensorStartMs = candidate
+        Applic.app?.let { MedtrumPersistence.setSensorStartMs(it, candidate) }
+        UiRefreshBus.requestStatusRefresh()
+    }
+
     /** AUTH failed with both dialects MAX_AUTH_FAILURES times: the serial does not fit the patch. */
     fun isAuthRejected(): Boolean = authGaveUp
 
@@ -749,6 +767,7 @@ class MedtrumBleManager(
         insertTime = state.insertTime
         runningTime = state.runningTime
         batteryMillivolts = state.batteryMillivolts
+        recordSensorStart(state.elapsedSeconds)
         Log.d(TAG, "readState: ${state.phase} seq=${state.sequence} battery=${state.batteryMillivolts / 512.0}V elapsed=${state.elapsedSeconds}s nextCal=${state.nextCalibrationSequence}")
         val pending = pendingCalibrationMgdl ?: return
         pendingCalibrationMgdl = null

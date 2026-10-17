@@ -29,13 +29,28 @@ interface MedtrumDriver : ManagedBluetoothSensorDriver, ManagedSensorMaintenance
     /** Patch battery in millivolts, 0 when not yet reported. */
     fun getBatteryMillivolts(): Int = 0
 
+    /** When the patch was inserted, 0 until a readState record has told us. */
+    fun getStartTimeMs(): Long = 0L
+
+    /** End of the patch's 14 days, 0 while the start is not known. */
+    fun getExpectedEndMs(): Long = MedtrumSensorLife.endFromStart(getStartTimeMs())
+
     override fun getManagedUiSnapshot(activeSensorId: String?): ManagedSensorUiSnapshot? {
         val sn = getSerialNumber().takeIf { it != 0L }?.toString() ?: return null
         val address = getDeviceAddress()
+        val startMs = runCatching { getStartTimeMs() }.getOrDefault(0L)
+        val endMs = MedtrumSensorLife.endFromStart(startMs)
+        val nowMs = System.currentTimeMillis()
         return ManagedSensorUiSnapshot(
             serial = sn,
             displayName = "Medtrum EasySense",
             deviceAddress = address.ifBlank { "Unknown" },
+            startTimeMs = startMs,
+            officialEndMs = endMs,
+            expectedEndMs = endMs,
+            sensorAgeHours = MedtrumSensorLife.ageHours(startMs, nowMs),
+            sensorRemainingHours = MedtrumSensorLife.remainingHours(startMs, nowMs),
+            isSensorExpired = endMs > 0L && nowMs >= endMs,
             uiFamily = ManagedSensorUiFamily.MEDTRUM,
             connectionStatus = runCatching { getConnectionStatus() }.getOrDefault(""),
             detailedStatus = runCatching { getDetailedBleStatus() }.getOrDefault(""),
