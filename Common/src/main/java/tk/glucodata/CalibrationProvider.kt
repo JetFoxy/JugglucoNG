@@ -92,11 +92,19 @@ interface CalibrationProvider {
     fun clearAllBlocking(): Boolean = false
 
     /**
-     * File every calibration of [sensorId] under [archiveId], so a new disposable sensor on the same
-     * transmitter starts with none while the old points stay in the database. False when no engine
-     * handled it.
+     * Take effect immediately and in memory only: points of [sensorId] taken before [cutoffMs] no
+     * longer match the live sensor. Cheap enough for a BLE callback, and called before the
+     * persisted move below, which may be queued or retried much later.
      */
-    fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Boolean = false
+    fun declareSessionBoundary(sensorId: String, archiveId: String, cutoffMs: Long) {}
+
+    /**
+     * File the calibrations of [sensorId] taken before [cutoffMs], the insertion of the replacement,
+     * under [archiveId], so a new disposable sensor on the same transmitter starts with none while
+     * the old points stay in the database. Points from the cutoff on belong to the replacement.
+     * False when no engine handled it.
+     */
+    fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String, cutoffMs: Long): Boolean = false
 
     /** Delete the calibration recorded at [timestamp]; false when none matched or none handled it. */
     fun deleteCalibrationAtBlocking(timestamp: Long): Boolean = false

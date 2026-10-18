@@ -13,6 +13,7 @@ object MedtrumPersistence {
     private const val KEY_SENSOR_START_MS = "medtrum_sensor_start_ms"
     private const val KEY_SESSION_KEY = "medtrum_sensor_session_key"
     private const val KEY_PENDING_ARCHIVE = "medtrum_pending_calibration_archive"
+    private const val KEY_PENDING_ARCHIVE_CUTOFF = "medtrum_pending_calibration_archive_cutoff"
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -61,8 +62,15 @@ object MedtrumPersistence {
     fun getPendingArchive(context: Context): String =
         prefs(context).getString(KEY_PENDING_ARCHIVE, "") ?: ""
 
-    fun setPendingArchive(context: Context, archiveId: String) {
-        prefs(context).edit().putString(KEY_PENDING_ARCHIVE, archiveId).apply()
+    /** The replacement's insertion: only calibrations taken before it belong to the pending archive. */
+    fun getPendingArchiveCutoff(context: Context): Long =
+        prefs(context).getLong(KEY_PENDING_ARCHIVE_CUTOFF, 0L)
+
+    fun setPendingArchive(context: Context, archiveId: String, cutoffMs: Long = 0L) {
+        prefs(context).edit()
+            .putString(KEY_PENDING_ARCHIVE, archiveId)
+            .putLong(KEY_PENDING_ARCHIVE_CUTOFF, if (archiveId.isBlank()) 0L else cutoffMs)
+            .apply()
     }
 
     fun clear(context: Context) {

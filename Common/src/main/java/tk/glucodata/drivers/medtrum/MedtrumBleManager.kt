@@ -296,7 +296,7 @@ class MedtrumBleManager(
             val archiveId = MedtrumSensorSession.archiveId(serial, previousStart)
             Log.i(TAG, "New Medtrum sensor on $serial (was started ${previousStart}): archiving calibrations as $archiveId")
             // Recorded before the session key below, and kept until the move has happened.
-            ctx?.let { MedtrumPersistence.setPendingArchive(it, archiveId) }
+            ctx?.let { MedtrumPersistence.setPendingArchive(it, archiveId, candidate) }
             sensorStartMs = 0L
             ctx?.let { MedtrumPersistence.setSensorStartMs(it, 0L) }
         }
@@ -320,11 +320,19 @@ class MedtrumBleManager(
             MedtrumPersistence.setPendingArchive(ctx, "")
             return
         }
-        if (!archiveRunning.compareAndSet(false, true)) return
+        val cutoffMs = MedtrumPersistence.getPendingArchiveCutoff(ctx).takeIf { it > 0L } ?: getStartTimeMs()
+        if (cutoffMs <= 0L) {
+            // Without the replacement's insertion the move could sweep up its own points.
+            MedtrumPersistence.setPendingArchive(ctx, "")
+            return
+        }
         val serial = serialLong.toString()
+        // In effect before this readState's records are published; the move below may run much later.
+        CalibrationAccess.declareSessionBoundary(serial, archiveId, cutoffMs)
+        if (!archiveRunning.compareAndSet(false, true)) return
         ARCHIVE_EXECUTOR.execute {
             try {
-                if (CalibrationAccess.archiveSensorCalibrations(serial, archiveId)) {
+                if (CalibrationAccess.archiveSensorCalibrations(serial, archiveId, cutoffMs)) {
                     Applic.app?.let {
                         if (MedtrumPersistence.getPendingArchive(it) == archiveId) {
                             MedtrumPersistence.setPendingArchive(it, "")

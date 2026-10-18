@@ -1264,7 +1264,7 @@ object CalibrationManager {
             val list = withContext(Dispatchers.IO) {
                 migrateCalibrationSensorIdsIfPossible()
                 dao.getAllSync()
-            }
+            }.let(::relabelBeforeBoundaries)
             if (calibrationStateLoaded && _calibrations.value == list) return
             _calibrations.value = list
             calibrationStateLoaded = true
@@ -1488,25 +1488,64 @@ object CalibrationManager {
         Log.i(TAG, "Cleared all calibrations")
     }
 
-    /** Blocking entry point for a driver on its own thread (see [archiveSensorCalibrations]). */
-    fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Int =
-        kotlinx.coroutines.runBlocking { archiveSensorCalibrations(sensorId, archiveId) }
+    /** A replaced sensor's insertion: points of [sensorId] taken before [cutoffMs] are filed as [archiveId]. */
+    private data class SessionBoundary(val archiveId: String, val cutoffMs: Long)
+
+    private val sessionBoundaries = java.util.concurrent.ConcurrentHashMap<String, SessionBoundary>()
+
+    private fun relabelBeforeBoundaries(rows: List<CalibrationEntity>): List<CalibrationEntity> {
+        if (sessionBoundaries.isEmpty()) return rows
+        return rows.map { row ->
+            val boundary = sessionBoundaries.entries
+                .firstOrNull { sensorMatches(row.sensorId, it.key) && row.timestamp < it.value.cutoffMs }
+                ?.value
+            if (boundary == null) row else row.copy(sensorId = boundary.archiveId)
+        }
+    }
 
     /**
-     * Re-files every calibration of [sensorId] under [archiveId]. Nothing is deleted: the rows keep
-     * their values and only stop matching the live sensor, so the replacement electrode is not
-     * corrected by an offset measured on the previous one. Returns how many rows moved, or -1 when
-     * the engine could not do it yet, so a caller that must not lose the request can retry.
+     * Makes the session boundary effective in lookups right away, without touching the database:
+     * a driver calls it on its BLE thread before it publishes the replacement's first reading, so
+     * the previous electrode's points cannot correct it while the persisted move is still queued.
+     * Only points taken before [cutoffMs] are affected, so a calibration entered for the replacement
+     * is never swept along.
      */
-    suspend fun archiveSensorCalibrations(sensorId: String, archiveId: String): Int {
+    fun declareSessionBoundary(sensorId: String, archiveId: String, cutoffMs: Long) {
+        val target = normalizeSensorId(sensorId)
+        if (archiveId.isBlank() || target.isBlank() || cutoffMs <= 0L) return
+        val boundary = SessionBoundary(archiveId, cutoffMs)
+        if (sessionBoundaries.put(target, boundary) == boundary) return
+        if (!calibrationStateLoaded) return // loadCalibrations applies it when the rows arrive
+        val current = _calibrations.value
+        val relabeled = relabelBeforeBoundaries(current)
+        if (relabeled == current) return
+        _calibrations.value = relabeled
+        invalidateComputationCache("sessionBoundary")
+    }
+
+    /** Blocking entry point for a driver on its own thread (see [archiveSensorCalibrations]). */
+    fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String, cutoffMs: Long): Int =
+        kotlinx.coroutines.runBlocking { archiveSensorCalibrations(sensorId, archiveId, cutoffMs) }
+
+    /**
+     * Re-files the calibrations of [sensorId] taken before [cutoffMs] (the replacement's insertion)
+     * under [archiveId]. Nothing is deleted: the rows keep their values and only stop matching the
+     * live sensor, so the replacement electrode is not corrected by an offset measured on the
+     * previous one. Points at or after the cutoff belong to the replacement and stay. Returns how
+     * many rows moved, or -1 when the engine could not do it yet, so a caller that must not lose
+     * the request can retry.
+     */
+    suspend fun archiveSensorCalibrations(sensorId: String, archiveId: String, cutoffMs: Long = Long.MAX_VALUE): Int {
         if (!ensureInitialized()) return -1
         val target = normalizeSensorId(sensorId)
         if (archiveId.isBlank() || target.isBlank()) return 0
         val moved = withContext(Dispatchers.IO) {
             dao.getAllSync()
-                .filter { sensorMatches(it.sensorId, target) }
+                .filter { sensorMatches(it.sensorId, target) && it.timestamp < cutoffMs }
                 .sumOf { dao.updateSensorId(it.id, archiveId) }
         }
+        // The rows are in the database under the archive id now; the in-memory rule has done its job.
+        sessionBoundaries.remove(target, SessionBoundary(archiveId, cutoffMs))
         if (moved == 0) return 0
         deferGlucoseAlertsUntilNextReading()
         loadCalibrations()

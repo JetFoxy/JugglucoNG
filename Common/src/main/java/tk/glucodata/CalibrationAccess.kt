@@ -57,8 +57,14 @@ object CalibrationAccess {
      * sensor: the old electrode's calibration must not apply to the replacement.
      */
     @JvmStatic
-    fun archiveSensorCalibrations(sensorId: String, archiveId: String): Boolean =
-        runCatching { provider?.archiveSensorCalibrationsBlocking(sensorId, archiveId) }
+    fun declareSessionBoundary(sensorId: String, archiveId: String, cutoffMs: Long) {
+        runCatching { provider?.declareSessionBoundary(sensorId, archiveId, cutoffMs) }
+            .onFailure { Log.stack(TAG, "declareSessionBoundary failed", it) }
+    }
+
+    @JvmStatic
+    fun archiveSensorCalibrations(sensorId: String, archiveId: String, cutoffMs: Long): Boolean =
+        runCatching { provider?.archiveSensorCalibrationsBlocking(sensorId, archiveId, cutoffMs) }
             .onFailure { Log.stack(TAG, "archiveSensorCalibrations failed", it) }
             .getOrNull() ?: false
 

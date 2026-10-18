@@ -214,7 +214,7 @@ class MedtrumCalibrationArchiveTest {
             value: Float, timestamp: Long, isRawMode: Boolean, emitDiagnostics: Boolean, sensorId: String?,
         ) = value
 
-        override fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String): Boolean {
+        override fun archiveSensorCalibrationsBlocking(sensorId: String, archiveId: String, cutoffMs: Long): Boolean {
             calls.add(sensorId to archiveId)
             return results.poll() ?: true
         }

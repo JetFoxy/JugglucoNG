@@ -26,6 +26,10 @@ import tk.glucodata.Natives
 class CalibrationArchiveTest {
     private val serial = "2329895446"
 
+    private companion object {
+        const val CUTOFF = 5_000L
+    }
+
     @Before
     fun setUp() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
@@ -39,7 +43,7 @@ class CalibrationArchiveTest {
         CalibrationManager.addCalibration(1_000L, 6f, 6f, 7f, sensorId = serial)
         assertTrue(CalibrationManager.hasActiveCalibration(false, serial))
 
-        val moved = CalibrationManager.archiveSensorCalibrations(serial, "$serial@1000")
+        val moved = CalibrationManager.archiveSensorCalibrations(serial, "$serial@1000", CUTOFF)
 
         assertEquals(1, moved)
         assertFalse("the replacement sensor starts without the old offset", CalibrationManager.hasActiveCalibration(false, serial))
@@ -50,7 +54,7 @@ class CalibrationArchiveTest {
         CalibrationManager.addCalibration(1_000L, 6f, 6f, 7f, sensorId = serial)
         CalibrationManager.addCalibration(2_000L, 6f, 6f, 8f, sensorId = "3MH01M0MWYR")
 
-        CalibrationManager.archiveSensorCalibrations(serial, "$serial@1000")
+        CalibrationManager.archiveSensorCalibrations(serial, "$serial@1000", CUTOFF)
 
         val rows = CalibrationManager.calibrations.value
         assertEquals(setOf("$serial@1000", "3MH01M0MWYR"), rows.map { it.sensorId }.toSet())
@@ -60,10 +64,38 @@ class CalibrationArchiveTest {
     }
 
     @Test
+    fun archivingLeavesPointsOfTheReplacementInsertion() = runBlocking {
+        CalibrationManager.addCalibration(1_000L, 6f, 6f, 7f, sensorId = serial)
+        CalibrationManager.addCalibration(CUTOFF + 1_000L, 6f, 6f, 8f, sensorId = serial)
+
+        val moved = CalibrationManager.archiveSensorCalibrations(serial, "$serial@1000", CUTOFF)
+
+        assertEquals("only the previous insertion's point moves", 1, moved)
+        val rows = CalibrationManager.calibrations.value
+        assertEquals(8f, rows.single { it.sensorId == serial }.userValue, 0f)
+        assertEquals(7f, rows.single { it.sensorId == "$serial@1000" }.userValue, 0f)
+        assertTrue("the replacement keeps its own correction", CalibrationManager.hasActiveCalibration(false, serial))
+    }
+
+    @Test
+    fun declaredBoundaryTakesEffectBeforeTheDatabaseMove() = runBlocking {
+        CalibrationManager.addCalibration(1_000L, 6f, 6f, 7f, sensorId = serial)
+        assertTrue(CalibrationManager.hasActiveCalibration(false, serial))
+
+        CalibrationManager.declareSessionBoundary(serial, "$serial@1000", CUTOFF)
+
+        assertFalse("no archive has run, yet the old point no longer matches", CalibrationManager.hasActiveCalibration(false, serial))
+        CalibrationManager.addCalibration(CUTOFF + 1_000L, 6f, 6f, 8f, sensorId = serial)
+        assertTrue("a point for the replacement still counts", CalibrationManager.hasActiveCalibration(false, serial))
+        CalibrationManager.loadCalibrations()
+        assertEquals("a reload keeps the boundary", 1, CalibrationManager.calibrations.value.count { it.sensorId == serial })
+    }
+
+    @Test
     fun archivingASensorWithoutCalibrationsChangesNothing() = runBlocking {
         CalibrationManager.addCalibration(2_000L, 6f, 6f, 8f, sensorId = "3MH01M0MWYR")
 
-        assertEquals(0, CalibrationManager.archiveSensorCalibrations(serial, "$serial@1000"))
+        assertEquals(0, CalibrationManager.archiveSensorCalibrations(serial, "$serial@1000", CUTOFF))
         assertEquals(1, CalibrationManager.calibrations.value.size)
     }
 }
