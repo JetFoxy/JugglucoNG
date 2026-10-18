@@ -258,9 +258,12 @@ class MedtrumCalibrationArchiveTest {
 
         // The session key is already stored, so only the persisted request can ask again.
         driver.softDisconnect()
-        noteState(sensorId = 8, insertTime = 2_000L)
-
-        awaitCalls(2)
+        // The first attempt may still be unwinding on the archive thread, in which case this
+        // readState finds it running and the next one retries, as on a real link.
+        await {
+            noteState(sensorId = 8, insertTime = 2_000L)
+            calls.size >= 2
+        }
         awaitPendingCleared()
     }
 
