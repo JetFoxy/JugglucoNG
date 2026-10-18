@@ -320,8 +320,10 @@ object CalibrationManager {
             }.onFailure {
                 Log.w(TAG, "Failed to load calibrations for background access", it)
             }.getOrNull() ?: return false
-            _calibrations.value = list
-            calibrationStateLoaded = true
+            synchronized(boundaryLock) {
+                _calibrations.value = relabelBeforeBoundaries(list)
+                calibrationStateLoaded = true
+            }
             invalidateComputationCache("ensureCalibrationStateLoaded")
         }
         return true
@@ -1264,10 +1266,18 @@ object CalibrationManager {
             val list = withContext(Dispatchers.IO) {
                 migrateCalibrationSensorIdsIfPossible()
                 dao.getAllSync()
-            }.let(::relabelBeforeBoundaries)
-            if (calibrationStateLoaded && _calibrations.value == list) return
-            _calibrations.value = list
-            calibrationStateLoaded = true
+            }
+            val changed = synchronized(boundaryLock) {
+                val relabeled = relabelBeforeBoundaries(list)
+                if (calibrationStateLoaded && _calibrations.value == relabeled) {
+                    false
+                } else {
+                    _calibrations.value = relabeled
+                    calibrationStateLoaded = true
+                    true
+                }
+            }
+            if (!changed) return
             invalidateComputationCache("loadCalibrations")
             requestUiRefreshAfterCalibrationChange()
         }
@@ -1488,10 +1498,26 @@ object CalibrationManager {
         Log.i(TAG, "Cleared all calibrations")
     }
 
+    /** A process that has not read the rows yet, as after a background restart. */
+    internal fun resetLoadedStateForTests(keepBoundaries: Boolean = true) {
+        synchronized(boundaryLock) {
+            if (!keepBoundaries) sessionBoundaries.clear()
+            calibrationStateLoaded = false
+            _calibrations.value = emptyList()
+        }
+    }
+
     /** A replaced sensor's insertion: points of [sensorId] taken before [cutoffMs] are filed as [archiveId]. */
     private data class SessionBoundary(val archiveId: String, val cutoffMs: Long)
 
     private val sessionBoundaries = java.util.concurrent.ConcurrentHashMap<String, SessionBoundary>()
+
+    /**
+     * Orders a boundary against the loaders: a snapshot read before the boundary was declared is
+     * relabelled when it is applied, and a boundary declared while the rows are not loaded yet is
+     * not lost, so an older snapshot cannot bring the previous electrode's points back.
+     */
+    private val boundaryLock = Any()
 
     private fun relabelBeforeBoundaries(rows: List<CalibrationEntity>): List<CalibrationEntity> {
         if (sessionBoundaries.isEmpty()) return rows
@@ -1514,13 +1540,16 @@ object CalibrationManager {
         val target = normalizeSensorId(sensorId)
         if (archiveId.isBlank() || target.isBlank() || cutoffMs <= 0L) return
         val boundary = SessionBoundary(archiveId, cutoffMs)
-        if (sessionBoundaries.put(target, boundary) == boundary) return
-        if (!calibrationStateLoaded) return // loadCalibrations applies it when the rows arrive
-        val current = _calibrations.value
-        val relabeled = relabelBeforeBoundaries(current)
-        if (relabeled == current) return
-        _calibrations.value = relabeled
-        invalidateComputationCache("sessionBoundary")
+        val changed = synchronized(boundaryLock) {
+            if (sessionBoundaries.put(target, boundary) == boundary) return@synchronized false
+            if (!calibrationStateLoaded) return@synchronized false // the loaders apply it when the rows arrive
+            val current = _calibrations.value
+            val relabeled = relabelBeforeBoundaries(current)
+            if (relabeled == current) return@synchronized false
+            _calibrations.value = relabeled
+            true
+        }
+        if (changed) invalidateComputationCache("sessionBoundary")
     }
 
     /** Blocking entry point for a driver on its own thread (see [archiveSensorCalibrations]). */

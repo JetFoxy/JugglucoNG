@@ -36,6 +36,8 @@ class CalibrationArchiveTest {
         Applic.app = context as Applic
         CalibrationManager.init(context)
         CalibrationManager.clearAll()
+        CalibrationManager.resetLoadedStateForTests(keepBoundaries = false)
+        CalibrationManager.loadCalibrations()
     }
 
     @Test
@@ -89,6 +91,19 @@ class CalibrationArchiveTest {
         assertTrue("a point for the replacement still counts", CalibrationManager.hasActiveCalibration(false, serial))
         CalibrationManager.loadCalibrations()
         assertEquals("a reload keeps the boundary", 1, CalibrationManager.calibrations.value.count { it.sensorId == serial })
+    }
+
+    @Test
+    fun boundaryDeclaredBeforeTheFirstLoadAppliesToTheBackgroundLoader() = runBlocking {
+        CalibrationManager.addCalibration(1_000L, 6f, 6f, 7f, sensorId = serial)
+        CalibrationManager.resetLoadedStateForTests()
+
+        CalibrationManager.declareSessionBoundary(serial, "$serial@1000", CUTOFF)
+
+        assertFalse(
+            "the first lookup after a restart loads the rows itself and must still honour the boundary",
+            CalibrationManager.hasActiveCalibration(false, serial)
+        )
     }
 
     @Test
