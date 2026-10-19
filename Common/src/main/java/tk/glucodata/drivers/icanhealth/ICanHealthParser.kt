@@ -118,17 +118,24 @@ object ICanHealthParser {
     private const val MAX_DST_OFFSET_15MIN = 8 // double daylight time, +2h
 
     /**
-     * Time Zone value the vendor app writes on every `0x2AAA` write, regardless of the phone's
+     * Time Zone value the vendor app's writer hard-codes into `0x2AAA`, regardless of the phone's
      * real zone.
      *
-     * The vendor SDK's writer emits a constant `20` = UTC+5:00 next to the wall clock
-     * (`j2.java:1115`: `{yearLo, yearHi, month, day, hour, min, sec, 20, 0}`), so a sensor
-     * started anywhere but UTC+5 carries a wall clock plus a fake offset. Two captures confirm
-     * it: an iPhone at `+05` (Sep 2026) and an Android at `+08` (Aug 2026) both report `0x14`,
-     * and in each case the `0x2AA9` counter agrees with the *local* wall clock, not with `+05`.
+     * The vendor SDK emits a constant `20` = UTC+5:00 next to the wall clock
+     * (`j2.java:1115`: `{yearLo, yearHi, month, day, hour, min, sec, 20, 0}`). An Android at `+08`
+     * (Aug 2026) reading a vendor-started sensor shows `0x14`, and the `0x2AA9` counter proves that
+     * stored offset is fake: it puts the session start exactly 3 h away (`drift=179min` in the
+     * driver's warning), i.e. at the device's `+08` rather than at `+05`.
      *
-     * Treated as absent, like the specification's "unknown" sentinel, so the wall clock is read
-     * in the device's own zone. On a genuine UTC+5 device the result is unchanged.
+     * The byte is only *the vendor's* constant, though. [buildSessionStartWrite] stores the real
+     * offset, and sensors started by this driver report `0x20` (+08, Aug 2026), `0x28` (+10,
+     * Sep 2026) and `0x0C` (+03, Oct 2026). So `20` means "written by the vendor app" *or* "a device
+     * genuinely at UTC+5:00", and the payload cannot tell the two apart.
+     *
+     * Treated as absent, like the specification's "unknown" sentinel, so the wall clock is read in
+     * the device's own zone. That is right whenever the reader is in the writer's zone — every
+     * observed vendor-started sensor, and any UTC+5 device reading its own sensor — and off by the
+     * zone difference only for an honest UTC+5 write read from elsewhere.
      */
     private const val TIME_ZONE_VENDOR_CONSTANT = 20 // 0x14, +5:00
 
