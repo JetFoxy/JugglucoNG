@@ -90,14 +90,22 @@ object DexcomShareSettings {
      * every save: clearing it on a save that changes nothing would spend a login attempt with the
      * password Dexcom has already rejected.
      *
-     * The session id is not stored here — it lives in memory in [DexcomShareUploader], whose
-     * `onSettingsChanged` the caller invokes after a save.
+     * The queue belongs to one destination. When the account, the region or the receiver serial
+     * changes, the queue is cleared: its pending readings and its memory of what was delivered
+     * describe the old destination, and kept they would send the old account's backlog to the new
+     * one and refuse readings the new one never received. A password-only correction keeps it.
+     *
+     * The session id is not stored here — it lives in memory in [DexcomShareUploader]. Call this
+     * through [DexcomShareUploader.applySettings], which fences off results of the old settings.
      */
     fun save(context: Context, config: Config) {
         val wasEnabled = isEnabled(context)
         val stored = load(context)
         val credentialsChanged =
             stored.account != config.account || stored.password != config.password
+        val destinationChanged = stored.account != config.account ||
+            stored.region != config.region ||
+            stored.serial != normalizeSerial(config.serial)
         val encryptedAccount = encrypt(config.account)
         val encryptedPassword = encrypt(config.password)
         if (encryptedAccount == null || encryptedPassword == null) {
@@ -114,6 +122,8 @@ object DexcomShareSettings {
             if (credentialsChanged) editor.putBoolean(KEY_AUTH_BLOCKED, false)
             if (config.enabled && !wasEnabled) {
                 editor.putLong(KEY_ENABLED_AT_MS, System.currentTimeMillis())
+            }
+            if ((config.enabled && !wasEnabled) || destinationChanged) {
                 editor.remove(KEY_QUEUE_JSON)
                 editor.putInt(KEY_PENDING_COUNT, 0)
             }

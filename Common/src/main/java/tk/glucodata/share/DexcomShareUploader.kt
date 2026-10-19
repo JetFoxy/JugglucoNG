@@ -206,6 +206,12 @@ object DexcomShareUploader {
     private const val HELD_RECHECK_MS = DexcomShareQueue.DEFAULT_MAX_HOLD_MS + 5_000L
 
     /**
+     * How often to look again while there is no network and readings wait. Only a connectivity
+     * check runs, so it costs nothing on the network; the queue's 24-hour window bounds it.
+     */
+    private const val OFFLINE_RETRY_MS = 5L * 60_000L
+
+    /**
      * @param destination where this queue's readings go (region, account, serial); a queue is only
      *        carried into new settings that send to the same place.
      * @param enabledAtMs the switch-on moment the queue was built for; switching Share off and on
@@ -224,9 +230,6 @@ object DexcomShareUploader {
 
     /** The state a settings change replaced, kept until the next one is built (see [stateFor]). */
     private var retired: State? = null
-
-    /** Encoding and writing the queue happen under this, so an older snapshot never lands last. */
-    private val persistLock = Any()
 
     /**
      * Bumped whenever the settings change. A flush started under older settings may still be
@@ -297,28 +300,41 @@ object DexcomShareUploader {
     }
 
     /**
-     * The settings screen saved something: forget the session and try again from scratch. A flush
+     * Saves the settings the screen holds and starts over from them: a new session, and a flush
      * still waiting out a backoff is cancelled, or the new settings would sit unused for up to
      * [DexcomShareFlush.MAX_BACKOFF_MS].
+     *
+     * The save and the [generation] bump happen under [lock], the same lock every background
+     * result is checked and written under. A login or Test still running for the old settings
+     * therefore cannot slip its result in between the save and the bump.
      *
      * @param flush false when the caller is about to run [testConnection]: that test logs in
      *        itself and starts the flush when it succeeds, so flushing here too would spend a
      *        second login, and with a wrong password a second failed attempt, on one tap.
      */
-    fun onSettingsChanged(context: Context, flush: Boolean = true) {
+    fun applySettings(context: Context, config: DexcomShareSettings.Config, flush: Boolean = true) {
         try {
             val appContext = context.applicationContext
-            resetState()
+            synchronized(lock) {
+                generation++
+                DexcomShareSettings.save(appContext, config)
+                state?.let { retired = it }
+                state = null
+            }
             cancelScheduledFlush()
             if (flush) requestFlush(appContext)
         } catch (error: Throwable) {
-            Log.stack(LOG_ID, "onSettingsChanged", error)
+            Log.stack(LOG_ID, "applySettings", error)
         }
     }
 
     /**
      * The settings screen's Test button. Runs the full login sequence off the UI thread and hands
      * the outcome back; a success clears a blocked login and starts sending again.
+     *
+     * The outcome only touches the saved state if the settings are still the ones the Test was
+     * started for: an old Test returning after the user corrected and saved the password must not
+     * block the new one, and an old success must not clear a newer block.
      */
     fun testConnection(
         context: Context,
@@ -326,21 +342,17 @@ object DexcomShareUploader {
         callback: (Result) -> Unit
     ) {
         val appContext = context.applicationContext
+        val startedIn = generation
         executor.execute {
             val serial = DexcomShareSettings.normalizeSerial(config.serial)
+            var rejected = false
             val result = try {
                 val client = DexcomShareClient(config.region, DexcomShareClient.HttpTransport)
                 when (val login = client.login(config.account, config.password, serial)) {
                     is DexcomShareClient.LoginResult.Ok -> Result(true, "Connected")
                     is DexcomShareClient.LoginResult.Failed -> {
-                        if (login.kind == DexcomShareError.Kind.BAD_CREDENTIALS ||
+                        rejected = login.kind == DexcomShareError.Kind.BAD_CREDENTIALS ||
                             login.kind == DexcomShareError.Kind.LOCKED
-                        ) {
-                            DexcomShareSettings.setAuthBlocked(appContext, true)
-                            // An engine built while the Test was running read the flag as false;
-                            // it must not try the password Dexcom has just rejected.
-                            synchronized(lock) { state?.engine?.markAuthBlocked(true) }
-                        }
                         Result(false, login.message)
                     }
                 }
@@ -349,10 +361,28 @@ object DexcomShareUploader {
                 Result(false, error.message ?: "Connection failed")
             }
             if (result.ok) {
-                DexcomShareSettings.setAuthBlocked(appContext, false)
-                resetState()
-                cancelScheduledFlush()
-                requestFlush(appContext)
+                val current = synchronized(lock) {
+                    if (generation != startedIn) return@synchronized false
+                    DexcomShareSettings.setAuthBlocked(appContext, false)
+                    generation++
+                    state?.let { retired = it }
+                    state = null
+                    true
+                }
+                if (current) {
+                    cancelScheduledFlush()
+                    requestFlush(appContext)
+                }
+            } else if (rejected) {
+                val engine = synchronized(lock) {
+                    if (generation != startedIn) return@synchronized null
+                    DexcomShareSettings.setAuthBlocked(appContext, true)
+                    state?.engine
+                }
+                // An engine built while the Test was running read the flag as false; it must not
+                // try the password Dexcom has just rejected. Called outside the lock: the engine's
+                // own monitor is always taken before [lock], never after.
+                engine?.markAuthBlocked(true)
             }
             runCatching { callback(result) }.onFailure { Log.stack(LOG_ID, "testConnection callback", it) }
         }
@@ -395,14 +425,6 @@ object DexcomShareUploader {
     private fun destinationOf(config: DexcomShareSettings.Config): String =
         "${config.region.name}|${config.account}|${config.serial}"
 
-    private fun resetState() {
-        synchronized(lock) {
-            generation++
-            state?.let { retired = it }
-            state = null
-        }
-    }
-
     /**
      * Makes sure a flush runs within [delayMs]. A flush already due sooner is left alone; one due
      * later (a backoff, a held-row recheck) is moved up. Moving it up costs nothing: the engine
@@ -435,8 +457,15 @@ object DexcomShareUploader {
         try {
             val config = DexcomShareSettings.load(context)
             if (!config.isReady()) return
-            if (!hasUsableNetwork(context)) return
             val current = stateFor(context)
+            if (!hasUsableNetwork(context)) {
+                // No attempt and no recorded failure, but keep a retry armed: the sensor's last
+                // readings may have been queued offline, and nothing else may ever call in again.
+                val waiting = current.queue.pending(System.currentTimeMillis()).isNotEmpty() ||
+                    current.queue.heldCount() > 0
+                if (waiting) requestFlush(context, OFFLINE_RETRY_MS)
+                return
+            }
             // The saved flag is the truth: a Test may have blocked the login after this engine
             // was built.
             if (DexcomShareSettings.isAuthBlocked(context)) current.engine.markAuthBlocked(true)
@@ -462,37 +491,37 @@ object DexcomShareUploader {
     private fun sensorKey(sensorId: String): String =
         runCatching { SensorIdentity.resolveAppSensorId(sensorId) }.getOrNull() ?: sensorId
 
-    /** Writes a flush's results, unless the settings changed since it started ([generation]). */
+    /**
+     * Writes a flush's results, unless the settings changed since it started ([generation]).
+     *
+     * Each check and its write happen under [lock], which [applySettings] holds while it saves and
+     * bumps the generation, so a result can never land between the two.
+     */
     private class AndroidSink(
         private val context: Context,
         private val queue: DexcomShareQueue,
         private val startedIn: Int
     ) : DexcomShareStatusSink {
-        private fun isCurrent() = startedIn == generation
-
-        override fun recordSuccess(count: Int, newestMs: Long) {
-            if (isCurrent()) DexcomShareSettings.recordSuccess(context, count, newestMs)
+        private inline fun ifCurrent(write: () -> Unit) {
+            synchronized(lock) { if (startedIn == generation) write() }
         }
 
-        override fun recordFailure(code: Int, message: String) {
-            if (isCurrent()) DexcomShareSettings.recordFailure(context, code, message)
-        }
+        override fun recordSuccess(count: Int, newestMs: Long) =
+            ifCurrent { DexcomShareSettings.recordSuccess(context, count, newestMs) }
 
-        override fun recordAuthBlocked() {
-            if (isCurrent()) DexcomShareSettings.setAuthBlocked(context, true)
-        }
+        override fun recordFailure(code: Int, message: String) =
+            ifCurrent { DexcomShareSettings.recordFailure(context, code, message) }
+
+        override fun recordAuthBlocked() = ifCurrent { DexcomShareSettings.setAuthBlocked(context, true) }
 
         /**
          * Called from the live callback, the history writer and the send thread. Encoding and
          * writing under one lock keeps the saves in order: `apply()` updates the in-memory prefs
          * at once, so whichever snapshot is encoded last is also the one that stays.
          */
-        override fun persistQueue() {
-            synchronized(persistLock) {
-                if (!isCurrent()) return
-                DexcomShareSettings.saveQueueJson(context, queue.encode())
-                DexcomShareSettings.recordPending(context, queue.pending(System.currentTimeMillis()).size)
-            }
+        override fun persistQueue() = ifCurrent {
+            DexcomShareSettings.saveQueueJson(context, queue.encode())
+            DexcomShareSettings.recordPending(context, queue.pending(System.currentTimeMillis()).size)
         }
     }
 }

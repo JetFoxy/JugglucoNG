@@ -112,9 +112,8 @@ fun DexcomShareSettingsScreen(navController: NavController) {
      * @param flush false before a Test, which logs in itself: one tap must cost one login.
      */
     fun save(flush: Boolean = true) {
-        DexcomShareSettings.save(context, currentConfig())
-        // A saved change invalidates the session and the queue.
-        DexcomShareUploader.onSettingsChanged(context, flush)
+        // Saves, and fences off any login still running for the previous settings.
+        DexcomShareUploader.applySettings(context, currentConfig(), flush)
         status = DexcomShareSettings.status(context)
     }
 
