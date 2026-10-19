@@ -86,9 +86,15 @@ object ICanHealthCeCalibration {
         }
 
         val (slope, _, cv) = lineFit(bgList)
-        // `fminnm` in the binary: min(|slope| * 0.5 + cv * 0.5, 1.0), then exp(x / -10.0).
-        val confidenceInput = minOf(abs(slope) * 0.5f + cv * 0.5f, 1f)
-        val sigmoid = (0.5f / (1f + exp((-confidenceInput / 10f).toDouble()).toFloat())) + 0.5f
+        // The binary computes `fminnm(|slope| * 0.5 + cv * 0.5, 1.0)`. `fminnm` returns the non-NaN
+        // operand, so a degenerate history (empty, or all-zero mean, where the binary divides 0/0)
+        // produces NaN here and the clamp turns it into 1.0 — not 0. Verified on hardware-free
+        // golden vectors from the library itself: with an empty list the vendor returns
+        // caliK = 137.4856 for (algBg=180, newBg=0.5, coefficients 1,1,1), which is the sigmoid at
+        // ci = 1.0 (0.7625), not at ci = 0 (0.75).
+        val confidenceInput = abs(slope) * 0.5f + cv * 0.5f
+        val clampedConfidence = if (confidenceInput.isNaN()) 1f else minOf(confidenceInput, 1f)
+        val sigmoid = (0.5f / (1f + exp((-clampedConfidence / 10f).toDouble()).toFloat())) + 0.5f
         val factor = ((1f - sigmoid) * product + algBg * sigmoid) / product
 
         return ICanHealthCeCalibrationResult(
@@ -155,7 +161,11 @@ object ICanHealthCeCalibration {
     private fun lineFit(history: List<Float>): Triple<Float, Float, Float> {
         val samples = history.filter { it.isFinite() && it > 0f }
         if (samples.isEmpty()) {
-            return Triple(0f, 0f, 0f)
+            // The binary computes meanY = 0 / 0 here, i.e. NaN, and `fminnm` in planCalib turns
+            // that into a confidence of 1.0. Returning zeros would silently disagree with it.
+            // Invalid samples are filtered first; the vendor never puts non-positive values into
+            // bgList, so this only changes degenerate inputs.
+            return Triple(Float.NaN, Float.NaN, Float.NaN)
         }
         val n = samples.size.toFloat()
         var sumX = 0f
