@@ -241,4 +241,43 @@ class DexcomShareFlushTests {
         assertEquals(0, transport.uploadCalls)
         assertEquals(listOf(now), queue.pending(now).map { it.timeMs })
     }
+
+    @Test
+    fun loginErrorsDexcomKeepsAnsweringBlockTheAccountAfterTheLimit() {
+        // A 500 with no code Dexcom documents: it could be a password problem under a new name.
+        val transport = ScriptedTransport().apply {
+            loginCode = 500
+            loginBody = ""
+        }
+        val sink = RecordingSink()
+        val engine = flush(queueWith(listOf(now)), transport, sink)
+
+        repeat(DexcomShareFlush.MAX_FAILED_LOGINS) {
+            engine.flush(config)?.let { now += it }
+        }
+
+        assertTrue(engine.authBlocked)
+        assertEquals(1, sink.authBlockedCalls)
+        assertEquals(DexcomShareFlush.MAX_FAILED_LOGINS, transport.loginCalls)
+
+        now += DexcomShareFlush.MAX_BACKOFF_MS
+        assertEquals(null, engine.flush(config))
+        assertEquals(DexcomShareFlush.MAX_FAILED_LOGINS, transport.loginCalls)
+    }
+
+    @Test
+    fun transportFailuresDoNotCountTowardTheLoginLimit() {
+        val transport = ScriptedTransport().apply {
+            loginCode = DexcomShareClient.TRANSPORT_FAILURE_CODE
+            loginBody = "timeout"
+        }
+        val engine = flush(queueWith(listOf(now)), transport, RecordingSink())
+
+        repeat(DexcomShareFlush.MAX_FAILED_LOGINS * 2) {
+            engine.flush(config)?.let { now += it }
+        }
+
+        assertFalse(engine.authBlocked)
+        assertEquals(DexcomShareFlush.MAX_FAILED_LOGINS * 2, transport.loginCalls)
+    }
 }

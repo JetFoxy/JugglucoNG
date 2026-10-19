@@ -108,11 +108,13 @@ fun DexcomShareSettingsScreen(navController: NavController) {
     /**
      * The screen no longer decides whether a blocked login may be released: [DexcomShareSettings.save]
      * does that itself, and only when the account or the password changed.
+     *
+     * @param flush false before a Test, which logs in itself: one tap must cost one login.
      */
-    fun save() {
+    fun save(flush: Boolean = true) {
         DexcomShareSettings.save(context, currentConfig())
         // A saved change invalidates the session and the queue.
-        DexcomShareUploader.onSettingsChanged(context)
+        DexcomShareUploader.onSettingsChanged(context, flush)
         status = DexcomShareSettings.status(context)
     }
 
@@ -245,7 +247,7 @@ fun DexcomShareSettingsScreen(navController: NavController) {
 
             OutlinedButton(
                 onClick = {
-                    save()
+                    save(flush = false)
                     testMessage = null
                     testing = true
                     DexcomShareUploader.testConnection(context, currentConfig()) { result ->

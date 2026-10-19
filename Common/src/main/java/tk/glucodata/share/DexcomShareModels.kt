@@ -40,8 +40,8 @@ object DexcomShareJson {
     /** Share is a 5-minute stream; batches larger than this are split by the flush loop. */
     const val MAX_EGVS_PER_REQUEST = 60
 
-    /** Fixed value in every upload body, copied from xDrip. */
-    private const val TREND_PLACEHOLDER = -5
+    /** The `TA` field of every upload body: a fixed -5, copied from xDrip. */
+    private const val TIME_ADJUST = -5
 
     private const val MIN_MGDL = 40
     private const val MAX_MGDL = 400
@@ -77,7 +77,7 @@ object DexcomShareJson {
         return JSONObject()
             .put("SN", serial)
             .put("Egvs", array)
-            .put("TA", TREND_PLACEHOLDER)
+            .put("TA", TIME_ADJUST)
             .toString()
     }
 

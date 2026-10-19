@@ -17,13 +17,13 @@ import kotlinx.coroutines.CoroutineScope
 import tk.glucodata.Applic
 import tk.glucodata.BatteryTrace
 import tk.glucodata.CloneSensorRegistry
-import tk.glucodata.ExchangeTrend
 import tk.glucodata.GlucoseReadingSource
 import tk.glucodata.HistorySourceProvenance
 import tk.glucodata.Natives
 import tk.glucodata.SensorIdentity
 import tk.glucodata.UiRefreshBus
 import tk.glucodata.XdripBackfill
+import tk.glucodata.share.DexcomShareBackfillTrend
 import tk.glucodata.share.DexcomShareSettings
 import tk.glucodata.share.DexcomShareUploader
 import tk.glucodata.data.calibration.CalibrationManager
@@ -736,29 +736,15 @@ class HistoryRepository(context: Context = Applic.app) {
         }
     }
 
-    /**
-     * The rows Dexcom Share should hear about, each with its Dexcom trend: the row's own rate
-     * when it has one, else the rate the previous displayed row implies ([ExchangeTrend.fromSamples]
-     * refuses a gap outside 4–20 minutes), else no trend.
-     */
+    /** The rows Dexcom Share should hear about, each with its trend ([DexcomShareBackfillTrend]). */
     private fun dexcomRows(
         rows: List<XdripBackfill.Row>,
         displayed: List<XdripBackfill.DisplayedRow>,
     ): List<DexcomShareUploader.Row> {
         val rateByTime = rows.associate { it.timeMs to it.rate }
-        var previous: XdripBackfill.DisplayedRow? = null
-        return displayed.map { current ->
-            val ownRate = rateByTime[current.timeMs]
-            val trend = when {
-                ownRate != null && ownRate.isFinite() -> ExchangeTrend.fromRate(ownRate).index
-                previous != null -> ExchangeTrend.fromSamples(
-                    previous.mgdl, previous.timeMs, current.mgdl, current.timeMs,
-                ).index
-                else -> 0
-            }
-            previous = current
-            DexcomShareUploader.Row(current.timeMs, current.mgdl, trend)
-        }
+        return DexcomShareBackfillTrend.rows(
+            displayed.map { DexcomShareBackfillTrend.Source(it.timeMs, it.mgdl, rateByTime[it.timeMs]) },
+        )
     }
 
     /**

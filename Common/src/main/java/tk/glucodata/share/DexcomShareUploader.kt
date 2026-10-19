@@ -6,6 +6,7 @@ import android.net.NetworkCapabilities
 import androidx.annotation.Keep
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import tk.glucodata.Applic
 import tk.glucodata.Log
@@ -40,6 +41,14 @@ internal class DexcomShareFlush(
     companion object {
         const val INITIAL_BACKOFF_MS = 60_000L
         const val MAX_BACKOFF_MS = 30L * 60_000L
+
+        /**
+         * Logins Dexcom answered with an error, in a row, before the account is treated as
+         * blocked. A wrong password Dexcom reports under a code this app does not know would
+         * otherwise be retried on every backoff (about 48 times a day) until the account locks.
+         * Transport failures do not count: they never reached Dexcom.
+         */
+        const val MAX_FAILED_LOGINS = 5
     }
 
     var sessionId: String? = null
@@ -50,6 +59,13 @@ internal class DexcomShareFlush(
 
     private var backoffMs = 0L
     private var nextAttemptAtMs = 0L
+    private var failedLogins = 0
+
+    /** Either a session, or what [flush] must return because there is none. */
+    private sealed class Login {
+        object Ok : Login()
+        class Stop(val delayMs: Long?) : Login()
+    }
 
     /** The persisted flag from a previous process, restored when the engine is built. */
     @Synchronized
@@ -72,14 +88,8 @@ internal class DexcomShareFlush(
 
         val client = DexcomShareClient(config.region, transportFor(config.region))
         if (sessionId == null) {
-            when (val login = client.login(config.account, config.password, config.serial)) {
-                is DexcomShareClient.LoginResult.Ok -> sessionId = login.sessionId
-                is DexcomShareClient.LoginResult.Failed -> return when (login.kind) {
-                    DexcomShareError.Kind.BAD_CREDENTIALS,
-                    DexcomShareError.Kind.LOCKED -> blockAccount(login.code, login.message)
-                    else -> delayNextAttempt(now, login.code, login.message)
-                }
-            }
+            val login = logIn(client, config, now)
+            if (login is Login.Stop) return login.delayMs
         }
 
         var relogged = false
@@ -102,15 +112,8 @@ internal class DexcomShareFlush(
                         if (relogged) return delayNextAttempt(now, result.code, result.message)
                         relogged = true
                         sessionId = null
-                        when (val login = client.login(config.account, config.password, config.serial)) {
-                            is DexcomShareClient.LoginResult.Ok -> sessionId = login.sessionId
-                            is DexcomShareClient.LoginResult.Failed -> return when (login.kind) {
-                                DexcomShareError.Kind.BAD_CREDENTIALS,
-                                DexcomShareError.Kind.LOCKED ->
-                                    blockAccount(login.code, login.message)
-                                else -> delayNextAttempt(now, login.code, login.message)
-                            }
-                        }
+                        val login = logIn(client, config, now)
+                        if (login is Login.Stop) return login.delayMs
                     }
 
                     DexcomShareError.Kind.BAD_CREDENTIALS,
@@ -132,6 +135,25 @@ internal class DexcomShareFlush(
         sink.persistQueue()
         return null
     }
+
+    private fun logIn(client: DexcomShareClient, config: DexcomShareSettings.Config, now: Long): Login =
+        when (val login = client.login(config.account, config.password, config.serial)) {
+            is DexcomShareClient.LoginResult.Ok -> {
+                sessionId = login.sessionId
+                failedLogins = 0
+                Login.Ok
+            }
+            is DexcomShareClient.LoginResult.Failed -> {
+                if (login.code != DexcomShareClient.TRANSPORT_FAILURE_CODE) failedLogins++
+                when {
+                    login.kind == DexcomShareError.Kind.BAD_CREDENTIALS ||
+                        login.kind == DexcomShareError.Kind.LOCKED ||
+                        failedLogins >= MAX_FAILED_LOGINS ->
+                        Login.Stop(blockAccount(login.code, login.message))
+                    else -> Login.Stop(delayNextAttempt(now, login.code, login.message))
+                }
+            }
+        }
 
     private fun blockAccount(code: Int, message: String): Long? {
         authBlocked = true
@@ -187,6 +209,7 @@ object DexcomShareUploader {
 
     /** 0 while nothing is queued; otherwise the time the pending flush is due. */
     private var scheduledAtMs = 0L
+    private var scheduled: ScheduledFuture<*>? = null
 
     /** A live reading. Called on the BLE callback thread, so it must not block or throw. */
     @JvmStatic
@@ -232,12 +255,20 @@ object DexcomShareUploader {
         }
     }
 
-    /** The settings screen saved something: forget the session and try again from scratch. */
-    fun onSettingsChanged(context: Context) {
+    /**
+     * The settings screen saved something: forget the session and try again from scratch. A flush
+     * still waiting out a backoff is cancelled, or the new settings would sit unused for up to
+     * [DexcomShareFlush.MAX_BACKOFF_MS].
+     *
+     * @param flush false when the caller is about to run [testConnection]: that test logs in
+     *        itself and starts the flush when it succeeds, so flushing here too would spend a
+     *        second login, and with a wrong password a second failed attempt, on one tap.
+     */
+    fun onSettingsChanged(context: Context, flush: Boolean = true) {
         try {
             val appContext = context.applicationContext
             synchronized(lock) { state = null }
-            requestFlush(appContext)
+            if (flush) requestFlush(appContext, replace = true) else cancelScheduledFlush()
         } catch (error: Throwable) {
             Log.stack(LOG_ID, "onSettingsChanged", error)
         }
@@ -275,7 +306,7 @@ object DexcomShareUploader {
             if (result.ok) {
                 DexcomShareSettings.setAuthBlocked(appContext, false)
                 synchronized(lock) { state = null }
-                requestFlush(appContext)
+                requestFlush(appContext, replace = true)
             }
             runCatching { callback(result) }.onFailure { Log.stack(LOG_ID, "testConnection callback", it) }
         }
@@ -303,18 +334,38 @@ object DexcomShareUploader {
         }
     }
 
-    /** Queues a flush unless one is already waiting; the engine itself owns the backoff. */
-    private fun requestFlush(context: Context, delayMs: Long = 0L) {
+    /**
+     * Queues a flush unless one is already waiting; the engine itself owns the backoff.
+     *
+     * @param replace cancel a waiting flush and start over now, for a change the user made.
+     */
+    private fun requestFlush(context: Context, delayMs: Long = 0L, replace: Boolean = false) {
         val appContext = context.applicationContext
         synchronized(lock) {
+            if (replace) {
+                scheduled?.cancel(false)
+                scheduled = null
+                scheduledAtMs = 0L
+            }
             if (scheduledAtMs != 0L) return
             scheduledAtMs = System.currentTimeMillis() + delayMs
+            scheduled = executor.schedule({ runFlush(appContext) }, delayMs, TimeUnit.MILLISECONDS)
         }
-        executor.schedule({ runFlush(appContext) }, delayMs, TimeUnit.MILLISECONDS)
+    }
+
+    private fun cancelScheduledFlush() {
+        synchronized(lock) {
+            scheduled?.cancel(false)
+            scheduled = null
+            scheduledAtMs = 0L
+        }
     }
 
     private fun runFlush(context: Context) {
-        synchronized(lock) { scheduledAtMs = 0L }
+        synchronized(lock) {
+            scheduledAtMs = 0L
+            scheduled = null
+        }
         try {
             val config = DexcomShareSettings.load(context)
             if (!config.isReady()) return
