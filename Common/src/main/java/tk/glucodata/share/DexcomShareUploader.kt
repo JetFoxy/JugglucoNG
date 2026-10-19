@@ -378,7 +378,7 @@ object DexcomShareUploader {
             }
             if (result.ok) {
                 val current = synchronized(lock) {
-                    if (!testVerdictApplies(appContext, startedIn, startedFor)) return@synchronized false
+                    if (!outcomeApplies(appContext, startedIn, startedFor)) return@synchronized false
                     DexcomShareSettings.setAuthBlocked(appContext, false)
                     generation++
                     state?.let { retired = it }
@@ -391,7 +391,7 @@ object DexcomShareUploader {
                 }
             } else if (rejected) {
                 val engine = synchronized(lock) {
-                    if (!testVerdictApplies(appContext, startedIn, startedFor)) return@synchronized null
+                    if (!outcomeApplies(appContext, startedIn, startedFor)) return@synchronized null
                     DexcomShareSettings.setAuthBlocked(appContext, true)
                     state?.engine
                 }
@@ -405,11 +405,15 @@ object DexcomShareUploader {
     }
 
     /**
-     * A Test's verdict applies while the settings are still the ones it ran with. A generation
-     * bump alone is not enough to discard it: saving unchanged settings (the screen does that on
-     * the way out) would otherwise let the next flush retry a password Dexcom has just rejected.
+     * Whether a background outcome — a status write, a blocked login, a Test verdict — still
+     * describes the saved settings.
+     *
+     * The [generation] alone is too strict: the screen saves again on the way out, and a flush or
+     * a Test may still be in flight. Discarding its rejection for credentials that the save did
+     * not change would leave `auth_blocked` false and let the next flush retry a password Dexcom
+     * has just rejected. Outcomes for genuinely changed credentials are still dropped.
      */
-    private fun testVerdictApplies(
+    private fun outcomeApplies(
         context: Context,
         startedIn: Int,
         startedFor: DexcomShareSettings.Config
@@ -430,7 +434,8 @@ object DexcomShareUploader {
     private fun stateFor(context: Context): State {
         synchronized(lock) {
             state?.let { return it }
-            val destination = destinationOf(DexcomShareSettings.load(context))
+            val config = DexcomShareSettings.load(context)
+            val destination = destinationOf(config)
             val enabledAtMs = DexcomShareSettings.enabledAtMs(context)
             val carried = retired
                 ?.takeIf { it.destination == destination && it.enabledAtMs == enabledAtMs }
@@ -440,7 +445,7 @@ object DexcomShareUploader {
                 .takeUnless { it.isNullOrBlank() }
                 ?.let(DexcomShareQueue::decode)
                 ?: DexcomShareQueue(enabledAtMs = enabledAtMs)
-            val sink = AndroidSink(context, queue, generation)
+            val sink = AndroidSink(context, queue, generation, config)
             val engine = DexcomShareFlush(
                 queue = queue,
                 sink = sink,
@@ -523,7 +528,10 @@ object DexcomShareUploader {
         runCatching { SensorIdentity.resolveAppSensorId(sensorId) }.getOrNull() ?: sensorId
 
     /**
-     * Writes a flush's results, unless the settings changed since it started ([generation]).
+     * Writes a flush's results unless the settings have become another login target since it
+     * started. "Another login target", not "another generation": a save that leaves the
+     * credentials and the destination alone (the screen saves on the way out) must not discard a
+     * rejected password — that is exactly how the next flush would retry it.
      *
      * Each check and its write happen under [lock], which [applySettings] holds while it saves and
      * bumps the generation, so a result can never land between the two.
@@ -531,10 +539,11 @@ object DexcomShareUploader {
     private class AndroidSink(
         private val context: Context,
         private val queue: DexcomShareQueue,
-        private val startedIn: Int
+        private val startedIn: Int,
+        private val startedFor: DexcomShareSettings.Config
     ) : DexcomShareStatusSink {
         private inline fun ifCurrent(write: () -> Unit) {
-            synchronized(lock) { if (startedIn == generation) write() }
+            synchronized(lock) { if (outcomeApplies(context, startedIn, startedFor)) write() }
         }
 
         override fun recordSuccess(count: Int, newestMs: Long) =

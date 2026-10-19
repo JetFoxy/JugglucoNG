@@ -31,9 +31,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+
+
+
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -67,6 +67,7 @@ import tk.glucodata.ui.components.AppTopBar
 import tk.glucodata.ui.components.IconButtonTooltip
 import tk.glucodata.ui.components.MasterSwitchCard
 import tk.glucodata.ui.components.SectionLabel
+import tk.glucodata.ui.util.ConnectedButtonGroup
 
 /**
  * Dexcom Share is an unofficial, credential-carrying output, so the account, the password, the
@@ -213,25 +214,21 @@ fun DexcomShareSettingsScreen(navController: NavController) {
                     text = stringResource(R.string.dexcom_share_region),
                     style = MaterialTheme.typography.labelLarge,
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    val regions = listOf(DexcomShareRegion.OUS, DexcomShareRegion.US)
-                    regions.forEachIndexed { index, candidate ->
-                        SegmentedButton(
-                            selected = region == candidate,
-                            onClick = { region = candidate },
-                            shape = SegmentedButtonDefaults.itemShape(index, regions.size),
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text(
-                                if (candidate == DexcomShareRegion.US) {
-                                    stringResource(R.string.dexcom_share_region_us)
-                                } else {
-                                    stringResource(R.string.dexcom_share_region_ous)
-                                }
-                            )
-                        }
-                    }
-                }
+                val regions = listOf(DexcomShareRegion.OUS, DexcomShareRegion.US)
+                val outsideUsLabel = stringResource(R.string.dexcom_share_region_ous)
+                val usLabel = stringResource(R.string.dexcom_share_region_us)
+                ConnectedButtonGroup(
+                    options = regions,
+                    selectedOption = region,
+                    onOptionSelected = { region = it },
+                    label = { option ->
+                        Text(if (option == DexcomShareRegion.US) usLabel else outsideUsLabel)
+                    },
+                    labelText = { option ->
+                        if (option == DexcomShareRegion.US) usLabel else outsideUsLabel
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             OutlinedTextField(
@@ -260,7 +257,9 @@ fun DexcomShareSettingsScreen(navController: NavController) {
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
                 enabled = hasCredentials && !testing,
                 shapes = ButtonDefaults.shapes(),
                 contentPadding = ButtonDefaults.ContentPadding,
@@ -277,7 +276,7 @@ fun DexcomShareSettingsScreen(navController: NavController) {
                     text = testMessage!!,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (testMessage == testOkText) {
-                        MaterialTheme.colorScheme.primary
+                        StatusPalette.success()
                     } else {
                         MaterialTheme.colorScheme.error
                     },
@@ -294,7 +293,9 @@ fun DexcomShareSettingsScreen(navController: NavController) {
 
             Button(
                 onClick = { save(); testMessage = null },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
                 shapes = ButtonDefaults.shapes(),
                 contentPadding = ButtonDefaults.ContentPadding,
             ) {
@@ -324,7 +325,7 @@ private fun DexcomShareStatusCard(status: DexcomShareSettings.Status) {
     }
 
     Card(
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         Column(
@@ -335,7 +336,7 @@ private fun DexcomShareStatusCard(status: DexcomShareSettings.Status) {
         ) {
             Text(
                 text = stringResource(R.string.status),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMediumEmphasized,
             )
             if (status.authBlocked) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
