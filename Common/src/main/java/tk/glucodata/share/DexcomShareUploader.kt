@@ -315,10 +315,22 @@ object DexcomShareUploader {
     fun applySettings(context: Context, config: DexcomShareSettings.Config, flush: Boolean = true) {
         try {
             val appContext = context.applicationContext
+            val destination = destinationOf(config)
             synchronized(lock) {
+                // Switching on starts a new era: the queue of the previous one must not survive,
+                // not even through a flush that is still running across this save.
+                val switchingOn = config.enabled && !DexcomShareSettings.isEnabled(appContext)
                 generation++
                 DexcomShareSettings.save(appContext, config)
-                state?.let { retired = it }
+                val live = state
+                // Only a state that still sends to the same place may hand its queue over. A
+                // destination change must not keep the old queue alive even in memory, or a flush
+                // of the old settings could write it back after the save cleared it.
+                retired = when {
+                    switchingOn -> null
+                    live != null -> live.takeIf { it.destination == destination }
+                    else -> retired?.takeIf { it.destination == destination }
+                }
                 state = null
             }
             cancelScheduledFlush()
@@ -518,8 +530,16 @@ object DexcomShareUploader {
          * Called from the live callback, the history writer and the send thread. Encoding and
          * writing under one lock keeps the saves in order: `apply()` updates the in-memory prefs
          * at once, so whichever snapshot is encoded last is also the one that stays.
+         *
+         * Not fenced by the settings generation: after a password-only save the queue object is
+         * carried into the new state, and a flush that was running across the save records its
+         * deliveries in exactly that object. Refusing that write would leave the prefs with the
+         * batch still pending, and the next process start would send it again. The identity check
+         * keeps a queue that a destination change replaced out of the prefs instead.
          */
-        override fun persistQueue() = ifCurrent {
+        override fun persistQueue() = synchronized(lock) {
+            val stillCurrent = state?.queue === queue || retired?.queue === queue
+            if (!stillCurrent) return@synchronized
             DexcomShareSettings.saveQueueJson(context, queue.encode())
             DexcomShareSettings.recordPending(context, queue.pending(System.currentTimeMillis()).size)
         }
