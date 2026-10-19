@@ -88,6 +88,7 @@ class DexcomShareQueue(
      * A live reading, which also makes [sensorId] the sensor Share follows: only that one is
      * backfilled, so a second sensor's history cannot interleave into the stream.
      */
+    @Synchronized
     fun offerLive(sensorId: String, egv: ShareEgv, nowMs: Long): Boolean {
         if (sensorId.isEmpty()) return false
         liveSensor = sensorId
@@ -101,6 +102,7 @@ class DexcomShareQueue(
      *
      * @return how many of [egvs] were accepted.
      */
+    @Synchronized
     fun offerBackfill(sensorId: String, egvs: List<ShareEgv>, nowMs: Long): Int {
         if (sensorId.isEmpty() || sensorId != liveSensor) return 0
         var accepted = 0
@@ -112,11 +114,13 @@ class DexcomShareQueue(
     }
 
     /** Oldest first, without anything that has left [windowMs]. */
+    @Synchronized
     fun pending(nowMs: Long): List<ShareEgv> {
         trim(nowMs)
         return pending.toList()
     }
 
+    @Synchronized
     fun markDelivered(egvs: List<ShareEgv>) {
         val times = egvs.map(ShareEgv::timeMs).toSet()
         pending.removeAll { it.timeMs in times }
@@ -127,10 +131,13 @@ class DexcomShareQueue(
      * A batch Dexcom rejected. It is remembered as delivered as well as removed: the same
      * moments would otherwise come back with the next history batch and be rejected again.
      */
+    @Synchronized
     fun drop(egvs: List<ShareEgv>) = markDelivered(egvs)
 
+    @Synchronized
     fun liveSensorId(): String? = liveSensor
 
+    @Synchronized
     fun encode(): String {
         val pendingJson = JSONArray()
         pending.forEach { egv ->
