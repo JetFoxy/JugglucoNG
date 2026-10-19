@@ -106,16 +106,12 @@ fun DexcomShareSettingsScreen(navController: NavController) {
             DexcomShareSettings.normalizeSerial(serial) == DexcomShareSettings.normalizeSerial(initial.serial)
 
     /**
-     * A blocked login is only released when the user actually touched the credentials, or asked
-     * for a Test: saving anything else must not spend a login attempt with the rejected password.
+     * The screen no longer decides whether a blocked login may be released: [DexcomShareSettings.save]
+     * does that itself, and only when the account or the password changed.
      */
     fun save() {
-        val config = currentConfig()
-        DexcomShareSettings.save(context, config)
-        if (account != initial.account || password != initial.password) {
-            DexcomShareSettings.setAuthBlocked(context, false)
-        }
-        // A saved change invalidates the session, the blocked-login flag and the queue.
+        DexcomShareSettings.save(context, currentConfig())
+        // A saved change invalidates the session and the queue.
         DexcomShareUploader.onSettingsChanged(context)
         status = DexcomShareSettings.status(context)
     }
@@ -318,7 +314,7 @@ private fun DexcomShareStatusCard(status: DexcomShareSettings.Status) {
     val context = LocalContext.current
 
     fun timestamp(epochMillis: Long): String {
-        if (epochMillis <= 0L) return context.getString(R.string.outbound_api_status_never)
+        if (epochMillis <= 0L) return context.getString(R.string.dexcom_share_status_never)
         return DateFormat.getDateTimeInstance(
             DateFormat.SHORT,
             DateFormat.SHORT,
@@ -351,14 +347,14 @@ private fun DexcomShareStatusCard(status: DexcomShareSettings.Status) {
             }
             Text(
                 text = stringResource(
-                    R.string.outbound_api_last_success_format,
+                    R.string.dexcom_share_status_last_success,
                     timestamp(status.lastSuccessMs)
                 ),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
                 text = stringResource(
-                    R.string.outbound_api_last_attempt_format,
+                    R.string.dexcom_share_status_last_attempt,
                     timestamp(status.lastAttemptMs)
                 ),
                 style = MaterialTheme.typography.bodySmall,
@@ -371,7 +367,7 @@ private fun DexcomShareStatusCard(status: DexcomShareSettings.Status) {
             )
             if (status.lastError.isNotEmpty()) {
                 Text(
-                    text = stringResource(R.string.outbound_api_last_error_format, status.lastError),
+                    text = stringResource(R.string.dexcom_share_status_error, status.lastError),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )

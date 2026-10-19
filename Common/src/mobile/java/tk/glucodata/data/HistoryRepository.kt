@@ -24,6 +24,7 @@ import tk.glucodata.Natives
 import tk.glucodata.SensorIdentity
 import tk.glucodata.UiRefreshBus
 import tk.glucodata.XdripBackfill
+import tk.glucodata.share.DexcomShareSettings
 import tk.glucodata.share.DexcomShareUploader
 import tk.glucodata.data.calibration.CalibrationManager
 import tk.glucodata.ui.GlucosePoint
@@ -722,16 +723,21 @@ class HistoryRepository(context: Context = Applic.app) {
         readings.groupBy(HistoryReading::sensorSerial).forEach { (serial, rows) ->
             val backfillRows = rows.map { XdripBackfill.Row(it.timestamp, it.value, it.rawValue, it.rate) }
             XdripBackfill.onHistoryStored(serial, backfillRows)
-            // A factory: resolving the rows costs smoothing and calibration per row, and it is
-            // only ever asked for when Dexcom Share is on.
-            DexcomShareUploader.onHistoryStored(serial) {
-                XdripBackfill.displayedRows(serial, backfillRows).map { displayed ->
-                    DexcomShareUploader.Row(
-                        displayed.timeMs,
-                        displayed.mgdl,
-                        ExchangeTrend.fromRate(displayed.rate).index,
-                    )
-                }
+            // Resolving a row to the value a live send would carry costs a native snapshot,
+            // smoothing and calibration per row, so it is skipped for the many users who never
+            // switch Share on. The uploader checks the same flag again before it sends anything.
+            val app = Applic.app
+            if (app != null && DexcomShareSettings.isEnabled(app)) {
+                DexcomShareUploader.onHistoryStored(
+                    serial,
+                    XdripBackfill.displayedRows(serial, backfillRows).map { displayed ->
+                        DexcomShareUploader.Row(
+                            displayed.timeMs,
+                            displayed.mgdl,
+                            ExchangeTrend.fromRate(displayed.rate).index,
+                        )
+                    },
+                )
             }
         }
     }

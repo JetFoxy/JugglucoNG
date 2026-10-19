@@ -84,11 +84,11 @@ object XdripBackfill {
      * smoothed when exchange smoothing is on, then calibrated. Rows without a usable value are
      * left out.
      *
-     * The xDrip backfill uses this through [onHistoryStored]; Dexcom Share uses it so a backfilled
-     * reading shows the user the same number it showed on the chart and the broadcast.
+     * A batch rather than a single row because the smoothing window spans the rows; the xDrip
+     * backfill uses the same resolution through [onHistoryStored], and Dexcom Share uses this so a
+     * backfilled reading shows the user the number the chart and the broadcast showed.
      */
-    @JvmStatic
-    fun displayedRows(sensorSerial: String, rows: List<Row>): List<DisplayedRow> {
+    internal fun displayedRows(sensorSerial: String, rows: List<Row>): List<DisplayedRow> {
         if (rows.isEmpty() || sensorSerial.isEmpty()) return emptyList()
         return try {
             val app = Applic.app ?: return emptyList()

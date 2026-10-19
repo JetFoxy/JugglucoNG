@@ -2121,6 +2121,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="dexcom_share_test">Проверить подключение</string>
     <string name="dexcom_share_test_ok">Подключение установлено</string>
     <string name="dexcom_share_pending">В очереди: %1$d</string>
+    <string name="dexcom_share_status_last_success">Последний успех: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Последняя попытка: %1$s</string>
+    <string name="dexcom_share_status_error">Ошибка: %1$s</string>
+    <string name="dexcom_share_status_never">Никогда</string>
     <string name="dexcom_share_auth_blocked">Вход заблокирован — проверьте аккаунт и пароль</string>
     <string name="dexcom_share_credentials_required">Сначала введите аккаунт и пароль</string>
     <string name="dexcom_share_warning">Неофициальный интерфейс: Dexcom может изменить или заблокировать его в любой момент. Это не функция медицинского изделия.</string>

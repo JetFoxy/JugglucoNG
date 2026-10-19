@@ -81,16 +81,23 @@ object DexcomShareSettings {
     }
 
     /**
-     * Stores the credentials and clears what belonged to the old ones: the pending queue and the
-     * moment Share was switched on. Enabling the feature starts the backfill window at that
-     * moment, so history from before it is never uploaded.
+     * Stores the credentials and clears what belonged to the old ones: the pending queue, the
+     * moment Share was switched on, and — when the account or the password actually changed — the
+     * blocked-login flag.
      *
-     * The blocked-login flag is deliberately left alone: the settings screen clears it when the
-     * credentials actually change (or the Test button succeeds), because clearing it here would
-     * make merely opening the screen retry a password Dexcom has already rejected.
+     * Enabling the feature starts the backfill window at that moment, so history from before it is
+     * never uploaded. The blocked-login flag is released by an edit of the credentials, not by
+     * every save: clearing it on a save that changes nothing would spend a login attempt with the
+     * password Dexcom has already rejected.
+     *
+     * The session id is not stored here — it lives in memory in [DexcomShareUploader], whose
+     * `onSettingsChanged` the caller invokes after a save.
      */
     fun save(context: Context, config: Config) {
         val wasEnabled = isEnabled(context)
+        val stored = load(context)
+        val credentialsChanged =
+            stored.account != config.account || stored.password != config.password
         val encryptedAccount = encrypt(config.account)
         val encryptedPassword = encrypt(config.password)
         if (encryptedAccount == null || encryptedPassword == null) {
@@ -104,6 +111,7 @@ object DexcomShareSettings {
                 .putString(KEY_PASSWORD, encryptedPassword)
                 .putString(KEY_REGION, config.region.name)
                 .putString(KEY_SERIAL, normalizeSerial(config.serial))
+            if (credentialsChanged) editor.putBoolean(KEY_AUTH_BLOCKED, false)
             if (config.enabled && !wasEnabled) {
                 editor.putLong(KEY_ENABLED_AT_MS, System.currentTimeMillis())
                 editor.remove(KEY_QUEUE_JSON)

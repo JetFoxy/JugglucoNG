@@ -2678,6 +2678,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="dexcom_share_test">Test connection</string>
     <string name="dexcom_share_test_ok">Connection succeeded</string>
     <string name="dexcom_share_pending">Pending readings: %1$d</string>
+    <string name="dexcom_share_status_last_success">Last success: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Last attempt: %1$s</string>
+    <string name="dexcom_share_status_error">Error: %1$s</string>
+    <string name="dexcom_share_status_never">Never</string>
     <string name="dexcom_share_auth_blocked">Login blocked — check the account and password</string>
     <string name="dexcom_share_credentials_required">Enter the account and password first</string>
     <string name="dexcom_share_warning">Unofficial interface: Dexcom may change or block it at any time. This is not a medical device feature.</string>
