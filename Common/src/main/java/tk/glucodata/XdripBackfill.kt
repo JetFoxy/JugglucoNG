@@ -1,6 +1,7 @@
 package tk.glucodata
 
 import android.content.Context
+import java.util.concurrent.TimeUnit
 
 /**
  * Sends the readings a disconnect left out of the live stream to the xDrip-broadcast receivers
@@ -18,10 +19,12 @@ object XdripBackfill {
     private const val RAW_PRIMARY_VIEW_MODE = 3
     private const val MIN_SMOOTHING_POINTS = 3
     private const val MAX_RATE_LOOKBACK_MS = 60L * 60L * 1000L
+    private const val PROCESS_DELAY_MS = 5_000L
 
     data class Row(val timeMs: Long, val value: Float, val rawValue: Float, val rate: Float?)
 
     private val tracker = XdripBackfillTracker()
+    private val pending = HashMap<String, HashMap<Long, XdripBackfillTracker.Candidate>>()
 
     private fun key(sensorId: String): String = SensorIdentity.resolveAppSensorId(sensorId) ?: sensorId
 
@@ -39,19 +42,43 @@ object XdripBackfill {
         }.onFailure { Log.stack(LOG_ID, "persist", it) }
     }
 
-    /** History rows for [sensorSerial] were written. Sends the ones that live never carried. */
+    /**
+     * History rows for [sensorSerial] were written. The ones live never carried are sent
+     * [PROCESS_DELAY_MS] later: the history row of a reading is stored just before that reading
+     * goes out live, and sending it straight away doubled it in AAPS. Waiting lets the live send
+     * land first, so the deduplication sees it (xDrip processes backfill after a delay too).
+     */
     @JvmStatic
     fun onHistoryStored(sensorSerial: String, rows: List<Row>) {
         if (rows.isEmpty() || sensorSerial.isEmpty()) return
         try {
             if (!Natives.getxbroadcast() || !isMainSensor(sensorSerial)) return
             val id = key(sensorSerial)
-            val sensor = tracker.sensor(id) ?: restore(id) ?: return
+            if (tracker.sensor(id) == null && restore(id) == null) return
             val app = Applic.app ?: return
-            val viewMode = viewMode(sensorSerial)
             val candidates = buildCandidates(
-                sensorSerial, rows, viewMode, DataSmoothing.exchangeSmoothingMinutes(app),
+                sensorSerial, rows, viewMode(sensorSerial), DataSmoothing.exchangeSmoothingMinutes(app),
             )
+            if (candidates.isEmpty()) return
+            val schedule = synchronized(pending) {
+                val queued = pending.getOrPut(id) { HashMap() }
+                val first = queued.isEmpty()
+                candidates.forEach { queued[it.timeMs] = it }
+                first
+            }
+            if (schedule) {
+                Applic.scheduler.schedule({ flush(id) }, PROCESS_DELAY_MS, TimeUnit.MILLISECONDS)
+            }
+        } catch (error: Throwable) {
+            Log.stack(LOG_ID, "onHistoryStored", error)
+        }
+    }
+
+    private fun flush(id: String) {
+        try {
+            val candidates = synchronized(pending) { pending.remove(id)?.values?.toList() } ?: return
+            val app = Applic.app ?: return
+            val sensor = tracker.sensor(id) ?: return
             val spacingMs = DataSmoothing.exchangeThrottleIntervalMinutes(app) * 60_000L
             val picked = tracker.pick(id, candidates, System.currentTimeMillis(), spacingMs)
             if (picked.isEmpty()) return
@@ -60,7 +87,7 @@ object XdripBackfill {
                 SendLikexDrip.broadcastBackfill(id, sensor.sensorGen, point.mgdl, point.timeMs, point.rate, sensor.sensorStartMs)
             }
         } catch (error: Throwable) {
-            Log.stack(LOG_ID, "onHistoryStored", error)
+            Log.stack(LOG_ID, "flush", error)
         }
     }
 

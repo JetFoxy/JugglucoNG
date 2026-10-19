@@ -6,15 +6,17 @@ import org.junit.Test
 import tk.glucodata.XdripBackfillTracker.Candidate
 
 class XdripBackfillTrackerTests {
+    private val second = 1_000L
     private val minute = 60_000L
     private val now = 10_000L * minute
 
-    private fun point(minutesAgo: Long, mgdl: Double = 100.0) =
-        Candidate(now - minutesAgo * minute, mgdl, Float.NaN)
+    private fun at(timeMs: Long, mgdl: Double = 100.0) = Candidate(timeMs, mgdl, Float.NaN)
+
+    private fun point(minutesAgo: Long, mgdl: Double = 100.0) = at(now - minutesAgo * minute, mgdl)
 
     @Test
     fun `gap before the first live send after a restart is backfilled in order`() {
-        val tracker = XdripBackfillTracker(liveGraceMs = 0L)
+        val tracker = XdripBackfillTracker()
         tracker.restore("S", now - 40 * minute, 1, 0L)
         tracker.recordSent("S", now, 1, 0L)
 
@@ -26,7 +28,7 @@ class XdripBackfillTrackerTests {
 
     @Test
     fun `history that arrives before the live reading is also backfilled`() {
-        val tracker = XdripBackfillTracker(liveGraceMs = 0L)
+        val tracker = XdripBackfillTracker()
         tracker.restore("S", now - 30 * minute, 1, 0L)
 
         val picked = tracker.pick("S", (0L..29L).map { point(it) }, now)
@@ -36,18 +38,55 @@ class XdripBackfillTrackerTests {
     }
 
     @Test
-    fun `a point near a live send is not sent twice`() {
-        val tracker = XdripBackfillTracker(liveGraceMs = 0L)
-        tracker.recordSent("S", now - 20_000L, 1, 0L)
+    fun `the history row of a reading already sent live is not sent again`() {
+        // The trace case: the history row lands a few seconds off the live timestamp.
+        val tracker = XdripBackfillTracker()
+        tracker.restore("S", now - 10 * minute, 1, 0L)
+        tracker.recordSent("S", now - 20 * second, 1, 0L)
 
-        val picked = tracker.pick("S", listOf(Candidate(now - 40_000L, 100.0, Float.NaN)), now)
+        val rows = listOf(160L, 100L, 40L).map { at(now - it * second) }
 
-        assertEquals(emptyList<Candidate>(), picked)
+        val picked = tracker.pick("S", rows, now)
+
+        assertEquals(listOf(now - 160 * second, now - 100 * second), picked.map { it.timeMs })
+    }
+
+    @Test
+    fun `a five minute sensor deduplicates against a live send minutes away`() {
+        val tracker = XdripBackfillTracker()
+        tracker.restore("S", now - 60 * minute, 1, 0L)
+        tracker.recordSent("S", now - 3 * minute, 1, 0L)
+
+        // History every 5 minutes; the row 2 minutes after the live send is the same reading.
+        val picked = tracker.pick("S", listOf(point(20), point(15), point(10), point(5), point(1)), now)
+
+        assertEquals(listOf(20L, 15L, 10L).map { now - it * minute }, picked.map { it.timeMs })
+    }
+
+    @Test
+    fun `a one minute sensor keeps every minute of the gap`() {
+        val tracker = XdripBackfillTracker()
+        tracker.restore("S", now - 6 * minute, 1, 0L)
+        tracker.recordSent("S", now, 1, 0L)
+
+        val picked = tracker.pick("S", (1L..5L).map { point(it) }, now)
+
+        assertEquals(5, picked.size)
+    }
+
+    @Test
+    fun `a single row batch uses the period measured earlier`() {
+        val tracker = XdripBackfillTracker()
+        tracker.restore("S", now - 60 * minute, 1, 0L)
+        tracker.pick("S", listOf(point(50), point(45), point(40)), now)
+        tracker.recordSent("S", now - 3 * minute, 1, 0L)
+
+        assertEquals(emptyList<Candidate>(), tracker.pick("S", listOf(point(1)), now))
     }
 
     @Test
     fun `a batch re-synced a second time sends nothing`() {
-        val tracker = XdripBackfillTracker(liveGraceMs = 0L)
+        val tracker = XdripBackfillTracker()
         tracker.restore("S", now - 10 * minute, 1, 0L)
         val batch = (0L..9L).map { point(it) }
 
@@ -57,7 +96,7 @@ class XdripBackfillTrackerTests {
 
     @Test
     fun `nothing before the start watermark or older than the window is sent`() {
-        val tracker = XdripBackfillTracker(windowMs = 60 * minute, liveGraceMs = 0L)
+        val tracker = XdripBackfillTracker(windowMs = 60 * minute)
         tracker.restore("S", now - 500 * minute, 1, 0L)
 
         val picked = tracker.pick("S", listOf(point(61), point(59), point(1)), now)
@@ -67,7 +106,7 @@ class XdripBackfillTrackerTests {
 
     @Test
     fun `a sensor with no live send is never backfilled`() {
-        val tracker = XdripBackfillTracker(liveGraceMs = 0L)
+        val tracker = XdripBackfillTracker()
 
         assertEquals(emptyList<Candidate>(), tracker.pick("S", listOf(point(5)), now))
         assertNull(tracker.sensor("S"))
@@ -75,7 +114,7 @@ class XdripBackfillTrackerTests {
 
     @Test
     fun `collapse spacing thins the backfill`() {
-        val tracker = XdripBackfillTracker(liveGraceMs = 0L)
+        val tracker = XdripBackfillTracker()
         tracker.restore("S", now - 20 * minute, 1, 0L)
 
         val picked = tracker.pick("S", (0L..19L).map { point(it) }, now, spacingMs = 5 * minute)
@@ -85,36 +124,11 @@ class XdripBackfillTrackerTests {
 
     @Test
     fun `invalid and future readings are dropped`() {
-        val tracker = XdripBackfillTracker(liveGraceMs = 0L)
-        tracker.restore("S", now - 10 * minute, 1, 0L)
-
-        val picked = tracker.pick(
-            "S",
-            listOf(point(5, 0.0), point(4, Double.NaN), Candidate(now + minute, 100.0, Float.NaN)),
-            now,
-        )
-
-        assertEquals(emptyList<Candidate>(), picked)
-    }
-
-    @Test
-    fun `readings the live path is about to send are left to it`() {
-        val tracker = XdripBackfillTracker()
-        tracker.recordSent("S", now - 70 * 1000L, 1, 0L)
-
-        // The history row for the next reading lands before that reading is sent live.
-        val picked = tracker.pick("S", listOf(point(0), point(1), point(3)), now)
-
-        assertEquals(emptyList<Candidate>(), picked)
-    }
-
-    @Test
-    fun `a reading older than the grace period is still backfilled`() {
         val tracker = XdripBackfillTracker()
         tracker.restore("S", now - 10 * minute, 1, 0L)
 
-        val picked = tracker.pick("S", listOf(point(6), point(1)), now)
+        val picked = tracker.pick("S", listOf(point(5, 0.0), point(4, Double.NaN), at(now + minute)), now)
 
-        assertEquals(listOf(now - 6 * minute), picked.map { it.timeMs })
+        assertEquals(emptyList<Candidate>(), picked)
     }
 }
