@@ -2967,4 +2967,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_device_rejected">Questo dispositivo non è un cerotto Medtrum. Assicurati che il cerotto sia vicino e riprova.</string>
 
     <string name="alert_sound_volume">Volume del suono di avviso</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Invia le letture a Dexcom Follow</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">Condividi con Dexcom</string>
+    <string name="dexcom_share_active_desc">Invia le letture in tempo reale da questo telefono a Dexcom Follow</string>
+    <string name="dexcom_share_account">Account Dexcom</string>
+    <string name="dexcom_share_password">Password</string>
+    <string name="dexcom_share_region">Regione</string>
+    <string name="dexcom_share_region_ous">Fuori dagli USA</string>
+    <string name="dexcom_share_region_us">USA</string>
+    <string name="dexcom_share_serial">Numero di serie del ricevitore</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Lascia il valore predefinito se non hai un ricevitore Dexcom</string>
+    <string name="dexcom_share_test">Verifica connessione</string>
+    <string name="dexcom_share_test_ok">Connessione riuscita</string>
+    <string name="dexcom_share_pending">Letture in attesa: %1$d</string>
+    <string name="dexcom_share_status_last_success">Ultimo invio riuscito: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Ultimo tentativo: %1$s</string>
+    <string name="dexcom_share_status_error">Errore: %1$s</string>
+    <string name="dexcom_share_status_never">Mai</string>
+    <string name="dexcom_share_auth_blocked">Accesso bloccato — controlla account e password</string>
+    <string name="dexcom_share_credentials_required">Inserisci prima account e password</string>
+    <string name="dexcom_share_warning">Interfaccia non ufficiale: Dexcom può modificarla o bloccarla in qualsiasi momento. Non è una funzione di un dispositivo medico.</string>
 </resources>

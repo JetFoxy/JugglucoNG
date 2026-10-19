@@ -3005,4 +3005,27 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="medtrum_setup_device_rejected">Bu cihaz bir Medtrum yaması değil. Yamanın yakında olduğundan emin olun ve tekrar deneyin.</string>
 
     <string name="alert_sound_volume">Uyarı sesi düzeyi</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Ölçümleri Dexcom Follow\'a gönder</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">Dexcom ile paylaş</string>
+    <string name="dexcom_share_active_desc">Bu telefondaki canlı ölçümleri Dexcom Follow\'a gönder</string>
+    <string name="dexcom_share_account">Dexcom hesabı</string>
+    <string name="dexcom_share_password">Şifre</string>
+    <string name="dexcom_share_region">Bölge</string>
+    <string name="dexcom_share_region_ous">ABD dışı</string>
+    <string name="dexcom_share_region_us">ABD</string>
+    <string name="dexcom_share_serial">Alıcı seri numarası</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Dexcom alıcınız yoksa varsayılan değeri bırakın</string>
+    <string name="dexcom_share_test">Bağlantıyı test et</string>
+    <string name="dexcom_share_test_ok">Bağlantı başarılı</string>
+    <string name="dexcom_share_pending">Bekleyen ölçümler: %1$d</string>
+    <string name="dexcom_share_status_last_success">Son başarılı: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Son deneme: %1$s</string>
+    <string name="dexcom_share_status_error">Hata: %1$s</string>
+    <string name="dexcom_share_status_never">Hiç</string>
+    <string name="dexcom_share_auth_blocked">Giriş engellendi — hesabı ve şifreyi kontrol edin</string>
+    <string name="dexcom_share_credentials_required">Önce hesabı ve şifreyi girin</string>
+    <string name="dexcom_share_warning">Resmi olmayan arayüz: Dexcom bunu istediği zaman değiştirebilir veya engelleyebilir. Bu bir tıbbi cihaz özelliği değildir.</string>
 </resources>

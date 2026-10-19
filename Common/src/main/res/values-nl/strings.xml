@@ -3020,4 +3020,27 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="medtrum_setup_device_rejected">Dit apparaat is geen Medtrum-patch. Zorg dat de patch binnen bereik is en probeer het opnieuw.</string>
 
     <string name="alert_sound_volume">Volume van het alarmgeluid</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Metingen naar Dexcom Follow sturen</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">Delen met Dexcom</string>
+    <string name="dexcom_share_active_desc">Actuele metingen van deze telefoon naar Dexcom Follow sturen</string>
+    <string name="dexcom_share_account">Dexcom-account</string>
+    <string name="dexcom_share_password">Wachtwoord</string>
+    <string name="dexcom_share_region">Regio</string>
+    <string name="dexcom_share_region_ous">Buiten de VS</string>
+    <string name="dexcom_share_region_us">VS</string>
+    <string name="dexcom_share_serial">Serienummer ontvanger</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Laat de standaardwaarde staan als je geen Dexcom-ontvanger hebt</string>
+    <string name="dexcom_share_test">Verbinding testen</string>
+    <string name="dexcom_share_test_ok">Verbinding geslaagd</string>
+    <string name="dexcom_share_pending">Wachtende metingen: %1$d</string>
+    <string name="dexcom_share_status_last_success">Laatst gelukt: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Laatste poging: %1$s</string>
+    <string name="dexcom_share_status_error">Fout: %1$s</string>
+    <string name="dexcom_share_status_never">Nooit</string>
+    <string name="dexcom_share_auth_blocked">Inloggen geblokkeerd — controleer account en wachtwoord</string>
+    <string name="dexcom_share_credentials_required">Vul eerst account en wachtwoord in</string>
+    <string name="dexcom_share_warning">Onofficiële interface: Dexcom kan deze op elk moment wijzigen of blokkeren. Dit is geen functie van een medisch hulpmiddel.</string>
 </resources>

@@ -29,6 +29,9 @@ object DexcomShareError {
     }
 
     private const val MESSAGE_LIMIT = 160
+
+    /** 408 Request Timeout and 429 Too Many Requests. */
+    private val TEMPORARY_CLIENT_CODES = setOf(408, 429)
     private const val SSO_INTERNAL_ERROR = "SSO_InternalError"
 
     private val SESSION_CODES = setOf("SessionIdNotFound", "SessionNotValid")
@@ -62,6 +65,9 @@ object DexcomShareError {
             // xDrip treats any 500 as "the session died"; the uploader allows exactly one
             // re-login per flush, so an endless 500 cannot turn into a login loop.
             httpCode == 500 -> Kind.SESSION_EXPIRED
+            // A timeout or a rate limit says "later", not "never": rejecting would drop the batch
+            // and remember it as delivered, so history could not bring it back.
+            httpCode in TEMPORARY_CLIENT_CODES -> Kind.TRANSIENT
             httpCode in 400..499 -> Kind.REJECTED
             else -> Kind.TRANSIENT
         }

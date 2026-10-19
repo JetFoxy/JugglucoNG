@@ -2978,4 +2978,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_device_rejected">Este dispositivo não é um adesivo Medtrum. Verifique se o adesivo está por perto e tente novamente.</string>
 
     <string name="alert_sound_volume">Volume do som de alerta</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Enviar leituras para o Dexcom Follow</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">Compartilhar com a Dexcom</string>
+    <string name="dexcom_share_active_desc">Enviar leituras em tempo real deste telefone para o Dexcom Follow</string>
+    <string name="dexcom_share_account">Conta Dexcom</string>
+    <string name="dexcom_share_password">Senha</string>
+    <string name="dexcom_share_region">Região</string>
+    <string name="dexcom_share_region_ous">Fora dos EUA</string>
+    <string name="dexcom_share_region_us">EUA</string>
+    <string name="dexcom_share_serial">Número de série do receptor</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Deixe o valor padrão se você não tiver um receptor Dexcom</string>
+    <string name="dexcom_share_test">Testar conexão</string>
+    <string name="dexcom_share_test_ok">Conexão bem-sucedida</string>
+    <string name="dexcom_share_pending">Leituras pendentes: %1$d</string>
+    <string name="dexcom_share_status_last_success">Último sucesso: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Última tentativa: %1$s</string>
+    <string name="dexcom_share_status_error">Erro: %1$s</string>
+    <string name="dexcom_share_status_never">Nunca</string>
+    <string name="dexcom_share_auth_blocked">Login bloqueado — verifique a conta e a senha</string>
+    <string name="dexcom_share_credentials_required">Digite primeiro a conta e a senha</string>
+    <string name="dexcom_share_warning">Interface não oficial: a Dexcom pode alterá-la ou bloqueá-la a qualquer momento. Este não é um recurso de dispositivo médico.</string>
 </resources>

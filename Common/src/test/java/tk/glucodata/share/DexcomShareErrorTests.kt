@@ -80,6 +80,12 @@ class DexcomShareErrorTests {
     }
 
     @Test
+    fun aTimeoutOrRateLimitIsRetriedNotDropped() {
+        assertEquals(Kind.TRANSIENT, DexcomShareError.classify(408, ""))
+        assertEquals(Kind.TRANSIENT, DexcomShareError.classify(429, "Too Many Requests"))
+    }
+
+    @Test
     fun messagePrefersDexcomsMessageThenItsCode() {
         assertEquals("Password is invalid", DexcomShareError.message(body("Code1", "Password is invalid")))
         assertEquals("Code2", DexcomShareError.message(body("Code2")))

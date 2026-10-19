@@ -3093,4 +3093,27 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="medtrum_setup_device_rejected">Dieses Gerät ist kein Medtrum-Patch. Stellen Sie sicher, dass sich der Patch in Reichweite befindet, und versuchen Sie es erneut.</string>
 
     <string name="alert_sound_volume">Lautstärke des Alarmtons</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Werte an Dexcom Follow senden</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">An Dexcom senden</string>
+    <string name="dexcom_share_active_desc">Aktuelle Werte von diesem Telefon an Dexcom Follow senden</string>
+    <string name="dexcom_share_account">Dexcom-Konto</string>
+    <string name="dexcom_share_password">Passwort</string>
+    <string name="dexcom_share_region">Region</string>
+    <string name="dexcom_share_region_ous">Außerhalb der USA</string>
+    <string name="dexcom_share_region_us">USA</string>
+    <string name="dexcom_share_serial">Seriennummer des Empfängers</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Standardwert beibehalten, wenn Sie keinen Dexcom-Empfänger haben</string>
+    <string name="dexcom_share_test">Verbindung testen</string>
+    <string name="dexcom_share_test_ok">Verbindung erfolgreich</string>
+    <string name="dexcom_share_pending">Ausstehende Werte: %1$d</string>
+    <string name="dexcom_share_status_last_success">Letzter Erfolg: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Letzter Versuch: %1$s</string>
+    <string name="dexcom_share_status_error">Fehler: %1$s</string>
+    <string name="dexcom_share_status_never">Nie</string>
+    <string name="dexcom_share_auth_blocked">Anmeldung gesperrt — Konto und Passwort prüfen</string>
+    <string name="dexcom_share_credentials_required">Zuerst Konto und Passwort eingeben</string>
+    <string name="dexcom_share_warning">Inoffizielle Schnittstelle: Dexcom kann sie jederzeit ändern oder sperren. Dies ist keine Funktion eines Medizinprodukts.</string>
 </resources>

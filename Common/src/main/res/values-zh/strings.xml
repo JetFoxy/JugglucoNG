@@ -2992,4 +2992,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_device_rejected">此设备不是 Medtrum 贴片。请确认贴片在附近，然后重试。</string>
 
     <string name="alert_sound_volume">警报音量</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">将读数上传到 Dexcom Follow</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">分享到 Dexcom</string>
+    <string name="dexcom_share_active_desc">将此手机的实时读数发送到 Dexcom Follow</string>
+    <string name="dexcom_share_account">Dexcom 账户</string>
+    <string name="dexcom_share_password">密码</string>
+    <string name="dexcom_share_region">地区</string>
+    <string name="dexcom_share_region_ous">美国以外</string>
+    <string name="dexcom_share_region_us">美国</string>
+    <string name="dexcom_share_serial">接收器序列号</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">如果您没有 Dexcom 接收器，请保留默认值</string>
+    <string name="dexcom_share_test">测试连接</string>
+    <string name="dexcom_share_test_ok">连接成功</string>
+    <string name="dexcom_share_pending">待发送读数：%1$d</string>
+    <string name="dexcom_share_status_last_success">上次成功：%1$s</string>
+    <string name="dexcom_share_status_last_attempt">上次尝试：%1$s</string>
+    <string name="dexcom_share_status_error">错误：%1$s</string>
+    <string name="dexcom_share_status_never">从未</string>
+    <string name="dexcom_share_auth_blocked">登录已被阻止——请检查账户和密码</string>
+    <string name="dexcom_share_credentials_required">请先输入账户和密码</string>
+    <string name="dexcom_share_warning">非官方接口：Dexcom 可能随时更改或封锁它。这不是医疗器械功能。</string>
 </resources>

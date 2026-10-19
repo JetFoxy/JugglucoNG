@@ -2977,4 +2977,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="medtrum_setup_device_rejected">Den här enheten är inte ett Medtrum-plåster. Kontrollera att plåstret är inom räckhåll och försök igen.</string>
 
     <string name="alert_sound_volume">Volym för larmljud</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Skicka värden till Dexcom Follow</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">Dela till Dexcom</string>
+    <string name="dexcom_share_active_desc">Skicka aktuella värden från den här telefonen till Dexcom Follow</string>
+    <string name="dexcom_share_account">Dexcom-konto</string>
+    <string name="dexcom_share_password">Lösenord</string>
+    <string name="dexcom_share_region">Region</string>
+    <string name="dexcom_share_region_ous">Utanför USA</string>
+    <string name="dexcom_share_region_us">USA</string>
+    <string name="dexcom_share_serial">Mottagarens serienummer</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Behåll standardvärdet om du inte har någon Dexcom-mottagare</string>
+    <string name="dexcom_share_test">Testa anslutning</string>
+    <string name="dexcom_share_test_ok">Anslutningen lyckades</string>
+    <string name="dexcom_share_pending">Väntande värden: %1$d</string>
+    <string name="dexcom_share_status_last_success">Senast lyckad: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Senaste försök: %1$s</string>
+    <string name="dexcom_share_status_error">Fel: %1$s</string>
+    <string name="dexcom_share_status_never">Aldrig</string>
+    <string name="dexcom_share_auth_blocked">Inloggning blockerad — kontrollera konto och lösenord</string>
+    <string name="dexcom_share_credentials_required">Ange konto och lösenord först</string>
+    <string name="dexcom_share_warning">Inofficiellt gränssnitt: Dexcom kan ändra eller blockera det när som helst. Detta är inte en funktion i en medicinteknisk produkt.</string>
 </resources>

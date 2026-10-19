@@ -3019,4 +3019,27 @@
     <string name="medtrum_setup_device_rejected">To urządzenie nie jest plastrem Medtrum. Upewnij się, że plaster jest w pobliżu, i spróbuj ponownie.</string>
 
     <string name="alert_sound_volume">Głośność dźwięku alarmu</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Wysyłaj odczyty do Dexcom Follow</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">Udostępniaj w Dexcom</string>
+    <string name="dexcom_share_active_desc">Wysyłaj bieżące odczyty z tego telefonu do Dexcom Follow</string>
+    <string name="dexcom_share_account">Konto Dexcom</string>
+    <string name="dexcom_share_password">Hasło</string>
+    <string name="dexcom_share_region">Region</string>
+    <string name="dexcom_share_region_ous">Poza USA</string>
+    <string name="dexcom_share_region_us">USA</string>
+    <string name="dexcom_share_serial">Numer seryjny odbiornika</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Pozostaw wartość domyślną, jeśli nie masz odbiornika Dexcom</string>
+    <string name="dexcom_share_test">Sprawdź połączenie</string>
+    <string name="dexcom_share_test_ok">Połączenie udane</string>
+    <string name="dexcom_share_pending">Oczekujące odczyty: %1$d</string>
+    <string name="dexcom_share_status_last_success">Ostatni sukces: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Ostatnia próba: %1$s</string>
+    <string name="dexcom_share_status_error">Błąd: %1$s</string>
+    <string name="dexcom_share_status_never">Nigdy</string>
+    <string name="dexcom_share_auth_blocked">Logowanie zablokowane — sprawdź konto i hasło</string>
+    <string name="dexcom_share_credentials_required">Najpierw wpisz konto i hasło</string>
+    <string name="dexcom_share_warning">Nieoficjalny interfejs: Dexcom może go w każdej chwili zmienić lub zablokować. To nie jest funkcja wyrobu medycznego.</string>
 </resources>

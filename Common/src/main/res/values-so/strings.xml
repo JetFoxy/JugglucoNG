@@ -3162,4 +3162,27 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="medtrum_setup_device_rejected">Qalabkani ma aha Medtrum balastar. Hubi in balastarku uu dhow yahay oo mar kale isku day.</string>
 
     <string name="alert_sound_volume">Codka digniinta</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">U dir akhrisyada Dexcom Follow</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">La wadaag Dexcom</string>
+    <string name="dexcom_share_active_desc">U dir akhrisyada tooska ah ee taleefankan Dexcom Follow</string>
+    <string name="dexcom_share_account">Akoonka Dexcom</string>
+    <string name="dexcom_share_password">Furaha sirta</string>
+    <string name="dexcom_share_region">Gobolka</string>
+    <string name="dexcom_share_region_ous">Ka baxsan Mareykanka</string>
+    <string name="dexcom_share_region_us">Mareykanka</string>
+    <string name="dexcom_share_serial">Lambarka taxanaha qaataha</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Ka tag qiimaha caadiga ah haddii aadan haysan qaataha Dexcom</string>
+    <string name="dexcom_share_test">Tijaabi xiriirka</string>
+    <string name="dexcom_share_test_ok">Xiriirku wuu guuleystay</string>
+    <string name="dexcom_share_pending">Akhrisyada sugaya: %1$d</string>
+    <string name="dexcom_share_status_last_success">Guushii u dambeysay: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Isku daygii u dambeeyay: %1$s</string>
+    <string name="dexcom_share_status_error">Khalad: %1$s</string>
+    <string name="dexcom_share_status_never">Weligeed</string>
+    <string name="dexcom_share_auth_blocked">Gelitaanka waa la xannibay — hubi akoonka iyo furaha sirta</string>
+    <string name="dexcom_share_credentials_required">Marka hore geli akoonka iyo furaha sirta</string>
+    <string name="dexcom_share_warning">Interface aan rasmi ahayn: Dexcom wuu beddeli karaa ama xannibi karaa wakhti kasta. Tani maaha hawl qalab caafimaad.</string>
 </resources>

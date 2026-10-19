@@ -3078,4 +3078,27 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="medtrum_setup_device_rejected">Энэ төхөөрөмж Medtrum наалт биш. Наалт ойрхон байгаа эсэхийг шалгаад дахин оролдоно уу.</string>
 
     <string name="alert_sound_volume">Дохиоллын дууны түвшин</string>
+    <string name="dexcom_share_title">Dexcom Share</string>
+    <string name="dexcom_share_desc">Үзүүлэлтийг Dexcom Follow руу илгээх</string>
+    <string name="dexcom_share_settings_title">Dexcom Share</string>
+    <string name="dexcom_share_active">Dexcom руу илгээх</string>
+    <string name="dexcom_share_active_desc">Энэ утаснаас бодит цагийн үзүүлэлтийг Dexcom Follow руу илгээх</string>
+    <string name="dexcom_share_account">Dexcom бүртгэл</string>
+    <string name="dexcom_share_password">Нууц үг</string>
+    <string name="dexcom_share_region">Бүс нутаг</string>
+    <string name="dexcom_share_region_ous">АНУ-аас гадна</string>
+    <string name="dexcom_share_region_us">АНУ</string>
+    <string name="dexcom_share_serial">Хүлээн авагчийн серийн дугаар</string>
+    <string name="dexcom_share_serial_hint">SM00000000</string>
+    <string name="dexcom_share_serial_helper">Танд Dexcom хүлээн авагч байхгүй бол анхдагч утгыг үлдээнэ үү</string>
+    <string name="dexcom_share_test">Холболтыг шалгах</string>
+    <string name="dexcom_share_test_ok">Холболт амжилттай</string>
+    <string name="dexcom_share_pending">Хүлээгдэж буй үзүүлэлт: %1$d</string>
+    <string name="dexcom_share_status_last_success">Сүүлийн амжилт: %1$s</string>
+    <string name="dexcom_share_status_last_attempt">Сүүлийн оролдлого: %1$s</string>
+    <string name="dexcom_share_status_error">Алдаа: %1$s</string>
+    <string name="dexcom_share_status_never">Хэзээ ч үгүй</string>
+    <string name="dexcom_share_auth_blocked">Нэвтрэлт хаагдсан — бүртгэл болон нууц үгээ шалгана уу</string>
+    <string name="dexcom_share_credentials_required">Эхлээд бүртгэл болон нууц үгээ оруулна уу</string>
+    <string name="dexcom_share_warning">Албан бус интерфейс: Dexcom үүнийг хэзээ ч өөрчлөх эсвэл хааж болно. Энэ нь эмнэлгийн хэрэгслийн функц биш.</string>
 </resources>
