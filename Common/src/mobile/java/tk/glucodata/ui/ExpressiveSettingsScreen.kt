@@ -546,6 +546,14 @@ fun ExpressiveSettingsScreen(
                     onClick = { navController.navigate("settings/outbound-api") }
                 )
                 SettingsItem(
+                    title = stringResource(R.string.dexcom_share_title),
+                    subtitle = stringResource(R.string.dexcom_share_desc),
+                    icon = Icons.Default.CloudUpload,
+                    iconTint = exchangeColor,
+                    position = CardPosition.MIDDLE,
+                    onClick = { navController.navigate("settings/dexcom-share") }
+                )
+                SettingsItem(
                     title = stringResource(R.string.mirror),
                     subtitle = stringResource(R.string.mirror_desc),
                     icon = Icons.Default.Devices,
