@@ -1284,7 +1284,9 @@ object CalibrationManager {
             timestamp = timestamp,
             sensorId = resolvedSensorId,
             sensorValue = sensorValue,
-            sensorValueRaw = sensorValueRaw,
+            // A source without a raw lane hands us NaN here (iCan); storing it would fail the
+            // NOT NULL column because SQLite keeps NaN as NULL.
+            sensorValueRaw = CalibrationMath.sensorValueRawForStorage(sensorValueRaw),
             userValue = userValue,
             isRawMode = isRawMode,
             sensorValueStock = sensorValueStock.takeIf { it.isFinite() && it > 0f } ?: 0f
