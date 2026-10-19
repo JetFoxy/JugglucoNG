@@ -42,7 +42,7 @@ data class ICanHealthSessionStartTime(
     val hour: Int,
     val minute: Int,
     val second: Int,
-    val timezoneOffset15Min: Int?, // Time Zone, 15-minute increments, null when unknown
+    val timezoneOffset15Min: Int?, // Time Zone, 15-minute increments, null when unknown or vendor-constant
     val dstOffset15Min: Int? = null, // DST Offset, 15-minute increments, null when unknown
 ) {
     /** Total UTC offset in 15-minute increments, or null when the sensor told us nothing usable. */
@@ -61,7 +61,9 @@ data class ICanHealthSessionStartTime(
      *
      * So an offset of exactly zero is treated as *unknown* rather than as UTC. That costs nothing
      * for a genuinely-UTC device (local and UTC agree there) and repairs every other timezone.
-     * Only a non-zero offset is taken at face value.
+     * Only a non-zero offset is taken at face value — and never the vendor's hard-coded `0x14`,
+     * which [parseSessionStartTime] has already dropped (it lies on every sensor started outside
+     * UTC+5).
      */
     fun toEpochMillis(): Long {
         val offset15Min = utcOffset15MinOrNull()
@@ -114,6 +116,21 @@ object ICanHealthParser {
     private const val MIN_TIME_ZONE_15MIN = -48 // UTC-12:00
     private const val MAX_TIME_ZONE_15MIN = 56 // UTC+14:00
     private const val MAX_DST_OFFSET_15MIN = 8 // double daylight time, +2h
+
+    /**
+     * Time Zone value the vendor app writes on every `0x2AAA` write, regardless of the phone's
+     * real zone.
+     *
+     * The vendor SDK's writer emits a constant `20` = UTC+5:00 next to the wall clock
+     * (`j2.java:1115`: `{yearLo, yearHi, month, day, hour, min, sec, 20, 0}`), so a sensor
+     * started anywhere but UTC+5 carries a wall clock plus a fake offset. Two captures confirm
+     * it: an iPhone at `+05` (Sep 2026) and an Android at `+08` (Aug 2026) both report `0x14`,
+     * and in each case the `0x2AA9` counter agrees with the *local* wall clock, not with `+05`.
+     *
+     * Treated as absent, like the specification's "unknown" sentinel, so the wall clock is read
+     * in the device's own zone. On a genuine UTC+5 device the result is unchanged.
+     */
+    private const val TIME_ZONE_VENDOR_CONSTANT = 20 // 0x14, +5:00
 
     /**
      * Parse a 19-byte glucose notification.
@@ -247,10 +264,16 @@ object ICanHealthParser {
         if (year == 0 || year == 0xFFFF || month !in 1..12 || day !in 1..31) {
             return null
         }
-        // Time Zone: sint8. -128 is the spec's "unknown"; anything outside UTC-12..UTC+14 is junk.
+        // Time Zone: sint8. -128 is the spec's "unknown"; anything outside UTC-12..UTC+14 is junk,
+        // and 0x14 is the vendor's hard-coded constant rather than a real offset (see
+        // TIME_ZONE_VENDOR_CONSTANT).
         val tzOffset15Min = data.getOrNull(7)
             ?.toInt()
-            ?.takeIf { it != TIME_ZONE_UNKNOWN && it in MIN_TIME_ZONE_15MIN..MAX_TIME_ZONE_15MIN }
+            ?.takeIf {
+                it != TIME_ZONE_UNKNOWN &&
+                    it != TIME_ZONE_VENDOR_CONSTANT &&
+                    it in MIN_TIME_ZONE_15MIN..MAX_TIME_ZONE_15MIN
+            }
 
         // DST Offset: uint8. 255 is the spec's "unknown"; real values are 0, 2, 4 or 8.
         val dstOffset15Min = data.getOrNull(8)
