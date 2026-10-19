@@ -18,6 +18,7 @@ import java.util.TreeSet
 class XdripBackfillTracker(
     private val windowMs: Long = DEFAULT_WINDOW_MS,
     private val minSpacingMs: Long = MIN_SPACING_MS,
+    private val liveGraceMs: Long = LIVE_GRACE_MS,
 ) {
     data class Candidate(val timeMs: Long, val mgdl: Double, val rate: Float)
 
@@ -53,7 +54,9 @@ class XdripBackfillTracker(
 
     /**
      * The readings of [batch] to send, oldest first. A reading is skipped when it is outside the
-     * window, at or before the sensor's start watermark, or within [spacingMs] of something already
+     * window, at or before the sensor's start watermark, newer than [liveGraceMs] ago (the live
+     * path is about to send those itself, and the history row for a reading is written just before
+     * the reading goes out, so sending it here would double it), or within [spacingMs] of something already
      * sent. The ones returned are recorded as sent.
      */
     @Synchronized
@@ -68,7 +71,7 @@ class XdripBackfillTracker(
         val lowerBound = maxOf(nowMs - windowMs, state.startWatermarkMs)
         val picked = ArrayList<Candidate>()
         for (candidate in batch.sortedBy(Candidate::timeMs)) {
-            if (candidate.timeMs <= lowerBound || candidate.timeMs > nowMs) continue
+            if (candidate.timeMs <= lowerBound || candidate.timeMs > nowMs - liveGraceMs) continue
             if (!(candidate.mgdl.isFinite() && candidate.mgdl > 0.0)) continue
             if (hasSentWithin(state.sent, candidate.timeMs, spacing)) continue
             state.sent.add(candidate.timeMs)
@@ -92,5 +95,6 @@ class XdripBackfillTracker(
     companion object {
         const val DEFAULT_WINDOW_MS = 24L * 60L * 60L * 1000L
         const val MIN_SPACING_MS = 60_000L
+        const val LIVE_GRACE_MS = 5L * 60_000L
     }
 }
