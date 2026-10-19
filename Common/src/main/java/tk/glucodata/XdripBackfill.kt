@@ -23,8 +23,8 @@ object XdripBackfill {
 
     data class Row(val timeMs: Long, val value: Float, val rawValue: Float, val rate: Float?)
 
-    /** One stored reading with the value and rate an exchange send would carry for it. */
-    data class DisplayedRow(val timeMs: Long, val mgdl: Int, val rate: Float)
+    /** One stored reading with the mg/dL a live send would carry for it. */
+    data class DisplayedRow(val timeMs: Long, val mgdl: Int)
 
     private class Pending(val sensorSerial: String) {
         val candidates = HashMap<Long, XdripBackfillTracker.Candidate>()
@@ -80,9 +80,8 @@ object XdripBackfill {
     }
 
     /**
-     * The value and rate each of [rows] would carry on an exchange send: the primary lane,
-     * smoothed when exchange smoothing is on, then calibrated. Rows without a usable value are
-     * left out.
+     * The mg/dL each of [rows] would carry on an exchange send: the primary lane, smoothed when
+     * exchange smoothing is on, then calibrated. Rows without a usable value are left out.
      *
      * A batch rather than a single row because the smoothing window spans the rows; the xDrip
      * backfill uses the same resolution through [onHistoryStored], and Dexcom Share uses this so a
@@ -95,9 +94,7 @@ object XdripBackfill {
             candidates(
                 sensorSerial, rows, viewMode(sensorSerial),
                 DataSmoothing.exchangeSmoothingMinutes(app),
-            ).map {
-                DisplayedRow(it.timeMs, Math.round(it.mgdl).toInt(), it.rate)
-            }
+            ).map { DisplayedRow(it.timeMs, Math.round(it.mgdl).toInt()) }
         } catch (error: Throwable) {
             Log.stack(LOG_ID, "displayedRows", error)
             emptyList()

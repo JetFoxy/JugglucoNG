@@ -730,15 +730,34 @@ class HistoryRepository(context: Context = Applic.app) {
             if (app != null && DexcomShareSettings.isEnabled(app)) {
                 DexcomShareUploader.onHistoryStored(
                     serial,
-                    XdripBackfill.displayedRows(serial, backfillRows).map { displayed ->
-                        DexcomShareUploader.Row(
-                            displayed.timeMs,
-                            displayed.mgdl,
-                            ExchangeTrend.fromRate(displayed.rate).index,
-                        )
-                    },
+                    dexcomRows(backfillRows, XdripBackfill.displayedRows(serial, backfillRows)),
                 )
             }
+        }
+    }
+
+    /**
+     * The rows Dexcom Share should hear about, each with its Dexcom trend: the row's own rate
+     * when it has one, else the rate the previous displayed row implies ([ExchangeTrend.fromSamples]
+     * refuses a gap outside 4–20 minutes), else no trend.
+     */
+    private fun dexcomRows(
+        rows: List<XdripBackfill.Row>,
+        displayed: List<XdripBackfill.DisplayedRow>,
+    ): List<DexcomShareUploader.Row> {
+        val rateByTime = rows.associate { it.timeMs to it.rate }
+        var previous: XdripBackfill.DisplayedRow? = null
+        return displayed.map { current ->
+            val ownRate = rateByTime[current.timeMs]
+            val trend = when {
+                ownRate != null && ownRate.isFinite() -> ExchangeTrend.fromRate(ownRate).index
+                previous != null -> ExchangeTrend.fromSamples(
+                    previous.mgdl, previous.timeMs, current.mgdl, current.timeMs,
+                ).index
+                else -> 0
+            }
+            previous = current
+            DexcomShareUploader.Row(current.timeMs, current.mgdl, trend)
         }
     }
 

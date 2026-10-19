@@ -61,24 +61,13 @@ class DexcomShareClient(
             )
         }
 
-        // Steps 2 and 3 are fire-and-forget in xDrip: their results are ignored. One exception is
-        // deliberate — for SSO accounts this is where Dexcom reports a wrong password or a
-        // lockout, and accepting the session anyway would retry that password on every flush,
-        // which is exactly the loop the credentials policy exists to prevent.
+        // Steps 2 and 3 are fire-and-forget in xDrip: their results are ignored, but a non-2xx
+        // code is worth a line in the log when something is wrong server-side.
         val authenticate = transport.post(
             serverUrl("General/AuthenticatePublisherAccount", sessionId, serial),
             authBody
         )
         logNonSuccess("AuthenticatePublisherAccount", authenticate.code)
-        when (val kind = DexcomShareError.classify(authenticate.code, authenticate.body)) {
-            DexcomShareError.Kind.BAD_CREDENTIALS,
-            DexcomShareError.Kind.LOCKED -> return LoginResult.Failed(
-                kind,
-                authenticate.code,
-                DexcomShareError.message(authenticate.body)
-            )
-            else -> Unit
-        }
         val start = transport.post(
             serverUrl("Publisher/StartRemoteMonitoringSession", sessionId, serial),
             null
