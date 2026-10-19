@@ -23,6 +23,9 @@ object XdripBackfill {
 
     data class Row(val timeMs: Long, val value: Float, val rawValue: Float, val rate: Float?)
 
+    /** One stored reading with the value and rate an exchange send would carry for it. */
+    data class DisplayedRow(val timeMs: Long, val mgdl: Int, val rate: Float)
+
     private class Pending(val sensorSerial: String) {
         val candidates = HashMap<Long, XdripBackfillTracker.Candidate>()
     }
@@ -58,14 +61,14 @@ object XdripBackfill {
             val id = key(sensorSerial)
             if (tracker.sensor(id) == null && restore(id) == null) return
             val app = Applic.app ?: return
-            val candidates = buildCandidates(
+            val computed = candidates(
                 sensorSerial, rows, viewMode(sensorSerial), DataSmoothing.exchangeSmoothingMinutes(app),
             )
-            if (candidates.isEmpty()) return
+            if (computed.isEmpty()) return
             val schedule = synchronized(pending) {
                 val queued = pending.getOrPut(id) { Pending(sensorSerial) }
                 val first = queued.candidates.isEmpty()
-                candidates.forEach { queued.candidates[it.timeMs] = it }
+                computed.forEach { queued.candidates[it.timeMs] = it }
                 first
             }
             if (schedule) {
@@ -73,6 +76,31 @@ object XdripBackfill {
             }
         } catch (error: Throwable) {
             Log.stack(LOG_ID, "onHistoryStored", error)
+        }
+    }
+
+    /**
+     * The value and rate each of [rows] would carry on an exchange send: the primary lane,
+     * smoothed when exchange smoothing is on, then calibrated. Rows without a usable value are
+     * left out.
+     *
+     * The xDrip backfill uses this through [onHistoryStored]; Dexcom Share uses it so a backfilled
+     * reading shows the user the same number it showed on the chart and the broadcast.
+     */
+    @JvmStatic
+    fun displayedRows(sensorSerial: String, rows: List<Row>): List<DisplayedRow> {
+        if (rows.isEmpty() || sensorSerial.isEmpty()) return emptyList()
+        return try {
+            val app = Applic.app ?: return emptyList()
+            candidates(
+                sensorSerial, rows, viewMode(sensorSerial),
+                DataSmoothing.exchangeSmoothingMinutes(app),
+            ).map {
+                DisplayedRow(it.timeMs, Math.round(it.mgdl).toInt(), it.rate)
+            }
+        } catch (error: Throwable) {
+            Log.stack(LOG_ID, "displayedRows", error)
+            emptyList()
         }
     }
 
@@ -110,7 +138,7 @@ object XdripBackfill {
      * A stored rate of 0 is the "no rate" placeholder of backfilled history, so the rate is
      * derived from an earlier reading instead, or left unknown.
      */
-    private fun buildCandidates(
+    private fun candidates(
         sensorSerial: String,
         rows: List<Row>,
         viewMode: Int,
