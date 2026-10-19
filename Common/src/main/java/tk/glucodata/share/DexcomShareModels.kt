@@ -84,16 +84,23 @@ object DexcomShareJson {
     /**
      * Dexcom answers the session and status calls with a bare JSON *string* (`"8f2c…"`), and
      * the check call with an unquoted one (`AssignedToYou`). Accept whichever arrives.
+     *
+     * A JSON `null` (Dexcom's answer for an account that does not exist in this region) is not a
+     * session: returning the literal text "null" would make the uploader re-login on every flush.
      */
     fun parseJsonString(body: String): String {
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return ""
-        return runCatching {
+        val parsed = runCatching {
             when (val value = JSONTokener(trimmed).nextValue()) {
                 null -> ""
+                JSONObject.NULL -> ""
                 is String -> value
                 else -> value.toString()
             }
         }.getOrDefault(trimmed.removeSurrounding("\""))
+        return if (parsed.equals(NULL_LITERAL, ignoreCase = true)) "" else parsed
     }
+
+    private const val NULL_LITERAL = "null"
 }

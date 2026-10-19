@@ -722,16 +722,17 @@ class HistoryRepository(context: Context = Applic.app) {
         readings.groupBy(HistoryReading::sensorSerial).forEach { (serial, rows) ->
             val backfillRows = rows.map { XdripBackfill.Row(it.timestamp, it.value, it.rawValue, it.rate) }
             XdripBackfill.onHistoryStored(serial, backfillRows)
-            DexcomShareUploader.onHistoryStored(
-                serial,
+            // A factory: resolving the rows costs smoothing and calibration per row, and it is
+            // only ever asked for when Dexcom Share is on.
+            DexcomShareUploader.onHistoryStored(serial) {
                 XdripBackfill.displayedRows(serial, backfillRows).map { displayed ->
                     DexcomShareUploader.Row(
                         displayed.timeMs,
                         displayed.mgdl,
                         ExchangeTrend.fromRate(displayed.rate).index,
                     )
-                },
-            )
+                }
+            }
         }
     }
 

@@ -211,17 +211,21 @@ object DexcomShareUploader {
      * Readings the history writer just stored, which the live path may have missed. Only the
      * sensor that produced the last live reading is backfilled, and only for readings newer than
      * the moment Share was switched on — see [DexcomShareQueue.offerBackfill].
+     *
+     * [rows] is a factory, not a list: resolving a stored row to the value a live send would
+     * carry costs a native snapshot, smoothing and calibration per row, and it must not happen
+     * for the many users who never switch Share on.
      */
     @JvmStatic
-    fun onHistoryStored(sensorSerial: String, rows: List<Row>) {
-        if (sensorSerial.isEmpty() || rows.isEmpty()) return
+    fun onHistoryStored(sensorSerial: String, rows: () -> List<Row>) {
+        if (sensorSerial.isEmpty()) return
         try {
             val context = Applic.app ?: return
             if (!DexcomShareSettings.isEnabled(context)) return
             val current = stateFor(context)
             val accepted = current.queue.offerBackfill(
                 sensorKey(sensorSerial),
-                rows.filter { it.mgdl > 0 }.map {
+                rows().filter { it.mgdl > 0 }.map {
                     ShareEgv(it.timeMs, it.mgdl, DexcomShareJson.normalizeTrend(it.trendIndex))
                 },
                 System.currentTimeMillis()

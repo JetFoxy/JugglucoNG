@@ -81,9 +81,13 @@ object DexcomShareSettings {
     }
 
     /**
-     * Stores the credentials and clears everything that belonged to the old ones: a blocked
-     * login, the pending queue, and the moment Share was switched on. Enabling the feature starts
-     * the backfill window at that moment, so history from before it is never uploaded.
+     * Stores the credentials and clears what belonged to the old ones: the pending queue and the
+     * moment Share was switched on. Enabling the feature starts the backfill window at that
+     * moment, so history from before it is never uploaded.
+     *
+     * The blocked-login flag is deliberately left alone: the settings screen clears it when the
+     * credentials actually change (or the Test button succeeds), because clearing it here would
+     * make merely opening the screen retry a password Dexcom has already rejected.
      */
     fun save(context: Context, config: Config) {
         val wasEnabled = isEnabled(context)
@@ -100,7 +104,6 @@ object DexcomShareSettings {
                 .putString(KEY_PASSWORD, encryptedPassword)
                 .putString(KEY_REGION, config.region.name)
                 .putString(KEY_SERIAL, normalizeSerial(config.serial))
-                .putBoolean(KEY_AUTH_BLOCKED, false)
             if (config.enabled && !wasEnabled) {
                 editor.putLong(KEY_ENABLED_AT_MS, System.currentTimeMillis())
                 editor.remove(KEY_QUEUE_JSON)

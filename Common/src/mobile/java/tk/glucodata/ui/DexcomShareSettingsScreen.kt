@@ -39,7 +39,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -90,7 +89,6 @@ fun DexcomShareSettingsScreen(navController: NavController) {
     var status by remember { mutableStateOf(DexcomShareSettings.status(context)) }
     var testing by remember { mutableStateOf(false) }
     var testMessage by remember { mutableStateOf<String?>(null) }
-    var refreshCounter by remember { mutableIntStateOf(0) }
 
     fun currentConfig() = DexcomShareSettings.Config(
         enabled = enabled,
@@ -100,21 +98,36 @@ fun DexcomShareSettingsScreen(navController: NavController) {
         serial = serial,
     )
 
+    fun unchangedSinceOpen(): Boolean =
+        enabled == initial.enabled &&
+            account == initial.account &&
+            password == initial.password &&
+            region == initial.region &&
+            DexcomShareSettings.normalizeSerial(serial) == DexcomShareSettings.normalizeSerial(initial.serial)
+
+    /**
+     * A blocked login is only released when the user actually touched the credentials, or asked
+     * for a Test: saving anything else must not spend a login attempt with the rejected password.
+     */
     fun save() {
         val config = currentConfig()
         DexcomShareSettings.save(context, config)
+        if (account != initial.account || password != initial.password) {
+            DexcomShareSettings.setAuthBlocked(context, false)
+        }
         // A saved change invalidates the session, the blocked-login flag and the queue.
         DexcomShareUploader.onSettingsChanged(context)
         status = DexcomShareSettings.status(context)
     }
 
     DisposableEffect(Unit) {
-        onDispose { save() }
+        // Editing then leaving the screen is a save; merely visiting it is not.
+        onDispose { if (!unchangedSinceOpen()) save() }
     }
 
     // The uploader writes its status from the send thread and the prefs file is the only channel
     // between them, so the card is polled. Nothing here decrypts anything.
-    LaunchedEffect(refreshCounter) {
+    LaunchedEffect(Unit) {
         while (true) {
             status = DexcomShareSettings.status(context)
             delay(1_000)

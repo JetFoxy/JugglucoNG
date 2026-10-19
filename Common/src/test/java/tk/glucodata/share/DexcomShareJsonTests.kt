@@ -71,6 +71,16 @@ class DexcomShareJsonTests {
         assertEquals("", DexcomShareJson.parseJsonString(""))
         assertEquals("", DexcomShareJson.parseJsonString("  "))
     }
+
+    @Test
+    fun aJsonNullSessionIsEmptyRatherThanTheWordNull() {
+        // Dexcom answers an account that does not exist in the chosen region with a bare null.
+        // "null" is not a session id: treating it as one would re-login once per flush forever.
+        assertEquals("", DexcomShareJson.parseJsonString("null"))
+        assertEquals("", DexcomShareJson.parseJsonString("NULL"))
+        assertEquals("", DexcomShareJson.parseJsonString(" null "))
+        assertEquals("", DexcomShareJson.parseJsonString("\"null\""))
+    }
 }
 
 /** The Dexcom ordinal for a trend, spelled out for the tests that assert on it. */
