@@ -54,6 +54,18 @@ object DexcomShareSettings {
     ) {
         fun isReady(): Boolean =
             enabled && account.isNotBlank() && password.isNotBlank() && serial.isNotBlank()
+
+        /**
+         * Whether a login verdict taken for [other] still describes this configuration.
+         *
+         * The on/off switch is deliberately not part of it: a password Dexcom rejected is
+         * rejected whether Share is currently on or off. The serial must already be normalized.
+         */
+        fun sameLoginTarget(other: Config): Boolean =
+            account == other.account &&
+                password == other.password &&
+                region == other.region &&
+                serial == other.serial
     }
 
     data class Status(

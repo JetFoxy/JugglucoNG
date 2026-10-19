@@ -355,12 +355,16 @@ object DexcomShareUploader {
     ) {
         val appContext = context.applicationContext
         val startedIn = generation
+        // The verdict belongs to these credentials and this destination, not to the generation
+        // alone: the screen saves again on dispose, and a save that leaves the login target
+        // unchanged must not make a rejected password look stale.
+        val startedFor = config.copy(serial = DexcomShareSettings.normalizeSerial(config.serial))
         executor.execute {
-            val serial = DexcomShareSettings.normalizeSerial(config.serial)
+            val serial = startedFor.serial
             var rejected = false
             val result = try {
-                val client = DexcomShareClient(config.region, DexcomShareClient.HttpTransport)
-                when (val login = client.login(config.account, config.password, serial)) {
+                val client = DexcomShareClient(startedFor.region, DexcomShareClient.HttpTransport)
+                when (val login = client.login(startedFor.account, startedFor.password, serial)) {
                     is DexcomShareClient.LoginResult.Ok -> Result(true, "Connected")
                     is DexcomShareClient.LoginResult.Failed -> {
                         rejected = login.kind == DexcomShareError.Kind.BAD_CREDENTIALS ||
@@ -374,7 +378,7 @@ object DexcomShareUploader {
             }
             if (result.ok) {
                 val current = synchronized(lock) {
-                    if (generation != startedIn) return@synchronized false
+                    if (!testVerdictApplies(appContext, startedIn, startedFor)) return@synchronized false
                     DexcomShareSettings.setAuthBlocked(appContext, false)
                     generation++
                     state?.let { retired = it }
@@ -387,7 +391,7 @@ object DexcomShareUploader {
                 }
             } else if (rejected) {
                 val engine = synchronized(lock) {
-                    if (generation != startedIn) return@synchronized null
+                    if (!testVerdictApplies(appContext, startedIn, startedFor)) return@synchronized null
                     DexcomShareSettings.setAuthBlocked(appContext, true)
                     state?.engine
                 }
@@ -398,6 +402,21 @@ object DexcomShareUploader {
             }
             runCatching { callback(result) }.onFailure { Log.stack(LOG_ID, "testConnection callback", it) }
         }
+    }
+
+    /**
+     * A Test's verdict applies while the settings are still the ones it ran with. A generation
+     * bump alone is not enough to discard it: saving unchanged settings (the screen does that on
+     * the way out) would otherwise let the next flush retry a password Dexcom has just rejected.
+     */
+    private fun testVerdictApplies(
+        context: Context,
+        startedIn: Int,
+        startedFor: DexcomShareSettings.Config
+    ): Boolean {
+        if (generation == startedIn) return true
+        val saved = runCatching { DexcomShareSettings.load(context) }.getOrNull() ?: return false
+        return saved.sameLoginTarget(startedFor)
     }
 
     /**
