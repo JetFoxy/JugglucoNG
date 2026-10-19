@@ -205,10 +205,28 @@ object DexcomShareUploader {
     /** How long after history was held to look again, so held rows go out even if live stops. */
     private const val HELD_RECHECK_MS = DexcomShareQueue.DEFAULT_MAX_HOLD_MS + 5_000L
 
-    private class State(val queue: DexcomShareQueue, val engine: DexcomShareFlush, val sink: AndroidSink)
+    /**
+     * @param destination where this queue's readings go (region, account, serial); a queue is only
+     *        carried into new settings that send to the same place.
+     * @param enabledAtMs the switch-on moment the queue was built for; switching Share off and on
+     *        again starts a fresh queue.
+     */
+    private class State(
+        val queue: DexcomShareQueue,
+        val engine: DexcomShareFlush,
+        val sink: AndroidSink,
+        val destination: String,
+        val enabledAtMs: Long
+    )
 
     private val lock = Any()
     private var state: State? = null
+
+    /** The state a settings change replaced, kept until the next one is built (see [stateFor]). */
+    private var retired: State? = null
+
+    /** Encoding and writing the queue happen under this, so an older snapshot never lands last. */
+    private val persistLock = Any()
 
     /**
      * Bumped whenever the settings change. A flush started under older settings may still be
@@ -340,16 +358,27 @@ object DexcomShareUploader {
         }
     }
 
-    /** The queue and the session state, restored lazily from the prefs on first use. */
+    /**
+     * The queue and the session state, restored lazily from the prefs on first use.
+     *
+     * After a settings change the in-memory queue of the replaced state is carried over when the
+     * readings still go to the same place. An upload that was running across the save records its
+     * deliveries in that queue object; rebuilding from the prefs instead would drop the record
+     * (the old flush may no longer write) and send the same batch again.
+     */
     private fun stateFor(context: Context): State {
         synchronized(lock) {
             state?.let { return it }
-            val stored = DexcomShareSettings.queueJson(context)
-            val queue = if (stored.isNullOrBlank()) {
-                DexcomShareQueue(enabledAtMs = DexcomShareSettings.enabledAtMs(context))
-            } else {
-                DexcomShareQueue.decode(stored)
-            }
+            val destination = destinationOf(DexcomShareSettings.load(context))
+            val enabledAtMs = DexcomShareSettings.enabledAtMs(context)
+            val carried = retired
+                ?.takeIf { it.destination == destination && it.enabledAtMs == enabledAtMs }
+                ?.queue
+            retired = null
+            val queue = carried ?: DexcomShareSettings.queueJson(context)
+                .takeUnless { it.isNullOrBlank() }
+                ?.let(DexcomShareQueue::decode)
+                ?: DexcomShareQueue(enabledAtMs = enabledAtMs)
             val sink = AndroidSink(context, queue, generation)
             val engine = DexcomShareFlush(
                 queue = queue,
@@ -357,15 +386,19 @@ object DexcomShareUploader {
                 transportFor = { DexcomShareClient.HttpTransport },
             )
             engine.markAuthBlocked(DexcomShareSettings.isAuthBlocked(context))
-            val created = State(queue, engine, sink)
+            val created = State(queue, engine, sink, destination, enabledAtMs)
             state = created
             return created
         }
     }
 
+    private fun destinationOf(config: DexcomShareSettings.Config): String =
+        "${config.region.name}|${config.account}|${config.serial}"
+
     private fun resetState() {
         synchronized(lock) {
             generation++
+            state?.let { retired = it }
             state = null
         }
     }
@@ -449,10 +482,17 @@ object DexcomShareUploader {
             if (isCurrent()) DexcomShareSettings.setAuthBlocked(context, true)
         }
 
+        /**
+         * Called from the live callback, the history writer and the send thread. Encoding and
+         * writing under one lock keeps the saves in order: `apply()` updates the in-memory prefs
+         * at once, so whichever snapshot is encoded last is also the one that stays.
+         */
         override fun persistQueue() {
-            if (!isCurrent()) return
-            DexcomShareSettings.saveQueueJson(context, queue.encode())
-            DexcomShareSettings.recordPending(context, queue.pending(System.currentTimeMillis()).size)
+            synchronized(persistLock) {
+                if (!isCurrent()) return
+                DexcomShareSettings.saveQueueJson(context, queue.encode())
+                DexcomShareSettings.recordPending(context, queue.pending(System.currentTimeMillis()).size)
+            }
         }
     }
 }
