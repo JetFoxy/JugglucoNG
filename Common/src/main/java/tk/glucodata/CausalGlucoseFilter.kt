@@ -60,7 +60,7 @@ object CausalGlucoseFilter {
 
     internal val DEFAULT = Params()
 
-    data class Estimate(val mgdl: Double, val rateMgdlPerMin: Double)
+    internal data class Estimate(val mgdl: Double, val rateMgdlPerMin: Double)
 
     /**
      * Estimate at sample [at], from samples in `(t[at] − windowMs, t[at]]` only.

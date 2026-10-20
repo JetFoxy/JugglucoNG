@@ -75,6 +75,13 @@ object CurrentDisplaySource {
     internal val MEASURED = SmoothingMode(smoothAllData = false, smoothingMinutes = 0, collapseChunks = false)
 
     /**
+     * The history a live resolution loads. Causal estimation is defined over [CausalGlucoseFilter.WINDOW_MS],
+     * so loading less would make the live estimate a function of a shorter window than the backfill's.
+     */
+    internal fun liveHistoryWindowMs(requestedMs: Long, causal: Boolean): Long =
+        if (causal) requestedMs.coerceAtLeast(CausalGlucoseFilter.WINDOW_MS) else requestedMs
+
+    /**
      * The current reading as measured. A fingerstick is paired with this, never with a smoothed
      * or filtered estimate: anchoring a calibration to an estimate bakes the estimator's error
      * into every later value.
@@ -101,7 +108,10 @@ object CurrentDisplaySource {
         val current = CurrentGlucoseSource.getFresh(maxAgeMillis, resolvedSensorId)
         val isMmol = Applic.unit == 1
         val now = System.currentTimeMillis()
-        val liveHistoryWindowMs = historyWindowMs.coerceAtLeast(LIVE_CONTEXT_WINDOW_MS)
+        val liveHistoryWindowMs = liveHistoryWindowMs(
+            historyWindowMs.coerceAtLeast(LIVE_CONTEXT_WINDOW_MS),
+            smoothingMode.causal
+        )
         val historyStart = when {
             current != null && current.timeMillis > 0L -> (current.timeMillis - liveHistoryWindowMs).coerceAtLeast(0L)
             else -> now - historyWindowMs
@@ -173,7 +183,11 @@ object CurrentDisplaySource {
         }
         val resolvedSensorId = preferredSensorId ?: SensorIdentity.resolveMainSensor()
         val isMmol = Applic.unit == 1
-        val liveHistoryWindowMs = historyWindowMs.coerceAtLeast(LIVE_CONTEXT_WINDOW_MS)
+        val smoothingMode = localSmoothingMode()
+        val liveHistoryWindowMs = liveHistoryWindowMs(
+            historyWindowMs.coerceAtLeast(LIVE_CONTEXT_WINDOW_MS),
+            smoothingMode.causal
+        )
         val historyStart = (targetTimeMillis - liveHistoryWindowMs).coerceAtLeast(0L)
         val recentPoints = try {
             NotificationHistorySource.getDisplayHistory(historyStart, isMmol, resolvedSensorId)
@@ -196,7 +210,7 @@ object CurrentDisplaySource {
             historyStart = historyStart,
             viewMode = resolveSensorViewMode(resolvedSensorId),
             isMmol = isMmol,
-            smoothingMode = localSmoothingMode(),
+            smoothingMode = smoothingMode,
             sensorId = resolvedSensorId,
             preferIncomingSample = preferIncomingSample
         )

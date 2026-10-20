@@ -123,14 +123,35 @@ class XdripBackfillTracker(
         val lowerBound = maxOf(nowMs - windowMs, state.startWatermarkMs)
         val picked = ArrayList<Candidate>()
         for (candidate in sorted) {
-            if (candidate.timeMs <= lowerBound || candidate.timeMs > nowMs) continue
+            if (!isDeliverable(state, candidate.timeMs, nowMs, dedupMs, lowerBound)) continue
             if (!(candidate.mgdl.isFinite() && candidate.mgdl > 0.0)) continue
-            if (isRestoredAsSent(state.restored, candidate.timeMs, dedupMs)) continue
-            if (hasSentWithin(state.sent, candidate.timeMs, dedupMs)) continue
             state.sent.add(candidate.timeMs)
             picked.add(candidate)
         }
         return picked
+    }
+
+    private fun isDeliverable(state: State, timeMs: Long, nowMs: Long, dedupMs: Long, lowerBound: Long): Boolean =
+        timeMs > lowerBound && timeMs <= nowMs &&
+            !isRestoredAsSent(state.restored, timeMs, dedupMs) &&
+            !hasSentWithin(state.sent, timeMs, dedupMs)
+
+    /**
+     * Whether any of [times] still needs to go, without recording anything. Lets a caller skip
+     * preparing values for a batch the tracker would drop anyway.
+     */
+    @Synchronized
+    fun needsBackfill(
+        sensorId: String,
+        times: Collection<Long>,
+        nowMs: Long,
+        spacingMs: Long = 0L,
+    ): Boolean {
+        val state = states[sensorId] ?: return false
+        val period = period(state)
+        val dedupMs = maxOf(period - period / 6, spacingMs)
+        val lowerBound = maxOf(nowMs - windowMs, state.startWatermarkMs)
+        return times.any { isDeliverable(state, it, nowMs, dedupMs, lowerBound) }
     }
 
     private fun period(state: State): Long = if (state.periodMs > 0L) state.periodMs else DEFAULT_PERIOD_MS

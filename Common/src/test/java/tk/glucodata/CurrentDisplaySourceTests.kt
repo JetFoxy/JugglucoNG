@@ -548,6 +548,20 @@ class CurrentDisplaySourceTests {
         assertEquals(false, mode.collapseChunks)
     }
 
+    @Test
+    fun causalFilterWidensTheLiveHistoryWindowToItsWholeWindow() {
+        val trendWindow = 25 * 60_000L
+        assertEquals(trendWindow, CurrentDisplaySource.liveHistoryWindowMs(trendWindow, causal = false))
+        assertEquals(
+            CausalGlucoseFilter.WINDOW_MS,
+            CurrentDisplaySource.liveHistoryWindowMs(trendWindow, causal = true)
+        )
+        assertEquals(
+            90 * 60_000L,
+            CurrentDisplaySource.liveHistoryWindowMs(90 * 60_000L, causal = true)
+        )
+    }
+
     private fun withOffsetCalibration(offsetMgdl: Float, block: () -> Unit) {
         CalibrationAccess.register(object : CalibrationProvider {
             override fun hasActiveCalibration(isRawMode: Boolean, sensorId: String?) = true

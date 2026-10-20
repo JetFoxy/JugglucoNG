@@ -166,6 +166,13 @@ object XdripBackfill {
     private fun causalHistoryFor(app: Context, sensorSerial: String, rows: List<Row>): List<GlucosePoint>? {
         if (rows.isEmpty() || !DataSmoothing.useCausalFilter(app)) return null
         if (!DataSmoothing.shouldSmoothExchangeOutputs(app)) return null
+        // Only a batch with a reading the tracker would still send needs its history: a batch
+        // that is already covered would pay for a Room read and a filter for nothing.
+        val id = key(sensorSerial)
+        val spacingMs = DataSmoothing.exchangeThrottleIntervalMinutes(app) * 60_000L
+        if (!tracker.needsBackfill(id, rows.map { it.timeMs }, System.currentTimeMillis(), spacingMs)) {
+            return null
+        }
         val start = rows.minOf { it.timeMs } - CausalGlucoseFilter.WINDOW_MS
         return NotificationHistorySource.getRawHistory(start, sensorSerial)
     }
