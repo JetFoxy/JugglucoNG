@@ -141,6 +141,8 @@ object CausalGlucoseFilter {
      *
      * [mgdlPerUnit] converts the lane to mg/dL for the filter (18.0182 for mmol/L, 1 for mg/dL)
      * and back. An invalid point keeps its original value, as [GlucoseSmoothing.smoothLane] does.
+     * [sameSource] ends one filtered stretch and starts a new one: state is not carried across a
+     * change of sensor, so an imported stretch cannot pull the selected sensor's estimate.
      */
     internal fun <T> filterLane(
         points: List<T>,
@@ -148,15 +150,29 @@ object CausalGlucoseFilter {
         selector: (T) -> Float,
         mgdlPerUnit: Float,
         params: Params = DEFAULT,
+        sameSource: (T, T) -> Boolean = { _, _ -> true },
     ): FloatArray {
         val size = points.size
-        val times = LongArray(size) { timestamp(points[it]) }
         val originals = FloatArray(size) { selector(points[it]) }
         val values = DoubleArray(size) { originals[it].toDouble() * mgdlPerUnit }
-        return FloatArray(size) { index ->
-            val estimate = estimateAt(times, values, index, params)
-            if (estimate == null) originals[index] else (estimate.mgdl / mgdlPerUnit).toFloat()
+        val filtered = FloatArray(size)
+        var start = 0
+        while (start < size) {
+            var end = start
+            while (end + 1 < size && sameSource(points[end], points[end + 1])) end++
+            val times = LongArray(end - start + 1) { timestamp(points[start + it]) }
+            val segment = DoubleArray(times.size) { values[start + it] }
+            for (offset in times.indices) {
+                val estimate = estimateAt(times, segment, offset, params)
+                filtered[start + offset] = if (estimate == null) {
+                    originals[start + offset]
+                } else {
+                    (estimate.mgdl / mgdlPerUnit).toFloat()
+                }
+            }
+            start = end + 1
         }
+        return filtered
     }
 
     private fun isValid(value: Double): Boolean = value.isFinite() && value > 0.0

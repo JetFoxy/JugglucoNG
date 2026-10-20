@@ -81,6 +81,10 @@ object CurrentDisplaySource {
     internal fun liveHistoryWindowMs(requestedMs: Long, causal: Boolean): Long =
         if (causal) requestedMs.coerceAtLeast(CausalGlucoseFilter.WINDOW_MS) else requestedMs
 
+    /** Whether [points] holds a reading no older than [maxAgeMs] at [nowMs]. */
+    internal fun hasFreshReading(points: List<GlucosePoint>, nowMs: Long, maxAgeMs: Long): Boolean =
+        points.any { nowMs - it.timestamp <= maxAgeMs }
+
     /**
      * The current reading as measured. A fingerstick is paired with this, never with a smoothed
      * or filtered estimate: anchoring a calibration to an estimate bakes the estimator's error
@@ -121,6 +125,9 @@ object CurrentDisplaySource {
         } catch (_: Throwable) {
             emptyList()
         }
+        // The causal filter needs a longer window than a fresh reading does. With no live sample,
+        // a stale point from that longer window must not become the current value.
+        if (current == null && !hasFreshReading(recentPoints, now, maxAgeMillis)) return null
         val viewMode = resolveSensorViewMode(resolvedSensorId)
         return resolveSnapshot(
             current = current,

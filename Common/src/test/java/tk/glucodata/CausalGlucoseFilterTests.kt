@@ -115,4 +115,16 @@ class CausalGlucoseFilterTests {
         val lane = CausalGlucoseFilter.filterLane((0 until 5).toList(), { t[it] }, { v[it] }, 1f)
         assertEquals(0f, lane[2], 0f)
     }
+
+    @Test
+    fun aSourceChangeRestartsTheFilterInsteadOfCarryingTheOldLevel() {
+        val t = times(12)
+        val v = DoubleArray(12) { if (it < 6) 100.0 else 200.0 }
+        val source = List(12) { if (it < 6) "A" else "B" }
+        val lane = CausalGlucoseFilter.filterLane(
+            (0 until 12).toList(), { t[it] }, { v[it].toFloat() }, 1f,
+            sameSource = { a, b -> source[a] == source[b] },
+        )
+        assertEquals(200f, lane[11], 1e-3f)
+    }
 }

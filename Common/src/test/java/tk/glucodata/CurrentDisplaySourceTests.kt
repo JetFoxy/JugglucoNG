@@ -1,6 +1,7 @@
 package tk.glucodata
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
@@ -560,6 +561,23 @@ class CurrentDisplaySourceTests {
             90 * 60_000L,
             CurrentDisplaySource.liveHistoryWindowMs(90 * 60_000L, causal = true)
         )
+    }
+
+    @Test
+    fun anExpiredHistoryReadingIsNotCurrent() {
+        val now = 1_700_000_000_000L
+        val maxAge = 15 * 60_000L
+        assertTrue(
+            CurrentDisplaySource.hasFreshReading(
+                listOf(GlucosePoint(now - 60_000L, 100f, 90f)), now, maxAge
+            )
+        )
+        assertFalse(
+            CurrentDisplaySource.hasFreshReading(
+                listOf(GlucosePoint(now - 40 * 60_000L, 100f, 90f)), now, maxAge
+            )
+        )
+        assertFalse(CurrentDisplaySource.hasFreshReading(emptyList(), now, maxAge))
     }
 
     private fun withOffsetCalibration(offsetMgdl: Float, block: () -> Unit) {

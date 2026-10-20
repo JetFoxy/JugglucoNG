@@ -156,6 +156,7 @@ object XdripBackfill {
         if (history.isEmpty() || rowTimes.isEmpty()) return emptyMap()
         val lane = CausalGlucoseFilter.filterLane(
             history, { it.timestamp }, { if (rawLane) it.rawValue else it.value }, mgdlPerUnit = 1f,
+            sameSource = DataSmoothing::sameCausalSource,
         )
         val indexByTime = java.util.TreeMap<Long, Int>()
         history.forEachIndexed { index, point -> indexByTime[point.timestamp] = index }
@@ -223,8 +224,12 @@ object XdripBackfill {
         val smoothed = when {
             smoothingMinutes <= 0 -> valid.map(::base)
             causalHistory != null -> {
-                val filtered = causalLaneValues(causalHistory, valid.map(Row::timeMs), rawPrimary)
-                valid.map { row -> filtered[row.timeMs] ?: base(row) }
+                val times = valid.map(Row::timeMs)
+                val auto = causalLaneValues(causalHistory, times, rawLane = false)
+                val raw = if (rawPrimary) causalLaneValues(causalHistory, times, rawLane = true) else emptyMap()
+                // The same per-reading lane choice the live path makes: a row without a usable
+                // raw value takes the filtered auto lane, never its unfiltered stored value.
+                valid.map { row -> (if (usesRaw(row)) raw[row.timeMs] else auto[row.timeMs]) ?: base(row) }
             }
             valid.size >= MIN_SMOOTHING_POINTS ->
                 GlucoseSmoothing.smoothLane(valid, smoothingMinutes * 30_000L, Row::timeMs, ::base).toList()

@@ -272,6 +272,16 @@ object DataSmoothing {
         }
     }
 
+    /**
+     * Whether two display points belong to the same sensor. A point without a serial is the merged
+     * live sample of the selected sensor; aliases of one sensor match through
+     * [SensorIdentity.matches], while imported readings do not.
+     */
+    internal fun sameCausalSource(a: GlucosePoint, b: GlucosePoint): Boolean =
+        a.sensorSerial.isNullOrBlank() ||
+            b.sensorSerial.isNullOrBlank() ||
+            SensorIdentity.matches(a.sensorSerial, b.sensorSerial)
+
     private fun smoothSeries(
         points: List<GlucosePoint>,
         halfWindowMs: Long,
@@ -302,8 +312,12 @@ object DataSmoothing {
         val sanitizedMinutes = sanitizeMinutes(smoothingMinutes)
         if (sanitizedMinutes <= 0) return points
 
-        val autoLane = CausalGlucoseFilter.filterLane(points, { it.timestamp }, { it.value }, mgdlPerUnit)
-        val rawLane = CausalGlucoseFilter.filterLane(points, { it.timestamp }, { it.rawValue }, mgdlPerUnit)
+        val autoLane = CausalGlucoseFilter.filterLane(
+            points, { it.timestamp }, { it.value }, mgdlPerUnit, sameSource = ::sameCausalSource
+        )
+        val rawLane = CausalGlucoseFilter.filterLane(
+            points, { it.timestamp }, { it.rawValue }, mgdlPerUnit, sameSource = ::sameCausalSource
+        )
         val filtered = ArrayList<GlucosePoint>(points.size)
         points.indices.forEach { index ->
             val source = points[index]

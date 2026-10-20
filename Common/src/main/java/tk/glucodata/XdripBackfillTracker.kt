@@ -116,7 +116,7 @@ class XdripBackfillTracker(
     ): List<Candidate> {
         val state = states[sensorId] ?: return emptyList()
         val sorted = batch.sortedBy(Candidate::timeMs)
-        measurePeriod(sorted)?.let { state.periodMs = it }
+        measuredPeriod(sorted.map(Candidate::timeMs))?.let { state.periodMs = it }
         state.spacingMs = spacingMs
         val period = period(state)
         val dedupMs = maxOf(period - period / 6, spacingMs)
@@ -148,7 +148,9 @@ class XdripBackfillTracker(
         spacingMs: Long = 0L,
     ): Boolean {
         val state = states[sensorId] ?: return false
-        val period = period(state)
+        // The same period pick() would measure from this batch, so the two checks cannot
+        // disagree about what is already covered.
+        val period = measuredPeriod(times.sorted()) ?: period(state)
         val dedupMs = maxOf(period - period / 6, spacingMs)
         val lowerBound = maxOf(nowMs - windowMs, state.startWatermarkMs)
         return times.any { isDeliverable(state, it, nowMs, dedupMs, lowerBound) }
@@ -157,8 +159,8 @@ class XdripBackfillTracker(
     private fun period(state: State): Long = if (state.periodMs > 0L) state.periodMs else DEFAULT_PERIOD_MS
 
     /** Median spacing of consecutive readings, clamped to the 1-5 minute range sensors use. */
-    private fun measurePeriod(sorted: List<Candidate>): Long? {
-        val gaps = sorted.zipWithNext { a, b -> b.timeMs - a.timeMs }
+    private fun measuredPeriod(sortedTimes: List<Long>): Long? {
+        val gaps = sortedTimes.zipWithNext { a, b -> b - a }
             .filter { it in MIN_PERIOD_MS / 2..MAX_PERIOD_MS * 2 }
             .sorted()
         if (gaps.isEmpty()) return null

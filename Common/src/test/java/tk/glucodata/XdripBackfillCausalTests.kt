@@ -53,6 +53,21 @@ class XdripBackfillCausalTests {
     }
 
     @Test
+    fun rawPrimaryRowsWithoutRawUseTheFilteredAutoLane() {
+        val history = (0 until 40).map { i ->
+            GlucosePoint(i * minute, 100f + (i % 4) * 5f, if (i == 36) 0f else 90f)
+        }
+        val row = XdripBackfill.Row(36L * minute, history[36].value, 0f, null)
+        val displayed = XdripBackfill.displayedRows(
+            sensorSerial = "test", rows = listOf(row), viewMode = 3, smoothingMinutes = 5, causalHistory = history,
+        )
+        val auto = XdripBackfill.causalLaneValues(history, listOf(36L * minute), rawLane = false)
+
+        assertEquals(1, displayed.size)
+        assertEquals(auto.getValue(36L * minute), displayed.single().mgdl.toFloat(), 0.51f)
+    }
+
+    @Test
     fun displayedRowsCarryTheFilterValueEvenWhenTheTrackerNeverSawTheSensor() {
         val history = (0 until 40).map { i -> GlucosePoint(i * minute, 100f + (i % 4) * 5f, 90f) }
         val rows = listOf(35L, 36L, 37L).map { minuteIndex ->

@@ -176,6 +176,23 @@ class XdripBackfillTrackerTests {
     }
 
     @Test
+    fun `needsBackfill agrees with pick when the batch changes the cadence`() {
+        fun seeded(): XdripBackfillTracker = XdripBackfillTracker().also { tracker ->
+            tracker.recordSent("S", now - 30 * minute, 1, 0L)
+            // A sparse batch teaches a five-minute cadence.
+            tracker.pick("S", listOf(point(20), point(15)), now)
+            tracker.recordSent("S", now - 5 * minute, 1, 0L)
+            tracker.recordSent("S", now, 1, 0L)
+        }
+        val batch = (4L downTo 1L).map { point(it) }
+
+        val picked = seeded().pick("S", batch, now)
+
+        assertTrue(picked.isNotEmpty())
+        assertEquals(picked.isNotEmpty(), seeded().needsBackfill("S", batch.map { it.timeMs }, now))
+    }
+
+    @Test
     fun `an unknown sensor needs no backfill`() {
         assertFalse(XdripBackfillTracker().needsBackfill("S", listOf(now), now))
     }
