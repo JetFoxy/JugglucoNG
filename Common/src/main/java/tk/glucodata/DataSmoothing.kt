@@ -283,6 +283,45 @@ object DataSmoothing {
         selector = { if (useRawValue) it.rawValue else it.value },
     )
 
+    /**
+     * [smoothNativePoints] with [CausalGlucoseFilter] in place of the averaging window: every
+     * point is estimated from the past only, so the newest one is not an edge fit and will not be
+     * redrawn differently once later readings arrive. [smoothingMinutes] still gates it (0 = off)
+     * and still sets the collapse interval.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun smoothNativePointsCausal(
+        points: List<GlucosePoint>?,
+        smoothingMinutes: Int,
+        collapseChunks: Boolean,
+        mgdlPerUnit: Float,
+        nowMillis: Long = System.currentTimeMillis()
+    ): List<GlucosePoint> {
+        if (points.isNullOrEmpty()) return emptyList()
+        val sanitizedMinutes = sanitizeMinutes(smoothingMinutes)
+        if (sanitizedMinutes <= 0) return points
+
+        val autoLane = CausalGlucoseFilter.filterLane(points, { it.timestamp }, { it.value }, mgdlPerUnit)
+        val rawLane = CausalGlucoseFilter.filterLane(points, { it.timestamp }, { it.rawValue }, mgdlPerUnit)
+        val filtered = ArrayList<GlucosePoint>(points.size)
+        points.indices.forEach { index ->
+            val source = points[index]
+            val point = GlucosePoint(source.timestamp, autoLane[index], rawLane[index])
+            point.color = source.color
+            point.sensorSerial = source.sensorSerial
+            point.sealedDisplayValue = source.sealedDisplayValue
+            point.sealedDisplayViewMode = source.sealedDisplayViewMode
+            point.uncertainty = source.uncertainty?.shifted(autoLane[index] - source.value)
+            filtered.add(point)
+        }
+        return if (collapseChunks) {
+            collapsePointsForDisplay(filtered, collapseIntervalMinutes(sanitizedMinutes), nowMillis)
+        } else {
+            filtered
+        }
+    }
+
     internal fun collapsePointsForDisplay(
         points: List<GlucosePoint>,
         smoothingMinutes: Int,
