@@ -61,8 +61,22 @@ object XdripBackfill {
             val id = key(sensorSerial)
             if (tracker.sensor(id) == null && restore(id) == null) return
             val app = Applic.app ?: return
+            val mode = viewMode(sensorSerial)
+            // Live values are filtered when the causal filter is on; a backfilled minute must
+            // carry the same number, not the raw sample. Rows are already committed, so the
+            // stored history around them is what the live path would have seen.
+            val causal = if (DataSmoothing.shouldSmoothExchangeOutputs(app) && DataSmoothing.useCausalFilter(app)) {
+                val start = rows.minOf { it.timeMs } - CausalGlucoseFilter.WINDOW_MS
+                causalLaneValues(
+                    NotificationHistorySource.getRawHistory(start, sensorSerial),
+                    rows.map { it.timeMs },
+                    rawLane = mode == RAW_ONLY_VIEW_MODE || mode == RAW_PRIMARY_VIEW_MODE,
+                )
+            } else {
+                emptyMap()
+            }
             val computed = candidates(
-                sensorSerial, rows, viewMode(sensorSerial), DataSmoothing.exchangeSmoothingMinutes(app),
+                sensorSerial, rows, mode, DataSmoothing.exchangeSmoothingMinutes(app), causal,
             )
             if (computed.isEmpty()) return
             val schedule = synchronized(pending) {
@@ -127,6 +141,36 @@ object XdripBackfill {
         return main.isNullOrEmpty() || SensorIdentity.matches(sensorSerial, main)
     }
 
+    /** Room keeps the arrival millisecond; a row and its stored point can differ by that much. */
+    private const val MATCH_TOLERANCE_MS = 30_000L
+
+    /**
+     * The lane value the live path would have sent for each of [rowTimes], given the stored
+     * [history] (ascending, mg/dL). A row with no stored point within [MATCH_TOLERANCE_MS] is
+     * left out, and the caller sends its own value as before.
+     */
+    internal fun causalLaneValues(
+        history: List<GlucosePoint>,
+        rowTimes: Collection<Long>,
+        rawLane: Boolean,
+    ): Map<Long, Float> {
+        if (history.isEmpty() || rowTimes.isEmpty()) return emptyMap()
+        val lane = CausalGlucoseFilter.filterLane(
+            history, { it.timestamp }, { if (rawLane) it.rawValue else it.value }, mgdlPerUnit = 1f,
+        )
+        val indexByTime = java.util.TreeMap<Long, Int>()
+        history.forEachIndexed { index, point -> indexByTime[point.timestamp] = index }
+        val result = HashMap<Long, Float>()
+        for (rowTime in rowTimes) {
+            val nearest = listOfNotNull(indexByTime.floorEntry(rowTime), indexByTime.ceilingEntry(rowTime))
+                .minByOrNull { kotlin.math.abs(it.key - rowTime) } ?: continue
+            if (kotlin.math.abs(nearest.key - rowTime) > MATCH_TOLERANCE_MS) continue
+            val value = lane[nearest.value]
+            if (value.isFinite() && value > 0f) result[rowTime] = value
+        }
+        return result
+    }
+
     /**
      * The values a live reading would have carried: the primary lane, smoothed when exchange
      * smoothing is on, then calibrated. In the raw view modes a row without a raw value falls back
@@ -134,16 +178,20 @@ object XdripBackfill {
      * here; [NightscoutCalibration] does the display-unit conversion the calibration model needs.
      * A stored rate of 0 is the "no rate" placeholder of backfilled history, so the rate is
      * derived from an earlier reading instead, or left unknown.
+     *
+     * [causal] carries the value the live path would have sent for a row when the causal filter is
+     * on; a row it does not name falls back to its raw stored value.
      */
     private fun candidates(
         sensorSerial: String,
         rows: List<Row>,
         viewMode: Int,
         smoothingMinutes: Int,
+        causal: Map<Long, Float> = emptyMap(),
     ): List<XdripBackfillTracker.Candidate> {
         val rawPrimary = viewMode == RAW_ONLY_VIEW_MODE || viewMode == RAW_PRIMARY_VIEW_MODE
         fun usesRaw(row: Row) = rawPrimary && row.rawValue.isFinite() && row.rawValue > 0f
-        fun base(row: Row) = if (usesRaw(row)) row.rawValue else row.value
+        fun base(row: Row) = causal[row.timeMs] ?: if (usesRaw(row)) row.rawValue else row.value
         val valid = rows.sortedBy(Row::timeMs).filter { base(it).isFinite() && base(it) > 0f }
         val smoothed = if (smoothingMinutes > 0 && valid.size >= MIN_SMOOTHING_POINTS) {
             GlucoseSmoothing.smoothLane(valid, smoothingMinutes * 30_000L, Row::timeMs, ::base).toList()
