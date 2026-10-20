@@ -1,6 +1,7 @@
 package tk.glucodata
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
 
@@ -498,6 +499,46 @@ class CurrentDisplaySourceTests {
             sensorId = SENSOR
         )
     )
+
+    @Test
+    fun prepareRecentPointsForCurrent_causalModeDoesNotJumpToALoneLiveSpike() {
+        val minute = 60_000L
+        val recentPoints = (0 until 19).map { GlucosePoint(it * minute, 100f, 100f) }
+        val current = CurrentGlucoseSource.Snapshot(
+            timeMillis = 20L * minute,
+            valueText = "",
+            numericValue = 160f,
+            rawNumericValue = Float.NaN,
+            rate = 0f,
+            sensorId = "test",
+            sensorGen = 0,
+            index = 0,
+            source = "test"
+        )
+        val processed = CurrentDisplaySource.prepareRecentPointsForCurrent(
+            recentPoints = recentPoints,
+            current = current,
+            historyStart = 0L,
+            viewMode = 0,
+            smoothAllData = true,
+            smoothingMinutes = 5,
+            collapseChunks = false,
+            causal = true,
+            mgdlPerUnit = 1f
+        )
+        assertEquals(20L * minute, processed.last().timestamp)
+        assertTrue(processed.last().value < 110f)
+    }
+
+    @Test
+    fun exchangeSmoothingMode_carriesTheCausalSwitch() {
+        val mode = CurrentDisplaySource.exchangeSmoothingMode(
+            smoothingMinutes = 5, graphOnly = false, exchangeOutputsOnly = true,
+            collapseChunks = false, causal = true
+        )
+        assertTrue(mode.smoothAllData)
+        assertTrue(mode.causal)
+    }
 
     private fun withOffsetCalibration(offsetMgdl: Float, block: () -> Unit) {
         CalibrationAccess.register(object : CalibrationProvider {
