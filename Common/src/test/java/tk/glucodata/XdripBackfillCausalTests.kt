@@ -34,4 +34,21 @@ class XdripBackfillCausalTests {
         val values = XdripBackfill.causalLaneValues(history, listOf(60L * minute), rawLane = false)
         assertTrue(values.isEmpty())
     }
+
+    @Test
+    fun candidatesCarryTheCausalValueWithoutSmoothingItAgain() {
+        val history = (0 until 40).map { i -> GlucosePoint(i * minute, 100f + (i % 4) * 5f, 90f) }
+        val rows = listOf(35L, 36L, 37L).map { minuteIndex ->
+            val point = history[minuteIndex.toInt()]
+            XdripBackfill.Row(minuteIndex * minute, point.value, point.rawValue, null)
+        }
+        val causal = XdripBackfill.causalLaneValues(history, rows.map { it.timeMs }, rawLane = false)
+        val candidates = XdripBackfill.candidates(
+            sensorSerial = "test", rows = rows, viewMode = 0, smoothingMinutes = 5, causalHistory = history,
+        )
+        assertEquals(rows.size, candidates.size)
+        candidates.forEach { candidate ->
+            assertEquals(causal.getValue(candidate.timeMs), candidate.mgdl.toFloat(), 1e-3f)
+        }
+    }
 }
