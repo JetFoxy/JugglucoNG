@@ -51,4 +51,22 @@ class XdripBackfillCausalTests {
             assertEquals(causal.getValue(candidate.timeMs), candidate.mgdl.toFloat(), 1e-3f)
         }
     }
+
+    @Test
+    fun displayedRowsCarryTheFilterValueEvenWhenTheTrackerNeverSawTheSensor() {
+        val history = (0 until 40).map { i -> GlucosePoint(i * minute, 100f + (i % 4) * 5f, 90f) }
+        val rows = listOf(35L, 36L, 37L).map { minuteIndex ->
+            val point = history[minuteIndex.toInt()]
+            XdripBackfill.Row(minuteIndex * minute, point.value, point.rawValue, null)
+        }
+        val causal = XdripBackfill.causalLaneValues(history, rows.map { it.timeMs }, rawLane = false)
+
+        // No XdripBackfillTracker is involved: Dexcom Share must not depend on the xDrip broadcast.
+        val displayed = XdripBackfill.displayedRows("test", rows, viewMode = 0, smoothingMinutes = 5, causalHistory = history)
+
+        assertEquals(rows.size, displayed.size)
+        displayed.forEach { row ->
+            assertEquals(causal.getValue(row.timeMs), row.mgdl.toFloat(), 0.5f)
+        }
+    }
 }

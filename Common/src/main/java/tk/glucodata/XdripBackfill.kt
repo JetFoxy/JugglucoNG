@@ -63,7 +63,7 @@ object XdripBackfill {
             val app = Applic.app ?: return
             val computed = candidates(
                 sensorSerial, rows, viewMode(sensorSerial), DataSmoothing.exchangeSmoothingMinutes(app),
-                causalHistoryFor(app, sensorSerial, rows),
+                backfillCausalHistoryFor(app, sensorSerial, rows),
             )
             if (computed.isEmpty()) return
             val schedule = synchronized(pending) {
@@ -92,16 +92,27 @@ object XdripBackfill {
         if (rows.isEmpty() || sensorSerial.isEmpty()) return emptyList()
         return try {
             val app = Applic.app ?: return emptyList()
-            candidates(
+            displayedRows(
                 sensorSerial, rows, viewMode(sensorSerial),
                 DataSmoothing.exchangeSmoothingMinutes(app),
                 causalHistoryFor(app, sensorSerial, rows),
-            ).map { DisplayedRow(it.timeMs, Math.round(it.mgdl).toInt()) }
+            )
         } catch (error: Throwable) {
             Log.stack(LOG_ID, "displayedRows", error)
             emptyList()
         }
     }
+
+    /** [displayedRows] with everything it reads from the phone already resolved. */
+    internal fun displayedRows(
+        sensorSerial: String,
+        rows: List<Row>,
+        viewMode: Int,
+        smoothingMinutes: Int,
+        causalHistory: List<GlucosePoint>?,
+    ): List<DisplayedRow> =
+        candidates(sensorSerial, rows, viewMode, smoothingMinutes, causalHistory)
+            .map { DisplayedRow(it.timeMs, Math.round(it.mgdl).toInt()) }
 
     private fun flush(id: String) {
         try {
@@ -163,18 +174,32 @@ object XdripBackfill {
      * Stored history around [rows] for the causal filter, or null when it is off. Rows are
      * already committed, so this is what the live path would have seen for each of them.
      */
+    /**
+     * Stored history around [rows] for the causal filter, or null when it is off. Rows are
+     * already committed, so this is what the live path would have seen for each of them.
+     *
+     * Never consults the xDrip tracker: Dexcom Share uses this path even when the xDrip broadcast
+     * is off, and must still carry the number the live stream showed.
+     */
     private fun causalHistoryFor(app: Context, sensorSerial: String, rows: List<Row>): List<GlucosePoint>? {
         if (rows.isEmpty() || !DataSmoothing.useCausalFilter(app)) return null
         if (!DataSmoothing.shouldSmoothExchangeOutputs(app)) return null
-        // Only a batch with a reading the tracker would still send needs its history: a batch
-        // that is already covered would pay for a Room read and a filter for nothing.
-        val id = key(sensorSerial)
-        val spacingMs = DataSmoothing.exchangeThrottleIntervalMinutes(app) * 60_000L
-        if (!tracker.needsBackfill(id, rows.map { it.timeMs }, System.currentTimeMillis(), spacingMs)) {
-            return null
-        }
         val start = rows.minOf { it.timeMs } - CausalGlucoseFilter.WINDOW_MS
         return NotificationHistorySource.getRawHistory(start, sensorSerial)
+    }
+
+    /**
+     * [causalHistoryFor] for the xDrip backfill only, and only when the tracker would still send
+     * something from [rows]. A batch that is already covered would pay for a Room read and a
+     * filter for nothing.
+     */
+    private fun backfillCausalHistoryFor(app: Context, sensorSerial: String, rows: List<Row>): List<GlucosePoint>? {
+        val spacingMs = DataSmoothing.exchangeThrottleIntervalMinutes(app) * 60_000L
+        val needed = tracker.needsBackfill(
+            key(sensorSerial), rows.map { it.timeMs }, System.currentTimeMillis(), spacingMs,
+        )
+        if (!needed) return null
+        return causalHistoryFor(app, sensorSerial, rows)
     }
 
     /**

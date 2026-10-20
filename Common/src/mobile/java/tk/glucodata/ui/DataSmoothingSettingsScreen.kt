@@ -265,17 +265,7 @@ fun DataSmoothingSettingsScreen(
                     onCheckedChange = { viewModel.setDataSmoothingCollapseChunks(it) },
                     icon = Icons.Default.FilterAlt,
                     iconTint = MaterialTheme.colorScheme.secondary,
-                    position = CardPosition.MIDDLE,
-                    enabled = isEnabled
-                )
-                SettingsSwitchItem(
-                    title = stringResource(R.string.data_smoothing_causal_title),
-                    subtitle = stringResource(R.string.data_smoothing_causal_desc),
-                    checked = causal,
-                    onCheckedChange = { viewModel.setDataSmoothingCausal(it) },
-                    icon = Icons.Default.Timeline,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    position = CardPosition.BOTTOM,
+                    position = CardPosition.TOP,
                     enabled = isEnabled
                 )
                 if (collapseChunks) {
@@ -286,6 +276,16 @@ fun DataSmoothingSettingsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
+                SettingsSwitchItem(
+                    title = stringResource(R.string.data_smoothing_causal_title),
+                    subtitle = stringResource(R.string.data_smoothing_causal_desc),
+                    checked = causal,
+                    onCheckedChange = { viewModel.setDataSmoothingCausal(it) },
+                    icon = Icons.Default.Timeline,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    position = CardPosition.BOTTOM,
+                    enabled = isEnabled
+                )
             }
         }
     }
