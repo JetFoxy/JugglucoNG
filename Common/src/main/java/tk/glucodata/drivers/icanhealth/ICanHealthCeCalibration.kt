@@ -51,9 +51,12 @@ data class ICanHealthCeCalibrationResult(
  *    `((caliK - 1) * count) / 5 + 1` is only meaningful for a coefficient. Feeding a glucose value
  *    there produces a ramp of the order of the glucose itself.
  *
- * The path is unreachable at runtime while `supportsSensorCalibration()` is false, and it cannot
- * become meaningful before the coefficients have a source: they come from the `correctCode` table
- * (server, or the SN-derived fallback) — see the iCan calibration plan.
+ * The path is unreachable at runtime while `supportsSensorCalibration()` is false. The coefficients
+ * it needs are the per-sensor `calFactor` blob: the vendor parses `SdkCgmDeviceInfo.getCalFactor()`
+ * into an `AlgParameterBean`, calls `startCalib` with it, and stores the result back as the new
+ * `calFactor` (`util/l0.java`). It is seeded from the server's binding data and evolved locally on
+ * each calibration. The 25-float `correctCode` table is a *different* artifact — it is written into
+ * the sensor during provisioning and never read into these slots.
  */
 object ICanHealthCeCalibration {
 

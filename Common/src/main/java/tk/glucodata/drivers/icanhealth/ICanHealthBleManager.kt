@@ -796,7 +796,11 @@ class ICanHealthBleManager(
             authChallenge = challenge,
             glucoseKey = glucoseKey,
         ) ?: return false
-        if (latestCurrentRaw.isFinite() && latestCurrentRaw > 0f && latestTemperatureC.isFinite() && latestTemperatureC > 0f) {
+        // A recent live reading is the only precondition for exercising the calibration maths now:
+        // neither `latestCurrentRaw` nor `latestTemperatureC` feeds it (they are coefficients' slots,
+        // and per #683 the live packet carries no current/temperature at all). Keep the gate as the
+        // "a live measurement exists" sanity check it effectively is.
+        if (recentLiveGlucoseMgdl.isNotEmpty()) {
             val recentHistory = recentLiveGlucoseMgdl.toList()
             // Vendor contract: planCalib(algBg, newBg, bgList, caliK, calik0, calikM) and
             // startCalib(caliK, caliAdjustBool, caliAdjustNo, newBg, calik0). `newBg` is the
