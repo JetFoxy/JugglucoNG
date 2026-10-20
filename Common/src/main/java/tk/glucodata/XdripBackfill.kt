@@ -173,10 +173,6 @@ object XdripBackfill {
     /**
      * Stored history around [rows] for the causal filter, or null when it is off. Rows are
      * already committed, so this is what the live path would have seen for each of them.
-     */
-    /**
-     * Stored history around [rows] for the causal filter, or null when it is off. Rows are
-     * already committed, so this is what the live path would have seen for each of them.
      *
      * Never consults the xDrip tracker: Dexcom Share uses this path even when the xDrip broadcast
      * is off, and must still carry the number the live stream showed.

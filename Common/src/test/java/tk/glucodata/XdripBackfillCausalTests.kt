@@ -62,6 +62,8 @@ class XdripBackfillCausalTests {
         val causal = XdripBackfill.causalLaneValues(history, rows.map { it.timeMs }, rawLane = false)
 
         // No XdripBackfillTracker is involved: Dexcom Share must not depend on the xDrip broadcast.
+        // This drives the already-resolved overload, so it cannot catch someone re-adding the
+        // needsBackfill gate inside causalHistoryFor (which reads Room and has no unit seam).
         val displayed = XdripBackfill.displayedRows("test", rows, viewMode = 0, smoothingMinutes = 5, causalHistory = history)
 
         assertEquals(rows.size, displayed.size)

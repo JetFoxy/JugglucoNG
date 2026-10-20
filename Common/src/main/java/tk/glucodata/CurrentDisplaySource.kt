@@ -114,7 +114,7 @@ object CurrentDisplaySource {
         )
         val historyStart = when {
             current != null && current.timeMillis > 0L -> (current.timeMillis - liveHistoryWindowMs).coerceAtLeast(0L)
-            else -> now - historyWindowMs
+            else -> now - liveHistoryWindowMs
         }
         val recentPoints = try {
             NotificationHistorySource.getDisplayHistory(historyStart, isMmol, resolvedSensorId)

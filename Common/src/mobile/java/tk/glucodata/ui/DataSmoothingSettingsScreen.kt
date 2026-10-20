@@ -265,7 +265,7 @@ fun DataSmoothingSettingsScreen(
                     onCheckedChange = { viewModel.setDataSmoothingCollapseChunks(it) },
                     icon = Icons.Default.FilterAlt,
                     iconTint = MaterialTheme.colorScheme.secondary,
-                    position = CardPosition.TOP,
+                    position = CardPosition.SINGLE,
                     enabled = isEnabled
                 )
                 if (collapseChunks) {
@@ -283,7 +283,7 @@ fun DataSmoothingSettingsScreen(
                     onCheckedChange = { viewModel.setDataSmoothingCausal(it) },
                     icon = Icons.Default.Timeline,
                     iconTint = MaterialTheme.colorScheme.primary,
-                    position = CardPosition.BOTTOM,
+                    position = CardPosition.SINGLE,
                     enabled = isEnabled
                 )
             }
