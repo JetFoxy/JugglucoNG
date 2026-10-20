@@ -71,6 +71,26 @@ object CurrentDisplaySource {
         )
     }
 
+    /** No smoothing of any kind: what the sensor reported, for anchoring a calibration. */
+    internal val MEASURED = SmoothingMode(smoothAllData = false, smoothingMinutes = 0, collapseChunks = false)
+
+    /**
+     * The current reading as measured. A fingerstick is paired with this, never with a smoothed
+     * or filtered estimate: anchoring a calibration to an estimate bakes the estimator's error
+     * into every later value.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun resolveCurrentMeasured(
+        maxAgeMillis: Long = Notify.glucosetimeout,
+        preferredSensorId: String? = null,
+    ): Snapshot? = resolveCurrentInternal(
+        maxAgeMillis = maxAgeMillis,
+        preferredSensorId = preferredSensorId,
+        historyWindowMs = DEFAULT_HISTORY_WINDOW_MS,
+        smoothingMode = MEASURED
+    )
+
     private fun resolveCurrentInternal(
         maxAgeMillis: Long,
         preferredSensorId: String?,

@@ -540,6 +540,14 @@ class CurrentDisplaySourceTests {
         assertTrue(mode.causal)
     }
 
+    @Test
+    fun measuredModeNeverSmooths() {
+        val mode = CurrentDisplaySource.MEASURED
+        assertEquals(false, mode.smoothAllData)
+        assertEquals(false, mode.causal)
+        assertEquals(false, mode.collapseChunks)
+    }
+
     private fun withOffsetCalibration(offsetMgdl: Float, block: () -> Unit) {
         CalibrationAccess.register(object : CalibrationProvider {
             override fun hasActiveCalibration(isRawMode: Boolean, sensorId: String?) = true
