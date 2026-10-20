@@ -58,6 +58,15 @@ object DataSmoothing {
         SettingsRegistry.SMOOTHING_EXCHANGE_OUTPUTS_ONLY.readBool(context)
 
     /**
+     * Whether the newest reading — the one shown as current and the one sent out — is estimated
+     * by [CausalGlucoseFilter] instead of the edge of the averaging window. Only the method
+     * changes: where smoothing applies is still decided by the three switches above.
+     */
+    @JvmStatic
+    fun useCausalFilter(context: Context): Boolean =
+        SettingsRegistry.SMOOTHING_CAUSAL_LIVE.readBool(context)
+
+    /**
      * The three places a reading is used, and the one question each of them asks.
      *
      * The settings are three independent switches, so every caller used to recombine them
@@ -194,6 +203,14 @@ object DataSmoothing {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(SettingsRegistry.SMOOTHING_EXCHANGE_OUTPUTS_ONLY.key, enabled)
+            .apply()
+    }
+
+    @JvmStatic
+    fun setUseCausalFilter(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(SettingsRegistry.SMOOTHING_CAUSAL_LIVE.key, enabled)
             .apply()
     }
 

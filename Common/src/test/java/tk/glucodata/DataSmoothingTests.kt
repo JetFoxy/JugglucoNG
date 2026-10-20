@@ -249,6 +249,14 @@ class DataSmoothingTests {
     }
 
     @Test
+    fun causalLiveSettingIsRegisteredMirroredAndOffByDefault() {
+        val definition = tk.glucodata.settings.SettingsRegistry.SMOOTHING_CAUSAL_LIVE
+        assertEquals("dashboard_data_smoothing_causal_live", definition.key)
+        assertEquals(false, definition.defaultValue)
+        assertTrue(tk.glucodata.settings.SettingsRegistry.definitions.contains(definition))
+    }
+
+    @Test
     fun exchangeSmoothingMinutesIsPulledBackInByCollapseUnderGraphOnly() {
         assertEquals(
             0,
