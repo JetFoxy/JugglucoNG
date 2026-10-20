@@ -278,6 +278,18 @@ class DataSmoothingTests {
     }
 
     @Test
+    fun importedReadingsDoNotShareTheSelectedSensorsFilterState() {
+        val selected = GlucosePoint(0L, 100f, 90f).also { it.sensorSerial = "30211DF2J38" }
+        val alias = GlucosePoint(60_000L, 100f, 90f).also { it.sensorSerial = "30211df2j38" }
+        val imported = GlucosePoint(60_000L, 200f, 190f).also { it.sensorSerial = "__imported_csv__" }
+        val live = GlucosePoint(120_000L, 100f, 90f)
+
+        assertTrue(DataSmoothing.sameCausalSource(selected, alias))
+        assertTrue(DataSmoothing.sameCausalSource(selected, live))
+        assertFalse(DataSmoothing.sameCausalSource(selected, imported))
+    }
+
+    @Test
     fun causalLiveSettingIsRegisteredMirroredAndOffByDefault() {
         val definition = tk.glucodata.settings.SettingsRegistry.SMOOTHING_CAUSAL_LIVE
         assertEquals("dashboard_data_smoothing_causal_live", definition.key)
