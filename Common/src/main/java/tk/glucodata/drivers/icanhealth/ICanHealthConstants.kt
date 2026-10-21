@@ -542,7 +542,7 @@ object ICanHealthConstants {
 
     // ---- Vendor Auth Response Prefixes ----
 
-    /** `F6` code state meaning "no correctCode": the sensor refuses history until provisioned. */
+    /** `F6` code state meaning "no correctCode" (observed on unprovisioned sensors; see #676). */
     const val SENSOR_CODE_STATE_UNPROVISIONED = 0xFFFF
 
     /** Challenge response prefix: 06 F3 01 [4-byte challenge] */

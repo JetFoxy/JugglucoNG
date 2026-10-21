@@ -2317,8 +2317,8 @@ class ICanHealthBleManager(
                 if (codeState == ICanHealthConstants.SENSOR_CODE_STATE_UNPROVISIONED) {
                     Log.w(
                         TAG,
-                        "$info — sensor has no correct code (F6=0xFFFF); it will refuse history " +
-                            "reads until it is provisioned — start sensors with the vendor app first"
+                        "$info — sensor has no correct code (F6=0xFFFF); " +
+                            "history requests have been refused in this state — see issue #676"
                     )
                 } else {
                     Log.i(

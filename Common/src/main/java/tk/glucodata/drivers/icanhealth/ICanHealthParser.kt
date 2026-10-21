@@ -583,8 +583,9 @@ object ICanHealthParser {
     /**
      * Decode the code state from a sensor-info response (`1C F6 01 lo hi`).
      *
-     * [ICanHealthConstants.SENSOR_CODE_STATE_UNPROVISIONED] means the sensor has no
-     * `correctCode` and refuses history reads until the vendor app provisions it.
+     * [ICanHealthConstants.SENSOR_CODE_STATE_UNPROVISIONED] is observed on unprovisioned
+     * sensors; history reads have been refused in this state (causation not established,
+     * see issue #676).
      */
     fun parseSensorInfoCodeState(data: ByteArray): Int? {
         if (!isSensorInfoResponse(data) || data.size < 5) return null
