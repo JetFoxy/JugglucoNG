@@ -85,6 +85,7 @@ class ICanHealthBleManager(
         // Live timestamps are allowed to sit a hair ahead of the clock we compare them against;
         // the anchor is sampled a few milliseconds after `now` on a busy handler thread.
         private const val MAX_LIVE_TIMESTAMP_FUTURE_SKEW_MS = 5_000L
+        private const val MAX_LIVE_TIMESTAMP_LAG_MS = 10 * 60 * 1000L
         private const val RECENT_GLUCOSE_WINDOW_SIZE = 24
         private const val NATIVE_MIRROR_STREAM_WINDOW_SEC = 15L * 24L * 60L * 60L
         private const val HISTORY_SYNC_STATUS_STEP = 500
@@ -164,6 +165,7 @@ class ICanHealthBleManager(
     @Volatile private var postAuthSetupStarted = false
     @Volatile private var historyBackfillRequested = false
     @Volatile private var historyBackfillAttemptedThisConnection = false
+    @Volatile private var tailRetryAttemptedThisConnection = false
     @Volatile private var shouldRequestAuthenticatedHistoryBackfill = true
     @Volatile private var suppressAutomaticHistoryBackfill = false
     @Volatile private var nativeLifetimeDeclaredFor: String? = null
@@ -797,24 +799,33 @@ class ICanHealthBleManager(
         ) ?: return false
         if (latestCurrentRaw.isFinite() && latestCurrentRaw > 0f && latestTemperatureC.isFinite() && latestTemperatureC > 0f) {
             val recentHistory = recentLiveGlucoseMgdl.toList()
+            // Vendor contract: planCalib(algBg, newBg, bgList, caliK, calik0, calikM) and
+            // startCalib(caliK, caliAdjustBool, caliAdjustNo, newBg, calik0). `newBg` is the
+            // *sensor's* glucose, not the fingerstick; caliK/calik0/calikM are calibration
+            // coefficients, not measurements — their real source is the correctCode table
+            // (server or SN fallback) persisted per sensor, which the driver does not have yet.
+            // The 1f placeholders below are therefore inert, not a calibration.
+            val sensorBg = recentLiveGlucoseMgdl.lastOrNull() ?: glucoseMgDl.toFloat()
             val planned = ICanHealthCeCalibration.planCalib(
-                currentGluMgDl = recentLiveGlucoseMgdl.lastOrNull() ?: glucoseMgDl.toFloat(),
-                fingerGluMgDl = glucoseMgDl.toFloat(),
-                historyMgDl = recentHistory,
-                sensorCurrent = latestCurrentRaw,
-                temperatureC = latestTemperatureC,
+                algBg = sensorBg,
+                newBg = sensorBg,
+                bgList = recentHistory,
+                caliK = 1f,
+                calik0 = 1f,
+                calikM = 1f,
             )
             val started = ICanHealthCeCalibration.startCalib(
-                currentGluMgDl = glucoseMgDl.toFloat(),
-                isFirstCalibration = lastCeCalibrationCount <= 0,
-                existingCalibrationCount = lastCeCalibrationCount,
-                sensorCurrent = latestCurrentRaw,
-                temperatureC = latestTemperatureC,
+                caliK = 1f,
+                caliAdjustBool = lastCeCalibrationCount <= 0,
+                caliAdjustNo = lastCeCalibrationCount,
+                newBg = sensorBg,
+                calik0 = 1f,
             )
             Log.i(
                 TAG,
-                "iCan calibration plan finger=$glucoseMgDl seq=$sequenceNumber current=$latestCurrentRaw temp=$latestTemperatureC " +
-                    "planP=${planned.encodedP} startP=${started.encodedP}"
+                "iCan calibration plan finger=$glucoseMgDl seq=$sequenceNumber sensorBg=$sensorBg " +
+                    "raw=$latestCurrentRaw temp=$latestTemperatureC " +
+                    "planK=${planned.caliK} planBg=${planned.calibBg} startK=${started.caliK} startBg=${started.calibBg}"
             )
         }
         enqueueOp(GattOp.Write(ICanHealthConstants.CGM_SPECIFIC_OPS, packet))
@@ -1312,6 +1323,7 @@ class ICanHealthBleManager(
                 historyBackfillRequested = false
                 historyBackfillPhase = HistoryBackfillPhase.NONE
                 historyBackfillAttemptedThisConnection = false
+                tailRetryAttemptedThisConnection = false
                 awaitingFreshStatusForHistoryBackfill = false
                 awaitingMtuNegotiation = false
                 glucoseHistoryImportedRecordCount = 0
@@ -2099,6 +2111,24 @@ class ICanHealthBleManager(
         )
         if (resolved != null) {
             if (resolved <= fallbackNowMs) {
+                if (ICanHealthConstants.isStaleLiveTimestamp(
+                        sequenceNumber = sequenceNumber,
+                        currentSequenceNumber = currentSequenceNumber,
+                        resolvedMs = resolved,
+                        nowMs = fallbackNowMs,
+                        maxLagMs = MAX_LIVE_TIMESTAMP_LAG_MS,
+                    )) {
+                    // A live measurement was taken moments ago. A candidate far behind the wall
+                    // clock means the persisted covered edge is skewed, and every later reading
+                    // would be extrapolated from it and stored just as late.
+                    Log.w(
+                        TAG,
+                        "Live seq=$sequenceNumber resolved to $resolved, ${(fallbackNowMs - resolved) / 60000L}min " +
+                            "behind now=$fallbackNowMs; stamping it now and dropping the persisted covered edge"
+                    )
+                    invalidatePersistedCoveredEdge("live timestamp lags the wall clock")
+                    return fallbackNowMs
+                }
                 return resolved
             }
             // The anchor is read a moment after `now`, so a candidate can land a few milliseconds
@@ -2302,7 +2332,11 @@ class ICanHealthBleManager(
 
             ICanHealthParser.isSensorInfoResponse(data) -> {
                 handler.removeCallbacks(sensorInfoFallbackRunnable)
-                Log.i(TAG, "Sensor info: ${data.toHexString()}")
+                Log.i(
+                    TAG,
+                    "Sensor info: ${data.toHexString()} " +
+                        "model=$vendorModelName sw=$vendorSoftwareVersion ${bundledKeyContext()}"
+                )
                 startPostAuthSetup("sensor-info")
             }
 
@@ -2366,22 +2400,29 @@ class ICanHealthBleManager(
     }
 
     private fun handleRacpResponse(data: ByteArray) {
+        // Keep the raw bytes and the device identity on every RACP outcome: a
+        // history failure on an unseen firmware is otherwise undebuggable.
+        val racpContext =
+            "racp=${data.toHexString()} phase=${historyBackfillPhase.name} ${bundledKeyContext()}" +
+                " model=$vendorModelName sw=$vendorSoftwareVersion"
         when (ICanHealthParser.parseRacpResultCode(data)) {
             ICanHealthConstants.RACP_RESULT_SUCCESS -> {
-                Log.i(TAG, "RACP transfer complete")
+                Log.i(TAG, "RACP transfer complete ($racpContext)")
                 handleRacpPhaseCompletion(noData = false)
             }
 
             ICanHealthConstants.RACP_RESULT_NO_DATA -> {
-                Log.i(TAG, "RACP reported no data")
+                Log.i(TAG, "RACP reported no data ($racpContext)")
                 handleRacpPhaseCompletion(noData = true)
             }
 
             ICanHealthConstants.RACP_RESULT_NOT_SUPPORTED -> {
+                Log.w(TAG, "RACP not supported ($racpContext)")
                 handleRacpNotSupported()
             }
 
             ICanHealthConstants.RACP_RESULT_FAILED -> {
+                Log.w(TAG, "RACP failed ($racpContext)")
                 handleRacpFailed()
             }
 
@@ -2731,9 +2772,44 @@ class ICanHealthBleManager(
                         "retrying after RACP-failed on modern glucose-history command"
                     )
                 } else {
-                    suppressAutomaticHistoryBackfill = false
-                    shouldRequestAuthenticatedHistoryBackfill = glucoseHistoryImportedRecordCount <= 0
-                    Log.w(TAG, "RACP history request failed; will retry on a later authenticated reconnect")
+                    val requestedSequence = pendingGlucoseHistoryStartSequence
+                    val tailRetryStartSequence = if (tailRetryAttemptedThisConnection) {
+                        null
+                    } else {
+                        ICanHealthHistoryPolicy.tailRetryStartSequence(
+                            readingIntervalMinutes = readingIntervalMinutes(),
+                            currentSequence = currentSequenceNumber,
+                            requestedSequence = requestedSequence,
+                        )
+                    }
+                    if (tailRetryStartSequence != null) {
+                        // Both command families refused the requested range. That is also what a
+                        // sensor without a correct code does, but every refusal on record asks for a
+                        // range days behind the live edge, so try the tail once before concluding
+                        // anything: it either recovers the newest records or shows that the refusal
+                        // is about history as a whole. See docs/ican-cgm-protocol.md, section 6.
+                        tailRetryAttemptedThisConnection = true
+                        useModernGlucoseHistoryCommand = true
+                        pendingGlucoseHistoryStartSequence = tailRetryStartSequence
+                        Log.w(
+                            TAG,
+                            "Glucose-history RACP failed for seq=$requestedSequence on both command " +
+                                "families; retrying from the live edge at seq=$tailRetryStartSequence"
+                        )
+                        if (!beginHistoryBackfillPhase(
+                                HistoryBackfillPhase.GLUCOSE,
+                                "retrying from the live edge after RACP-failed on both command families"
+                            )
+                        ) {
+                            suppressAutomaticHistoryBackfill = false
+                            shouldRequestAuthenticatedHistoryBackfill = glucoseHistoryImportedRecordCount <= 0
+                            Log.w(TAG, "RACP history request failed; will retry on a later authenticated reconnect")
+                        }
+                    } else {
+                        suppressAutomaticHistoryBackfill = false
+                        shouldRequestAuthenticatedHistoryBackfill = glucoseHistoryImportedRecordCount <= 0
+                        Log.w(TAG, "RACP history request failed; will retry on a later authenticated reconnect")
+                    }
                 }
             }
 
@@ -3288,14 +3364,25 @@ class ICanHealthBleManager(
             persistedCoveredSequence >= 0 &&
             persistedCoveredTimestampMs > 0L &&
             currentSequenceNumber >= persistedCoveredSequence) {
-            val deltaMinutes = currentSequenceNumber - persistedCoveredSequence
-            val persistedAnchorTimeMs = persistedCoveredTimestampMs + deltaMinutes.toLong() * SEQUENCE_UNIT_MS
-            if (isPlausibleHistoryAnchor(persistedAnchorTimeMs, fallbackNowMs)) {
+            val persistedAnchorTimeMs = ICanHealthConstants.persistedCoveredAnchorMs(
+                persistedCoveredSequence = persistedCoveredSequence,
+                persistedCoveredTimestampMs = persistedCoveredTimestampMs,
+                currentSequenceNumber = currentSequenceNumber,
+                sequenceUnitMs = SEQUENCE_UNIT_MS,
+            )
+            if (ICanHealthConstants.isPersistedCoveredAnchorUsable(
+                    anchorMs = persistedAnchorTimeMs,
+                    sequenceObservedAtMs = currentSequenceObservedAtMs,
+                    divergenceToleranceMs = MAX_LIVE_TIMESTAMP_LAG_MS,
+                    plausibleRange = earliestObservedHistoryTimeMs(fallbackNowMs)..
+                        latestObservedHistoryTimeMs(fallbackNowMs),
+                )) {
                 return persistedAnchorTimeMs
             }
             invalidatePersistedCoveredEdge(
                 "persisted seq=$persistedCoveredSequence time=$persistedCoveredTimestampMs " +
-                    "reconstructed anchor=$persistedAnchorTimeMs current=$currentSequenceNumber now=$fallbackNowMs"
+                    "reconstructed anchor=$persistedAnchorTimeMs current=$currentSequenceNumber now=$fallbackNowMs " +
+                    "counterObservedAt=$currentSequenceObservedAtMs"
             )
         }
         return when {
@@ -3400,6 +3487,7 @@ class ICanHealthBleManager(
         if (!shouldUpdate) {
             return
         }
+        logd(TAG) { "Covered edge seq=$sequenceNumber time=$timestampMs (was seq=$persistedCoveredSequence time=$persistedCoveredTimestampMs)" }
         persistedCoveredSequence = sequenceNumber
         persistedCoveredTimestampMs = timestampMs
         persistedCoveredEdgeLoaded = true
@@ -4172,6 +4260,7 @@ class ICanHealthBleManager(
         historyBackfillRequested = false
         historyBackfillPhase = HistoryBackfillPhase.NONE
         historyBackfillAttemptedThisConnection = false
+        tailRetryAttemptedThisConnection = false
         awaitingFreshStatusForHistoryBackfill = false
         glucoseHistoryImportedRecordCount = 0
         pendingHistoryBackfillReason = null

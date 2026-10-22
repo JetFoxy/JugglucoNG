@@ -171,43 +171,24 @@ object WearPrefsSync {
         return out.toString()
     }
 
-    // What was last sent, so the periodic re-push stays silent while nothing
-    // changes. Same convergence story as the colour scheme: a watch that was off
-    // when the user changed a setting must still catch up on its own.
-    @Volatile private var lastSentHash: Int? = null
+    // MessageClient completion does not acknowledge application on the watch. Answer every
+    // request with a snapshot: the next request retries a lost reply, independently per node.
+    private val delivery = WearPrefsDelivery(
+        encode = { encode(Applic.app) },
+        send = { node, payload ->
+            MessageSender.getMessageSender()?.let { sender ->
+                if (node == null) sender.sendWearPrefs(payload) else sender.sendWearPrefs(node, payload)
+            }
+        },
+    )
 
     @JvmStatic
     fun push() {
-        runCatching {
-            val payload = encode(Applic.app)
-            if (payload.isEmpty()) return
-            MessageSender.getMessageSender()?.sendWearPrefs(payload)
-            lastSentHash = payload.contentHashCode()
-        }.onFailure { Log.stack(LOG_ID, "push", it) }
+        runCatching { delivery.push() }.onFailure { Log.stack(LOG_ID, "push", it) }
     }
 
     @JvmStatic
     fun pushTo(nodeName: String?) {
-        val target = nodeName ?: return
-        runCatching {
-            val payload = encode(Applic.app)
-            if (payload.isEmpty()) return
-            MessageSender.getMessageSender()?.sendWearPrefs(target, payload)
-            lastSentHash = payload.contentHashCode()
-        }.onFailure { Log.stack(LOG_ID, "pushTo", it) }
-    }
-
-    /** Pushes only when something changed since the last send. */
-    @JvmStatic
-    fun pushIfChanged(nodeName: String?) {
-        val target = nodeName ?: return
-        runCatching {
-            val payload = encode(Applic.app)
-            if (payload.isEmpty()) return
-            val hash = payload.contentHashCode()
-            if (hash == lastSentHash) return
-            MessageSender.getMessageSender()?.sendWearPrefs(target, payload)
-            lastSentHash = hash
-        }.onFailure { Log.stack(LOG_ID, "pushIfChanged", it) }
+        runCatching { delivery.pushTo(nodeName) }.onFailure { Log.stack(LOG_ID, "pushTo", it) }
     }
 }

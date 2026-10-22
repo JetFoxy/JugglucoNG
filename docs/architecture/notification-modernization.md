@@ -49,18 +49,33 @@ and reapplication clears peer children before inserting the current peers.
 A standalone Pixel 8 Pro/API 37 probe renders compact/expanded native values,
 rotating/tinted vectors and double arrows; reopening retains its latest value.
 The XML bundled-font check used the app's actual IBM Plex file: local inflation
-loads it, but the shade's system/XML-font images are pixel-identical, including a
-cancelled and freshly reposted notification. Therefore ongoing phone values use
-the system font. Size/weight preferences remain; the ineffective phone font-family
-selector is removed. Stored family preferences and independent alarm/Wear rendering
-remain unchanged. This is a static native rendering improvement, not verified smooth
-motion. Light-shade, TalkBack traversal and large accessibility settings still need
-physical-device checks, along with full-app integration. The probe also compiles
-the actual production presenter and packages its XML/vector resources: compact,
-expanded, and a value/double-arrow update after reopening render in System UI.
-See the [reproducible probe and cropped device evidence](../../tools/notification-native-view-probe/README.md).
-Fourteen API 26/34 presenter host tests pass, as do phone/Wear debug/release arm64
-APK builds including R8. These checks do not establish full-app lifecycle behavior.
+loads it, but System UI substitutes its font. The family preference therefore
+uses an app-rendered text-only IBM bitmap (default), while System uses native
+TextViews with the device's configured headline family via named TypefaceSpan.
+On Pixel this is Google Sans, not generic sans-serif/Roboto. Light System weight
+uses the text-only painter so numeric weight does not replace the configured
+family. All arrows remain resource vectors. Size/weight preferences and both
+settings selectors remain supported; changing a sheet setting refreshes the
+notification after persistence.
+
+The production probe confirms IBM/System/IBM switching in the actual shade:
+the System crop differs, and switching back reproduces IBM exactly. See the
+[reproducible probe and cropped device evidence](../../tools/notification-native-view-probe/README.md).
+API 26/34 presenter tests cover restricted hosts and family reapplication, including
+clearing hidden bitmap payloads. Phone/Wear debug/release arm64 APK builds include
+R8 validation. These checks do not establish full-app lifecycle behavior, internal
+animation, TalkBack traversal, light-shade behavior or large accessibility settings.
+
+### No standard text on the ongoing phone notification
+
+[#645](https://github.com/ctqvva/JugglucoNG/issues/645): watch companion apps
+such as Haylou Fun forward any notification that has a standard title or text,
+treat every update as a new message, and offer no per-channel filter. #548 put the
+value and delta into those fields, so the watch buzzed on every reading. The
+ongoing phone glucose notification leaves them empty, as it did up to 1.2.2-Alpha.
+Its custom views already give TalkBack the value as native text or a content
+description, plus the arrow and status. Alarm, stale/status and Wear notifications
+keep their standard text, so alarms still reach the watch.
 
 Validation includes focused freshness, refresh coalescing, startup supersession,
 service ownership and publication-recovery tests on phone and Wear. Full-app

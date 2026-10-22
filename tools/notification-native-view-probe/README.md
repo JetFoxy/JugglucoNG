@@ -6,7 +6,7 @@ replacement. Uses `DecoratedCustomViewStyle`, platform notification title text
 appearance, real primary/peer TextViews, resource vectors inside RotateDrawables,
 and a bitmap chart. The default and double-head geometry follows the app's arrow.
 
-## Pixel result, 2026-10-04
+## Initial XML-font probe, 2026-10-04
 
 Pixel 8 Pro, Android 17/API 37, build `CP41.260831.007`, target SDK 37:
 
@@ -88,6 +88,95 @@ adb -s "$probe_serial" logcat -d -v threadtime NativeViewProbe:I NotifContentInf
 adb -s "$probe_serial" uninstall tk.glucodata.nativeviewprobe
 ```
 
-The preview was removed at the end of the check. System font is the verified
-fallback for the production native-value implementation; keeping a font setting
-that silently has no effect would misrepresent the supported behavior.
+The preview was removed at the end of each check.
+
+## Font-selection repair, 2026-10-05
+
+The initial recipe incorrectly treated the generic platform notification style
+as the configured system font and removed IBM Plex support. The corrected
+production presenter accepts the existing family preference (unset means IBM).
+IBM values are rendered in-app using the bundled font, including compound spans,
+with actual layout metrics and bounded 2x-density transport. Arrows remain vectors.
+System regular/medium values stay TextViews with named configured headline-family
+spans; light weight uses the app-side painter to preserve the configured family
+while applying numeric weight.
+
+On the same Pixel, `cmd overlay lookup android android:string/config_headlineFontFamily`
+returns `google-sans`, medium returns `google-sans-medium`, and body returns
+`google-sans-text`. Generic `sans-serif` is a different family. Do not describe
+unmodified notification Title text appearance as Google Sans.
+
+The actual production presenter/resources were checked in the shade with:
+
+```sh
+adb -s "$probe_serial" shell am start -S -W -n tk.glucodata.nativeviewprobe/.ProbeActivity --ez production true --ez ibm true --ei step 0
+adb -s "$probe_serial" shell am broadcast -n tk.glucodata.nativeviewprobe/.ProbeReceiver --ez production true --ez ibm false --ei step 0
+adb -s "$probe_serial" shell am broadcast -n tk.glucodata.nativeviewprobe/.ProbeReceiver --ez production true --ez ibm true --ei step 0
+```
+
+Compact and expanded IBM content rendered successfully. In the expanded value
+region (730 x 140 pixels), IBM versus System changes 7,530 pixels; switching
+System back to IBM restores the original crop exactly (zero changed pixels).
+This uses the same notification ID, exercising System UI reapplication. These
+are synthetic inputs; the installed CGM app was unchanged. The preview was removed.
+
+IBM Plex:
+
+![IBM Plex](evidence/font-fixed-ibm.png)
+
+Configured System (Google Sans on this Pixel):
+
+![Google Sans](evidence/font-fixed-google-sans.png)
+
+Switched back to IBM Plex:
+
+![IBM Plex reapplied](evidence/font-fixed-ibm-reapplied.png)
+
+
+## Scaled spacing repair, 2026-10-05
+
+The split value/vector layout introduced fixed 8dp primary-arrow, 4dp peer-arrow
+and 12dp sensor margins. Restore the old painter's spacing proportions instead:
+arrow gap = primary text pixels × 2.5/22; sensor gap = primary text pixels × 8/22.
+The arrow ImageView includes this gap in its max width so padding does not reduce
+the vector's square. Start padding follows layout direction. Drawable geometry
+and font policy are unchanged.
+
+The production presenter/resources were checked in the Pixel shade at 1.0 and
+0.6 size with IBM Plex, and at 0.6 with System/Google Sans. Compact and expanded
+content render, and the small readout has a proportionately smaller gap. The
+separate preview was removed and the installed CGM app was unchanged.
+
+```sh
+adb -s "$probe_serial" shell am start -S -W -n tk.glucodata.nativeviewprobe/.ProbeActivity --ez production true --ez ibm true --ei step 0 --ef scale 1.0
+adb -s "$probe_serial" shell am broadcast -n tk.glucodata.nativeviewprobe/.ProbeReceiver --ez production true --ez ibm true --ei step 0 --ef scale 0.6
+adb -s "$probe_serial" shell am broadcast -n tk.glucodata.nativeviewprobe/.ProbeReceiver --ez production true --ez ibm false --ei step 0 --ef scale 0.6
+```
+
+Normal IBM:
+
+![Normal spacing](evidence/spacing-normal-value.png)
+
+Small IBM:
+
+![Small spacing](evidence/spacing-small-value.png)
+
+Small System/Google Sans:
+
+![Small system spacing](evidence/spacing-system-small-value.png)
+
+## Supporting typography, 2026-10-17
+
+The production preview includes a signed change and synthetic IOB text. The
+supporting line now follows the selected family: bundled IBM Plex is painted
+at regular body weight, while System uses the configured platform body family.
+Both use a quieter supporting color. Long bundled text is bounded to one
+ellipsized line, retaining the full accessible description and colored spans.
+
+The compact production presenter was inspected in the Pixel 8 Pro/API 37
+notification shade with IBM Plex. The screenshot below contains synthetic data.
+Expanded presentation and the dashboard hero were not checked on device in
+this pass. The focused JVM run passed 46 tests, including API 26/34 parceling,
+font switching, bitmap clearing, and long supporting content.
+
+![Compact IBM supporting typography](evidence/status-font-ibm-compact.png)

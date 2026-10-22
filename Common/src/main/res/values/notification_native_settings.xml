@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="notification_chart_accessibility">Glucose history over the last three hours</string>
-    <string name="notification_system_font">System notification font</string>
     <string name="notification_trend_steady">Steady trend</string>
     <string name="notification_trend_rising">Rising trend</string>
     <string name="notification_trend_rising_fast">Rapidly rising trend</string>

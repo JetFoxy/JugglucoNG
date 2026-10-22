@@ -718,6 +718,8 @@ public class Natives {
         public static native void closedynlib();
 
         public static native strGlucose lastglucose();
+        /** Latest valid stream reading for this sensor only; never falls back to a peer. */
+        public static native strGlucose lastglucoseForSensor(String sensorName);
 
         public static native long[] getGlucoseHistory(long starttime);
 
@@ -1028,6 +1030,8 @@ public class Natives {
         public static native void finishSensor(long dataptr);
 
         public static native boolean removeSensorById(String sensorId);
+
+        public static native boolean finishSensorById(String sensorId);
 
         public static native void unfinishSensor(long dataptr);
 
@@ -1558,6 +1562,19 @@ public class Natives {
         public static native byte[] accuAskValues(long dataptr);
 
         public static native long accuProcessData(long dataptr, byte[] value, long mmsec);
+
+        // CareSens Air (cpp/air/java.cpp)
+        public static native long airProcessData(long dataptr, byte[] value, long[] msecptr);
+
+        public static native int airGetLast(long dataptr);
+
+        public static native boolean airSaveSensorInfo(long dataptr, byte[] value);
+
+        public static native boolean airSaveSensorInfo2(long dataptr, byte[] value);
+
+        public static native void airSaveStartSensor(long dataptr, float eapp, float vref, int elapsedSecs);
+
+        public static native byte[] airGetPin(long dataptr);
 
         /**
          * Pass as {@code trendByte} when the AiDex frame carried no trend field — the direct F003

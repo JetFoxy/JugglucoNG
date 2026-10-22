@@ -44,6 +44,11 @@ interface ReadingDisplayDao {
      * invalidate every chart query observing the table.
      * A stale or incorrect horizon would weaken this bound. There is no other update
      * and no REPLACE anywhere in this DAO.
+     *
+     * A view-mode toggle revises like a calibration change does. Unsealed
+     * records are never drawn, so the hour before a toggle is already shown in
+     * the new lane; refusing the revision (#499) sealed those minutes with the
+     * old lane's numbers an hour later, and the line moved under the user.
      */
     @Query(
         """
@@ -70,6 +75,9 @@ interface ReadingDisplayDao {
 
     @Query("SELECT * FROM reading_display WHERE timestamp >= :startTime ORDER BY timestamp ASC")
     suspend fun getAllSince(startTime: Long): List<ReadingDisplay>
+
+    @Query("SELECT * FROM reading_display WHERE timestamp > :afterTimestamp ORDER BY timestamp ASC LIMIT :limit")
+    suspend fun getPageAfter(afterTimestamp: Long, limit: Int): List<ReadingDisplay>
 
     @Query(
         "SELECT * FROM reading_display WHERE timestamp >= :startTime AND timestamp <= :endTime " +

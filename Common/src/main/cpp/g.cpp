@@ -489,6 +489,9 @@ static jint sensorKindForUi(const SensorGlucoseData *sens) {
   if (sens->isAccuChek()) {
     return 0x20;
   }
+  if (sens->isAir()) {
+    return careSensAirKind;
+  }
   if (sens->isAiDex()) {
     return 0x30;
   }
@@ -618,6 +621,32 @@ fromjava(removeSensorById)(JNIEnv *env, jclass cl, jstring jsensor) {
   if (backup)
     backup->wakebackup(Backup::wakeall);
   return removedAll ? JNI_TRUE : JNI_FALSE;
+}
+
+// Retires a managed driver's native mirror shell by its full id. Unlike
+// removeSensorById this only marks the slot finished, so data written after
+// the same sensor is added again revives it. finishfromSensorptr cannot stand
+// in: it resolves the slot from the last 16 characters of the directory, which
+// misses ids shorter than 16 such as Ottai's 12-hex cloud id.
+extern "C" JNIEXPORT jboolean JNICALL
+fromjava(finishSensorById)(JNIEnv *env, jclass cl, jstring jsensor) {
+  const auto sensorindices = sensorIndicesFromId(env, jsensor);
+  if (sensorindices.empty()) {
+    LOGAR("finishSensorById unknown sensor");
+    return JNI_FALSE;
+  }
+  for (const int sensorindex : sensorindices) {
+    LOGGER("finishSensorById %s index=%d of %zu\n",
+           sensors->getsensor(sensorindex)->showsensorname(), sensorindex,
+           sensorindices.size());
+    sensors->finishsensor(sensorindex);
+    if (SensorGlucoseData *sensorptr = sensors->getSensorData(sensorindex))
+      setstreaming(sensorptr);
+  }
+  setusedsensors();
+  if (backup)
+    backup->wakebackup(Backup::wakeall);
+  return JNI_TRUE;
 }
 
 static void unfinishsensor(SensorGlucoseData *sensorptr, int sensorindex) {
@@ -779,6 +808,10 @@ extern "C" JNIEXPORT jlong JNICALL fromjava(getdataptr)(JNIEnv *env, jclass cl,
             LOGGER("getdataptr(%.*s) AccuChek\n", (int)sensor.length(),
                    sensor.data());
             candidate = new accustream(sensorindex, sens);
+          } else if (sens->isAir()) {
+            LOGGER("getdataptr(%.*s) Air\n", (int)sensor.length(),
+                   sensor.data());
+            candidate = new airstream(sensorindex, sens);
           } else if (sens->isAiDex()) {
             LOGGER("getdataptr(%.*s) AiDex\n", (int)sensor.length(),
                    sensor.data());
@@ -1056,17 +1089,20 @@ fromjava(getSensorUiSnapshot)(JNIEnv *env, jclass cl, jstring jsensor) {
     return nullptr;
   }
   const auto *info = sens->getinfo();
-  const jlong values[5]{
+  // [5] is the managed driver family: the kind in [0] is Libre 2 by
+  // elimination for every shell a Kotlin driver writes into.
+  const jlong values[6]{
       static_cast<jlong>(sensorKindForUi(sens)),
       static_cast<jlong>(info ? info->viewMode : 0),
       static_cast<jlong>(sens->getstarttime()) * 1000LL,
       static_cast<jlong>(sens->expectedEndTime()) * 1000LL,
-      static_cast<jlong>(sens->officialendtime()) * 1000LL};
-  jlongArray result = env->NewLongArray(5);
+      static_cast<jlong>(sens->officialendtime()) * 1000LL,
+      static_cast<jlong>(info ? info->managedFamilyCode() : 0)};
+  jlongArray result = env->NewLongArray(6);
   if (!result) {
     return nullptr;
   }
-  env->SetLongArrayRegion(result, 0, 5, values);
+  env->SetLongArrayRegion(result, 0, 6, values);
   return result;
 }
 extern "C" JNIEXPORT jstring JNICALL fromjava(getsensortext)(JNIEnv *envin,
@@ -1795,7 +1831,8 @@ extern "C" JNIEXPORT void JNICALL fromjava(setSensorWearDays)(
 // driver that holds the sensor; read anywhere a dataptr is in hand.
 extern "C" JNIEXPORT void JNICALL fromjava(setSensorManagedFamily)(
     JNIEnv *env, jclass cl, jstring sensorId, jint code) {
-  if (!sensors || !sensorId || code < 0 || code > 7)
+  if (!sensors || !sensorId || code < 0 ||
+      code > static_cast<jint>(SensorGlucoseData::Info::maxManagedFamilyCode))
     return;
   const char *str = env->GetStringUTFChars(sensorId, NULL);
   if (!str)
@@ -1803,8 +1840,8 @@ extern "C" JNIEXPORT void JNICALL fromjava(setSensorManagedFamily)(
   if (SensorGlucoseData *hist = ensureDirectStreamShellForId(str, 0)) {
     if (!hist->error()) {
       if (auto *info = hist->getinfo()) {
-        if (info->managedFamily != static_cast<unsigned>(code)) {
-          info->managedFamily = static_cast<unsigned>(code);
+        if (info->managedFamilyCode() != static_cast<unsigned>(code)) {
+          info->setManagedFamilyCode(static_cast<unsigned>(code));
           LOGGER("setSensorManagedFamily: %s family=%d\n", str, code);
         }
       }
@@ -1821,7 +1858,7 @@ extern "C" JNIEXPORT jint JNICALL fromjava(getSensorManagedFamily)(
   if (!hist)
     return 0;
   const auto *info = hist->getinfo();
-  return info ? static_cast<jint>(info->managedFamily) : 0;
+  return info ? static_cast<jint>(info->managedFamilyCode()) : 0;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL fromjava(hasSensorStreamCapacity)(
@@ -2309,6 +2346,8 @@ extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
   std::vector<std::string> names;
   names.reserve(active.size());
   for (const int index : active) {
+    if (sensors->sensorDirectoryMissing(index))
+      continue;
     const char *name = sensors->shortsensorname_chars(index);
     if (name)
       names.emplace_back(name);
@@ -2322,6 +2361,8 @@ extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
   std::vector<std::string> names;
   names.reserve(active.size());
   for (const int index : active) {
+    if (sensors->sensorDirectoryMissing(index))
+      continue;
     const SensorGlucoseData *sens = sensors->getSensorData(index);
     const char *name = sensors->shortsensorname_chars(index);
     if (sens && !sens->isLibre3() && name)

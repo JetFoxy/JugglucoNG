@@ -9,10 +9,10 @@ ext {
     // Bump the app version here only. Wear releases use appVersionCode + 1000000
     // so Play accepts both APKs in one release (distinct versionCodes per form
     // factor). Scheme originates on the wearos branch — keep the two in step.
-    appVersionCode = 1022
+    appVersionCode = 1025
     // Base version, without the flavour/build-type suffix chain that gets appended
     // to versionName. Used for the APK filename so it stays readable.
-    appVersionName = '1.2.2-Alpha'
+    appVersionName = '1.2.5-Alpha'
 
     ndkver       = '29.0.14206865'
     CMAKEVERSION = '4.1.2'
@@ -35,6 +35,13 @@ android {
 //thekeyfile = everyone.keystore
     signingConfigs {
         alg {
+            if (project.hasProperty('requireProductionSigning')) {
+                ['thekeyfile', 'thepassword', 'thekeyalias', 'thekeypassword'].each { name ->
+                    if (!project.hasProperty(name) || project.property(name).toString().isEmpty()) {
+                        throw new GradleException("Distribution build requires signing property: $name")
+                    }
+                }
+            }
             if (project.hasProperty('thekeypassword') && "$thekeypassword" != "") {
                 storeFile = file("$thekeyfile")
                 storePassword = "$thepassword"
@@ -105,9 +112,19 @@ android {
         externalNativeBuild {
             cmake {
                 version = "$CMAKEVERSION"
+                // Explicit relay-only input; ignored local headers/account tokens stay excluded.
+                if (project.hasProperty('requireProductionSigning')) {
+                    if (!project.hasProperty('distributionTurnDirectory') ||
+                            !file("${project.property('distributionTurnDirectory')}/distribution-turn.hpp").isFile()) {
+                        throw new GradleException('Distribution requires Clone TURN input; use scripts/build-dist.sh')
+                    }
+                    cppFlags "-DJUGGLUCO_DISTRIBUTION=1"
+                    arguments "-DJUGGLUCO_DISTRIBUTION_TURN_DIR=${file(project.property('distributionTurnDirectory')).absolutePath}"
+                }
                 cppFlags " -DAPPID=\"quotes($applicationId)\"   -DAPPVERSION=\"quotes($versionName)\"  -DLIBRE3=1 -DSIBIONICS=1 -DDEXCOM=1 "
                 cFlags " -DAPPID=\"quotes($applicationId)\"   -DAPPVERSION=\"quotes($versionName)\"  -DLIBRE3=1 -DSIBIONICS=1 -DDEXCOM=1 "
-                arguments "-DJUGGLUCO_APP=TRUE -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=TRUE", "-Dlibre3=TRUE", "-DDEXCOM=TRUE"
+                // No CMakeLists reads -Dlibre3/-DDEXCOM; LIBRE3/DEXCOM reach the compiler via cppFlags/cFlags above.
+                arguments "-DJUGGLUCO_APP=TRUE -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=TRUE"
             }
         }
     }
@@ -249,6 +266,11 @@ android {
                     '**/libnative-sensitivity-v110.so',
                     '**/libnative-struct2json.so',
             ]
+            // Preserve exact inventoried vendor bytes, including newly added library names.
+            def vendorInputs = new groovy.json.JsonSlurper().parse(rootProject.file('scripts/dist/build-inputs.json'))
+            vendorInputs.files.each { input ->
+                doNotStrip "**/${new File(input.path).name}"
+            }
             doNotStrip '**/libcalibrate.so'
             doNotStrip '**/libcalibrat2.so'
             doNotStrip '**/libinit.so'
@@ -274,7 +296,12 @@ android {
         includeInApk = true
         includeInBundle = true
     }
-    compileSdk = 37
+    compileSdk {
+        // Compose 1.13 (material3 1.5) needs the 37.1 minor SDK.
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
     buildToolsVersion = '37.0.0'
     buildFeatures {
         aidl = true
@@ -348,7 +375,7 @@ dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 
     // Compose (versions come from the BOM unless pinned deliberately)
-    def composeBom = platform('androidx.compose:compose-bom:2026.08.00')
+    def composeBom = platform('androidx.compose:compose-bom-alpha:2026.10.00')
     implementation composeBom
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'

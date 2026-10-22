@@ -25,7 +25,7 @@ test -f "$probe_java_classes/tk/glucodata/NotificationChartDrawer\$ValueItem.cla
 test -f "$probe_kotlin_classes/tk/glucodata/SensorVisuals.class"
 "$probe_tools/aapt2" compile --dir "$probe_build/res" -o "$probe_build/resources.zip"
 "$probe_tools/aapt2" link -I "$probe_android" --manifest AndroidManifest.xml --java "$probe_build/generated" --extra-packages tk.glucodata -o "$probe_build/resources.apk" "$probe_build/resources.zip"
-"$probe_java/bin/javac" -source 8 -target 8 -classpath "$probe_android:$probe_java_classes:$probe_kotlin_classes:$probe_stdlib" -d "$probe_build/classes" src/tk/glucodata/nativeviewprobe/*.java src/tk/glucodata/ProductionPreview.java ../../Common/src/main/java/tk/glucodata/CustomGlucoseNotification.java ../../Common/src/main/java/tk/glucodata/TrendArrowAngle.java "$probe_build/generated/tk/glucodata/nativeviewprobe/R.java" "$probe_build/generated/tk/glucodata/R.java"
+"$probe_java/bin/javac" -source 8 -target 8 -classpath "$probe_android:$probe_java_classes:$probe_kotlin_classes:$probe_stdlib" -d "$probe_build/classes" src/tk/glucodata/nativeviewprobe/*.java src/tk/glucodata/ProductionPreview.java ../../Common/src/main/java/tk/glucodata/CustomGlucoseNotification.java ../../Common/src/main/java/tk/glucodata/NotificationValueBitmap.java ../../Common/src/main/java/tk/glucodata/TrendArrowAngle.java "$probe_build/generated/tk/glucodata/nativeviewprobe/R.java" "$probe_build/generated/tk/glucodata/R.java"
 mkdir -p "$probe_build/nest-host/tk/glucodata"
 cp "$probe_java_classes"/tk/glucodata/NotificationChartDrawer*.class "$probe_build/nest-host/tk/glucodata/"
 "$probe_java/bin/jar" --create --file "$probe_build/nest-host.jar" -C "$probe_build/nest-host" .

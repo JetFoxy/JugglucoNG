@@ -5,9 +5,12 @@ import tk.glucodata.Applic
 import tk.glucodata.SensorIdentity
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.drivers.ManagedSensorIdentityAdapter
+import tk.glucodata.drivers.ManagedSensorUiFamily
 import tk.glucodata.SuperGattCallback
 
 object AiDexManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
+    override val uiFamily = ManagedSensorUiFamily.AIDEX
+
     private const val PREFIX = "X-"
     private const val PREFS_NAME = "tk.glucodata_preferences"
     private const val PREF_KEY = "aidex_sensors"
@@ -67,6 +70,13 @@ object AiDexManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
             ?.let { return it }
         val context = Applic.app
         if (context != null) {
+            // Retained native short names still belong to the managed writer
+            // after the BLE registration and saved sensor entry are removed.
+            val retained = "$PREFIX${normalized.uppercase()}"
+            if (context.getSharedPreferences("AiDexNativePrefs", Context.MODE_PRIVATE)
+                    .contains("algorithmAppliedMode_$retained") ||
+                AiDexSourceJournalBackup.file(context.filesDir, retained).isFile
+            ) return retained
             persistedSensorIds(context)
                 .firstOrNull { matchesCallbackId(it, normalized) }
                 ?.let { return it }
@@ -122,5 +132,5 @@ object AiDexManagedSensorIdentityAdapter : ManagedSensorIdentityAdapter {
         isManagedSensorId(sensorId)
 
     override fun shouldUseNativeHistorySync(sensorId: String?): Boolean? =
-        if (resolveCanonicalSensorId(sensorId) != null) true else null
+        if (resolveCanonicalSensorId(sensorId) != null) false else null
 }

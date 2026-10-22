@@ -45,7 +45,7 @@ final class ProbePublisher {
         }
         views.setImageViewBitmap(R.id.chart, chart);
         if (production) {
-            views = tk.glucodata.ProductionPreview.values(context, expanded, step);
+            views = tk.glucodata.ProductionPreview.values(context, expanded, step, ibm);
             tk.glucodata.ProductionPreview.chart(views, chart);
         }
         return views;

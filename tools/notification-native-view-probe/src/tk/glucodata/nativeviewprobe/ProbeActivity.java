@@ -26,6 +26,8 @@ public final class ProbeActivity extends Activity {
             root.addView(sample);
         }
         setContentView(root);
+        getSharedPreferences("native-view-probe", MODE_PRIVATE).edit()
+                .putFloat("scale", getIntent().getFloatExtra("scale", 1f)).apply();
         ProbePublisher.publish(this, getIntent().getBooleanExtra("ibm", false), getIntent().getIntExtra("step", 0),
                 getIntent().getBooleanExtra("production", false));
     }

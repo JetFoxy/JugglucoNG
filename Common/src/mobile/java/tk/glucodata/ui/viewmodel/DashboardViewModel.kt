@@ -280,6 +280,9 @@ class DashboardViewModel(
     private val _broadcastComputedTrend = MutableStateFlow(false)
     val broadcastComputedTrend = _broadcastComputedTrend.asStateFlow()
 
+    private val _xdripReportAsLibre2 = MutableStateFlow(false)
+    val xdripReportAsLibre2 = _xdripReportAsLibre2.asStateFlow()
+
     /**
      * The chart's line: every sensor that covers the visible window, merged.
      *
@@ -910,6 +913,7 @@ class DashboardViewModel(
         _patchedLibreBroadcastEnabled.value = Natives.getlibrelinkused()
         _glucodataBroadcastEnabled.value = Natives.getJugglucobroadcast()
         _broadcastComputedTrend.value = prefs.getBoolean(tk.glucodata.BroadcastTrendRate.PREF_KEY, false)
+        _xdripReportAsLibre2.value = prefs.getBoolean(tk.glucodata.XdripReportAsLibre2.PREF_KEY, false)
 
         _hasLowAlarm.value = Natives.hasalarmlow()
         _lowAlarmThreshold.value = Natives.alarmlow()
@@ -1693,6 +1697,13 @@ class DashboardViewModel(
         val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
         prefs.edit().putBoolean(tk.glucodata.BroadcastTrendRate.PREF_KEY, enabled).apply()
         _broadcastComputedTrend.value = enabled
+    }
+
+    fun setXdripReportAsLibre2(enabled: Boolean) {
+        val context = tk.glucodata.Applic.app
+        val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(tk.glucodata.XdripReportAsLibre2.PREF_KEY, enabled).apply()
+        _xdripReportAsLibre2.value = enabled
     }
 
     fun toggleGlucodataBroadcast(enabled: Boolean) {

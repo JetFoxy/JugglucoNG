@@ -8,6 +8,8 @@ public final class ProbeReceiver extends BroadcastReceiver {
             context.getSystemService(android.app.NotificationManager.class).cancel(8104);
             return;
         }
+        if (intent.hasExtra("scale")) context.getSharedPreferences("native-view-probe", Context.MODE_PRIVATE).edit()
+                .putFloat("scale", intent.getFloatExtra("scale", 1f)).apply();
         ProbePublisher.publish(context, intent.getBooleanExtra("ibm", false), intent.getIntExtra("step", 0),
                 intent.getBooleanExtra("production", false));
     }
