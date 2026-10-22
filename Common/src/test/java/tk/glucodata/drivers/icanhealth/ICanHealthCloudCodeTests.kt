@@ -126,7 +126,7 @@ class ICanHealthCloudCodeTests {
         assertEquals(0xFFFF, ICanHealthParser.parseSensorInfoMarker(fresh))
         assertTrue(ICanHealthParser.isSensorInfoMissingCalibration(fresh))
 
-        val provisioned = byteArrayOf(0x1C.toByte(), 0xF6.toByte(), 0x01, 0x02, 0x4E)
+        val provisioned = byteArrayOf(0x1C.toByte(), 0xF6.toByte(), 0x01, 0x4E.toByte(), 0x02)
         assertEquals(0x024E, ICanHealthParser.parseSensorInfoMarker(provisioned))
         assertFalse(ICanHealthParser.isSensorInfoMissingCalibration(provisioned))
 

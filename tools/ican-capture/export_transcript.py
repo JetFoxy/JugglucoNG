@@ -80,7 +80,15 @@ def att_pdus(path):
 
 
 def redact(hexstr: str) -> str:
-    """Render bytes as hex, replacing serial-like ASCII runs (>=12 hex chars) with <SN>."""
+    """Render bytes as hex, hiding serial-like runs with <SN>.
+
+    Serials are not always hex — some vendors use letters and dashes inside the
+    serial number, so a hex-only mask would leak long tails of those. Within every
+    printable run, any substring of >=12 characters from [0-9A-Za-z-] is treated as
+    serial-like and masked, even when the surrounding bytes break a fullmatch.
+    Short ASCII fragments (device names, firmware strings like "V1.5.SH2446.1")
+    still stay readable.
+    """
     data = bytes.fromhex(hexstr.replace(" ", ""))
     tokens = []
     i = 0
@@ -90,8 +98,13 @@ def redact(hexstr: str) -> str:
             while j < len(data) and 0x20 <= data[j] < 0x7F:
                 j += 1
             run = data[i:j]
-            if len(run) >= 12 and re.fullmatch(rb"[0-9A-Fa-f]{12,}", run):
+            m = re.search(rb"[0-9A-Za-z][0-9A-Za-z-]{10,}", run)
+            if m:
+                if m.start():
+                    tokens.extend("%02x" % b for b in run[:m.start()])
                 tokens.append("<SN>")
+                if m.end() < len(run):
+                    tokens.extend("%02x" % b for b in run[m.end():])
             else:
                 tokens.extend("%02x" % b for b in run)
             i = j

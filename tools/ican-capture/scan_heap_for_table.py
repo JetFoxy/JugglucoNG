@@ -12,6 +12,7 @@ Looks for:
 import glob
 import os
 import struct
+import tarfile
 import sys
 
 MARKERS = [b"correctCode", b"parameterCode", b"full code", b"writeCorrectCode",
@@ -30,13 +31,38 @@ def floats_at(d, off, n=25):
     return struct.unpack("<%df" % n, d[off:off + 4 * n])
 
 
+def gather_blobs(snap):
+    """Collect scan candidates as (name, bytes) pairs.
+
+    The heap watcher snapshots arrive as plain .bin dumps and as .tar archives of
+    them; both feeds go through the same scan.
+    """
+    for p in sorted(glob.glob(os.path.join(snap, "**", "*.bin"), recursive=True)):
+        yield p, open(p, "rb").read()
+    for p in sorted(glob.glob(os.path.join(snap, "**", "*.tar"), recursive=True)):
+        try:
+            with tarfile.open(p, "r:*") as tar:
+                for member in tar.getmembers():
+                    if member.isfile():
+                        yield "%s!%s" % (p, member.name), tar.extractfile(member).read()
+        except tarfile.TarError as exc:
+            print("skip unreadable archive %s: %s" % (p, exc))
+    for p in sorted(glob.glob(os.path.join(snap, "**", "*.tgz"), recursive=True)):
+        try:
+            with tarfile.open(p, "r:gz") as tar:
+                for member in tar.getmembers():
+                    if member.isfile():
+                        yield "%s!%s" % (p, member.name), tar.extractfile(member).read()
+        except tarfile.TarError as exc:
+            print("skip unreadable archive %s: %s" % (p, exc))
+
+
 def main():
     snap = sys.argv[1]
     blobs = [bytes.fromhex(h) for h in sys.argv[2:]]
-    files = sorted(glob.glob(os.path.join(snap, "**", "*.bin"), recursive=True))
+    files = list(gather_blobs(snap))
     print("files:", len(files))
-    for p in files:
-        d = open(p, "rb").read()
+    for p, d in files:
         for m in MARKERS:
             i = d.find(m)
             if i >= 0:

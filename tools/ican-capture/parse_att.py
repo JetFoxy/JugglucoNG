@@ -90,24 +90,29 @@ def main(path, t_from, t_to):
                 att.append((ts, DIR[data[3]], OPCODES.get(op, hex(op)), None, pdu[1:], idx))
             elif op == 0x11:  # read by group type response
                 ln = pdu[1]
+                if ln < 6:
+                    # Unparseable entry length; bail out rather than spin on p += 0.
+                    continue
                 p = 2
                 while p + ln <= len(pdu):
                     grp = pdu[p:p + ln]
-                    if ln >= 6:
-                        s, e = struct.unpack('<HH', grp[0:4])
-                        u = uuid_str(grp[4:ln])
-                        for hh in range(s, e + 1):
-                            uuid_by_handle[hh] = u
+                    s, e = struct.unpack('<HH', grp[0:4])
+                    u = uuid_str(grp[4:ln])
+                    for hh in range(s, e + 1):
+                        uuid_by_handle[hh] = u
                     p += ln
-            elif op == 0x09:  # read by type response
+            elif op == 0x09:  # read by type response (characteristic declarations)
                 ln = pdu[1]
+                if ln < 7:
+                    # Unparseable entry length; bail out rather than spin on p += 0.
+                    continue
                 p = 2
                 while p + ln <= len(pdu):
                     it = pdu[p:p + ln]
-                    if ln >= 7:
-                        hh, props = struct.unpack('<H', it[0:2])[0], it[2]
-                        u = uuid_str(it[3:ln])
-                        uuid_by_value_handle[hh] = u
+                    # Entry: declaration handle(2) + properties(1) + value handle(2) + UUID.
+                    vh = struct.unpack('<H', it[3:5])[0]
+                    u = uuid_str(it[5:ln])
+                    uuid_by_value_handle[vh] = u
                     p += ln
             elif op == 0x05:  # find information response
                 if len(pdu) >= 2:
@@ -118,9 +123,10 @@ def main(path, t_from, t_to):
                         u = uuid_str(pdu[p + 2:p + 2 + (2 if fmt == 1 else 16)])
                         uuid_by_handle[hh] = 'desc:' + u
                         p += 2 + (2 if fmt == 1 else 16)
-    # merge maps: characteristic value handle -> uuid (decl is at hh-1)
+    # merge maps: keys of uuid_by_value_handle are already the value handles; that
+    # authoritative mapping replaces the service-range fallback built above.
     for hh, u in uuid_by_value_handle.items():
-        uuid_by_handle.setdefault(hh + 1, u)
+        uuid_by_handle[hh] = u
     out = []
     out.append('== UUID map (service ranges) ==')
     prev = None
