@@ -1,0 +1,381 @@
+// ICanHealthCloudCode.kt — per-sensor calibration-code retrieval from the Sinocare iot cloud.
+
+package tk.glucodata.drivers.icanhealth
+
+import android.content.Context
+import android.content.SharedPreferences
+import java.io.ByteArrayInputStream
+import java.math.BigInteger
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.security.KeyFactory
+import java.security.MessageDigest
+import java.security.interfaces.RSAPublicKey
+import java.security.spec.X509EncodedKeySpec
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import java.util.zip.GZIPInputStream
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import org.json.JSONObject
+import tk.glucodata.Log
+
+/**
+ * Result of one per-sensor calibration-code retrieval.
+ *
+ * [parameterCodeJson] is the vendor `parameterCode` JSON string (the 25-float `correctCode`
+ * payload with keys x1..x25); [codeFloats] is the same payload parsed into floats.
+ */
+internal data class ICanCloudCodeResult(
+    val deviceSn: String,
+    val parameterCodeJson: String,
+    val codeFloats: Map<String, Float>,
+)
+
+/**
+ * Vendor iot-cloud credentials for the calibration-code endpoint.
+ *
+ * They belong to the vendor SDK builds (each market tenant carries its own pair) and are
+ * deliberately kept out of the repository. They are read at runtime from, in priority order:
+ *
+ * 1. SharedPreferences keys [ICanHealthConstants.PREF_CLOUD_APP_ID],
+ *    [ICanHealthConstants.PREF_CLOUD_APP_SECRET], [ICanHealthConstants.PREF_CLOUD_BASE_URL] —
+ *    in the app's main preference file, e.g. set via an adb shell on a debug build.
+ * 2. `<filesDir>/ican-cloud-creds.json` with fields `appId`, `appSecret`, `base`.
+ *
+ * These are the same values the vendor SDK itself carries in
+ * `com.sinocare.cgm.cgm_sdk.cgm.EnvConfigEnum`; `base` defaults to the RU tenant when omitted.
+ */
+internal data class ICanCloudCreds(val appId: String, val appSecret: String, val baseUrl: String)
+
+internal object ICanHealthCloudCode {
+    private const val TAG = "ICanHealthCloud"
+    private const val PREFS_NAME = "tk.glucodata_preferences"
+    private const val RETRY_THROTTLE_MS = 10L * 60L * 1000L
+
+    private val executor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable).apply { name = "ICanCloudCode"; isDaemon = true }
+    }
+    private val attemptsInFlight = ConcurrentHashMap.newKeySet<String>()
+    private val lastAttemptMs = ConcurrentHashMap<String, Long>()
+
+    /** Enqueue a fetch for `sn` on the background worker. Never throws, never blocks. */
+    @JvmStatic
+    fun fetchAndCacheAsync(context: Context?, sn: String?): Boolean {
+        val normalizedSn = (sn ?: "").trim()
+        if (context == null || normalizedSn.isEmpty()) return false
+        val prefs = runCatching {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull() ?: return false
+        if (cachedCode(context, normalizedSn) != null) return false
+        val now = System.currentTimeMillis()
+        val last = lastAttemptMs[normalizedSn] ?: 0L
+        if (now - last < RETRY_THROTTLE_MS) return false
+        if (!attemptsInFlight.add(normalizedSn)) return false
+        lastAttemptMs[normalizedSn] = now
+        executor.execute {
+            try {
+                val result = fetch(
+                    context,
+                    ICanCloudCredsLoader.load(context, prefs),
+                    normalizedSn,
+                )
+                if (result != null) {
+                    prefs.edit()
+                        .putString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + normalizedSn, result.parameterCodeJson)
+                        .commit()
+                    Log.i(TAG, "Cached vendor calibration code for ${maskSn(normalizedSn)} (${result.codeFloats.size} floats)")
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Cloud fetch for ${maskSn(normalizedSn)} failed: ${t.message ?: t.javaClass.simpleName}")
+            } finally {
+                attemptsInFlight.remove(normalizedSn)
+            }
+        }
+        return true
+    }
+
+    /** Cached parameterCode JSON for `sn`, or null. */
+    @JvmStatic
+    fun cachedCode(context: Context, sn: String): String? {
+        val prefs = runCatching {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull() ?: return null
+        return try {
+            val stored = prefs.getString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + sn, null)
+            stored?.takeIf { it.isNotBlank() }
+        } catch (t: Throwable) {
+            Log.stack(TAG, "cachedCode", t)
+            null
+        }
+    }
+
+    /** Synchronous fetch; must be called off the main thread (mirror AiDexCnCloudClient). */
+    @JvmStatic
+    fun fetch(context: Context, creds: ICanCloudCreds?, sn: String): ICanCloudCodeResult? {
+        if (creds == null) {
+            Log.w(TAG, "No vendor cloud credentials configured; fetch unavailable")
+            return null
+        }
+        val response = try {
+            ICanHealthCloudCodeProtocol.getResponse(creds, sn)
+        } catch (t: Throwable) {
+            Log.w(TAG, "request failed: ${t.message ?: t.javaClass.simpleName}")
+            return null
+        } ?: return null
+        val codeJson = try {
+            ICanHealthCloudCodeProtocol.decodeResponse(response.k, response.v)
+        } catch (t: Throwable) {
+            Log.w(TAG, "envelope decode failed: ${t.message ?: t.javaClass.simpleName}")
+            return null
+        } ?: return null
+        val floats = ICanHealthCloudCodeProtocol.parseCodeFloats(codeJson) ?: return null
+        return ICanCloudCodeResult(deviceSn = sn, parameterCodeJson = codeJson, codeFloats = floats)
+    }
+
+    /** Serial masked for logs: length plus a short tail, mirroring the driver's masking. */
+    internal fun maskSn(sn: String?): String {
+        val normalized = (sn ?: "").trim()
+        if (normalized.isEmpty()) return "<empty>"
+        return "len=${normalized.length}, suffix=${normalized.takeLast(3)}"
+    }
+}
+
+/**
+ * HTTP socket + envelope plumbing, extracted so the pure parts stay testable without Android.
+ */
+internal object ICanHealthCloudCodeProtocol {
+    private const val TAG = "ICanHealthCloud"
+    private const val CODE_PATH = "sino-deviceaccess/sdk/cgm-code-encrypt"
+    private const val DEFAULT_BASE_URL = "https://iot.ru.sinocareintl.com/api/"
+    private const val TIMEOUT_MS = 90_000
+
+    /**
+     * 1024-bit RSA public key shipped inside the vendor SDK dex (`RSAUtils`, f4812d key). The
+     * server signs/encrypts the AES key of every response with its private counterpart, so
+     * every client carries and uses this key to recover it. It opens nothing and is not a secret.
+     */
+    private const val RESPONSE_RSA_PUBLIC_B64 = (
+        "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC+RO5/amIJ96LEzlVwWE8ZbIvmdzquqcKNgHRzivSX7"
+            + "+AtQYT52hgmcEWbP2dgNvElxgOadrBkw+xEYwuglcBoPubirpQJyKGgTbUSDNt357vOEOLiUT4pcMe"
+            + "Qix/aDY8INulFWMuo7+SPrGyBtTVD9US1k7k6bEQ3MXFjh19hbQIDAQAB"
+        )
+
+    data class ResponseEnvelope(val k: String, val v: String)
+
+    /**
+     * The vendor sign scheme, confirmed against the SDK's own signer on-device:
+     * `uppercase(MD5("appId=<a>&deviceSn=<sn>&timestamp=<ms>&key=<secret>"))`.
+     */
+    fun sign(appId: String, appSecret: String, deviceSn: String, timestampMs: String): String {
+        val signString = "appId=$appId&deviceSn=$deviceSn&timestamp=$timestampMs&key=$appSecret"
+        return md5Hex(signString).uppercase(Locale.US)
+    }
+
+    fun md5Hex(value: String): String =
+        MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8)).toHexLower()
+
+    private fun ByteArray.toHexLower(): String = joinToString("") { "%02x".format(it) }
+
+    fun buildRequestUrl(creds: ICanCloudCreds, deviceSn: String, timestampMs: String): String {
+        val base = creds.baseUrl.ifBlank { DEFAULT_BASE_URL }
+        val separator = if (base.endsWith("/")) "" else "/"
+        val appId = urlEncode(creds.appId)
+        val sn = urlEncode(deviceSn)
+        val timestamp = urlEncode(timestampMs)
+        val signature = urlEncode(sign(creds.appId, creds.appSecret, deviceSn, timestampMs))
+        return "$base$separator$CODE_PATH?appId=$appId&deviceSn=$sn&timestamp=$timestamp&sign=$signature"
+    }
+
+    private fun urlEncode(value: String): String =
+        URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+
+    /**
+     * One complete HTTP round trip. Returns the raw envelope fields, or null with the reason
+     * logged; never throws for transport problems.
+     */
+    fun getResponse(creds: ICanCloudCreds, deviceSn: String): ResponseEnvelope? =
+        request(buildRequestUrl(creds, deviceSn, System.currentTimeMillis().toString()))
+
+    private fun request(url: String): ResponseEnvelope? {
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+            }
+            val httpCode = connection.responseCode
+            val stream = if (httpCode in 200..299) connection.inputStream else connection.errorStream
+            val responseText = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (httpCode !in 200..299) {
+                Log.w(TAG, "http=$httpCode ${responseText.take(160)}")
+                return null
+            }
+            val json = JSONObject(responseText)
+            val data = json.optJSONObject("data")
+            val k = data?.optString("k").orEmpty()
+            val v = data?.optString("v").orEmpty()
+            if (k.isBlank() || v.isBlank()) {
+                Log.w(TAG, "response without envelope fields")
+                return null
+            }
+            ResponseEnvelope(k, v)
+        } catch (t: Throwable) {
+            Log.w(TAG, "GET failed: ${t.message ?: t.javaClass.simpleName}")
+            null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    /**
+     * Decode the response envelope offline: `k` is the AES key encrypted with the vendor's
+     * RSA-1024 pair (recovered with a public-op against the SDK's public key), `v` is the
+     * AES-256-CBC payload with IV = the first 16 ASCII chars of the key. The plaintext may be
+     * gzip-compressed; the unpadding follows the vendor's type-1/type-2/raw variants.
+     */
+    fun decodeResponse(kB64: String, vB64: String, responsePublicKeyB64: String = RESPONSE_RSA_PUBLIC_B64): String? {
+        val publicKey = publicKey(responsePublicKeyB64) ?: return null
+        val aesKey = rsaPublicOp(publicKey, decodeBase64(kB64) ?: return null)
+        if (aesKey.size != 32) {
+            Log.w(TAG, "unexpected AES key length ${aesKey.size}")
+            return null
+        }
+        val key = aesKey.toString(Charsets.ISO_8859_1)
+        val plaintext = decryptAesCbcNoPad(decodeBase64(vB64) ?: return null, aesKey, aesKey.copyOfRange(0, 16))
+            ?: return null
+        val body = maybeGunzip(plaintext) ?: return null
+        return parseEnvelope(body)
+    }
+
+    private fun publicKey(b64: String): RSAPublicKey? = runCatching {
+        val spec = X509EncodedKeySpec(decodeBase64(b64)!!)
+        KeyFactory.getInstance("RSA").generatePublic(spec) as RSAPublicKey
+    }.getOrNull()
+
+    /**
+     * Vendor's unpadding, ported from `RSAUtils`: a type-1 PKCS#1 block splits on the first
+     * 0x00 after the padding, a type-2 block on the last 0x00, and any other shape is stripped
+     * of leading zeros.
+     */
+    private fun rsaPublicOp(publicKey: RSAPublicKey, ciphertext: ByteArray): ByteArray {
+        val modulus = publicKey.modulus
+        val exponent = publicKey.publicExponent
+        val blockLength = (modulus.bitLength() + 7) / 8
+        var block = ciphertext
+        while (block.size > blockLength) block = block.copyOfRange(1, block.size)
+        val padded = BigInteger(1, block).modPow(exponent, modulus).toFixedLength(blockLength)
+        return when {
+            padded[0] == 0.toByte() && padded[1] == 1.toByte() -> {
+                val sep = padded.drop(2).indexOf(0.toByte()) + 2
+                padded.copyOfRange(sep + 1, padded.size)
+            }
+            padded[0] == 0.toByte() && padded[1] == 2.toByte() -> {
+                val sep = padded.lastIndexOf(0.toByte())
+                padded.copyOfRange(sep + 1, padded.size)
+            }
+            else -> padded.dropWhile { it == 0.toByte() }.toByteArray()
+        }
+    }
+
+    private fun BigInteger.toFixedLength(length: Int): ByteArray {
+        val raw = toByteArray()
+        return when {
+            raw.size == length -> raw
+            raw.size == length + 1 && raw[0] == 0.toByte() -> raw.copyOfRange(1, raw.size)
+            raw.size <= length -> ByteArray(length).also { System.arraycopy(raw, 0, it, length - raw.size, raw.size) }
+            else -> throw IllegalStateException("RSA block longer than modulus")
+        }
+    }
+
+    private fun decryptAesCbcNoPad(
+        ciphertext: ByteArray,
+        key: ByteArray,
+        iv: ByteArray,
+    ): ByteArray? = runCatching {
+        val cipher = Cipher.getInstance("AES/CBC/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
+        cipher.doFinal(ciphertext)
+    }.getOrNull()
+
+    private fun maybeGunzip(bytes: ByteArray): ByteArray? = if (bytes.size > 2 &&
+        bytes[0] == 0x1F.toByte() && bytes[1] == 0x8B.toByte()
+    ) {
+        runCatching { GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() } }
+            .getOrNull()
+    } else {
+        bytes
+    }
+
+    /**
+     * `{"code":200,"data":{"code":"<parameterCode JSON string>"}}` — the inner code is JSON
+     * encoded again. Trailing bytes after the outer envelope are tolerated, like the vendor's
+     * streaming JSON parser.
+     */
+    internal fun parseEnvelope(body: ByteArray): String? = runCatching {
+        val json = JSONObject(String(body, Charsets.UTF_8))
+        if (json.optInt("code", 0) != 200) return null
+        val data = json.optJSONObject("data") ?: return null
+        val code = data.optString("code").let { if (it.isEmpty()) null else it }
+            ?: data.opt("code")?.toString()
+            ?: return null
+        code.ifBlank { null }
+    }.getOrNull()
+
+    /** The `correctCode` JSON: `{"x1":"0.4",..., "x25":"…" }` in string or number form. */
+    internal fun parseCodeFloats(codeJson: String): Map<String, Float>? = runCatching {
+        val json = JSONObject(codeJson)
+        val result = LinkedHashMap<String, Float>()
+        for (index in 1..25) {
+            val raw = json.opt("x$index") ?: return null
+            val value = when (raw) {
+                is String -> raw.toFloat()
+                is Int -> raw.toFloat()
+                is Long -> raw.toFloat()
+                is Double -> raw.toFloat()
+                else -> return null
+            }
+            if (!value.isFinite()) return null
+            result["x$index"] = value
+        }
+        result
+    }.getOrNull()
+
+    private fun decodeBase64(encoded: String): ByteArray? = runCatching {
+        val normalized = encoded.trim().replace("\\s", "")
+        val padding = (4 - normalized.length % 4) % 4
+        java.util.Base64.getDecoder().decode(normalized + "=".repeat(padding))
+    }.getOrNull()
+
+    internal val defaultBaseUrl: String get() = DEFAULT_BASE_URL
+}
+
+/**
+ * Runtime credential resolution, never compiled into the build. See [ICanCloudCreds].
+ */
+internal object ICanCloudCredsLoader {
+    internal const val CREDS_FILE_NAME = "ican-cloud-creds.json"
+
+    fun load(context: Context, prefsOverride: SharedPreferences): ICanCloudCreds? {
+        prefsOverride.also { prefs ->
+            val appId = prefs.getString(ICanHealthConstants.PREF_CLOUD_APP_ID, null)?.trim()
+            val secret = prefs.getString(ICanHealthConstants.PREF_CLOUD_APP_SECRET, null)?.trim()
+            val base = prefs.getString(ICanHealthConstants.PREF_CLOUD_BASE_URL, null)?.trim()
+            if (!appId.isNullOrBlank() && !secret.isNullOrBlank()) {
+                return ICanCloudCreds(appId, secret, base.orEmpty())
+            }
+        }
+        val file = java.io.File(context.filesDir, CREDS_FILE_NAME)
+        if (!file.isFile) return null
+        return runCatching {
+            val json = JSONObject(file.readText())
+            val appId = json.optString("appId").trim()
+            val secret = json.optString("appSecret").trim()
+            if (appId.isEmpty() || secret.isEmpty()) return null
+            ICanCloudCreds(appId, secret, json.optString("base", "").trim())
+        }.getOrNull()
+    }
+}

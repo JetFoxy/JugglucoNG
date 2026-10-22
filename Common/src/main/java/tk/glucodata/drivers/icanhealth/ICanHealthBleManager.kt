@@ -92,6 +92,16 @@ class ICanHealthBleManager(
         private const val LIVE_GAP_BACKFILL_MIN_INTERVAL_MS = 10 * 60 * 1000L
         private const val MIN_TZ_REPAIR_BATCH_RECORDS = 20
         private const val MIN_TZ_REPAIR_BATCH_SPAN_MS = 60 * 60 * 1000L
+
+        // CorrectCode (per-sensor calibration table) write path, mirroring the 2026-10-20
+        // vendor capture: after the `1A` ack and the Session Start Time write, three
+        // `[F2 10 <16 B>]` writes ~3 s later, each acked `1C F2 01` ~0.5 s apart.
+        // Dry-run builds and logs the chunks without touching the sensor; set to false
+        // for the live write tests (plan doc §7.8, T1b/T2).
+        private const val CORRECT_CODE_WRITE_DRY_RUN = false
+        private const val CORRECT_CODE_WRITE_DELAY_MS = 3_000L
+        private const val CORRECT_CODE_CHUNK_GAP_MS = 250L
+        private const val CORRECT_CODE_CHUNK_TIMEOUT_MS = 2_000L
     }
 
     enum class Phase {
@@ -195,6 +205,13 @@ class ICanHealthBleManager(
     @Volatile private var serialFromDevice: String? = null
     @Volatile private var rawSerialFromDevice: String? = null
     @Volatile private var onboardingDeviceSn: String? = null
+
+    // CorrectCode chain state; all of it lives on the handler thread once armed.
+    @Volatile private var correctCodeChainActive = false
+    @Volatile private var correctCodeChunks: List<ByteArray>? = null
+    private var correctCodeNextChunk = 0
+    private var correctCodeStartRunnable: Runnable? = null
+    private var correctCodeTimeoutRunnable: Runnable? = null
     @Volatile private var configuredAuthUserId: String? = null
     @Volatile private var recoveredAuthUserId: String? = null
     @Volatile private var authRetryCount = 0
@@ -1330,6 +1347,7 @@ class ICanHealthBleManager(
                 pendingHistoryBackfillReason = null
                 pendingHistoryBatch.clear()
                 lastAuthChallenge = null
+                resetCorrectCodeState()
                 receivedGlucoseThisConnection = false
                 currentSequenceObservedAtMs = 0L
                 startCommandIssuedThisConnection = false
@@ -2221,6 +2239,13 @@ class ICanHealthBleManager(
                 }
             }
 
+            data.size == 3 &&
+                data[0] == 0x1C.toByte() &&
+                data[1] == 0xF2.toByte() &&
+                data[2] == 0x01.toByte() -> {
+                if (correctCodeChainActive) onCorrectCodeAck()
+            }
+
             ICanHealthParser.parseStartSensorResult(data) != null -> {
                 val started = ICanHealthParser.parseStartSensorResult(data) == true
                 if (started) {
@@ -2241,6 +2266,7 @@ class ICanHealthBleManager(
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_STATUS))
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_SESSION_START_TIME))
                     drainGattQueue()
+                    scheduleCorrectCodeWrite()
                 } else {
                     Log.w(TAG, "Start sensor command rejected: ${data.toHexString()}")
                     // Recovery path for half-activated WARMUP state: if the sensor
@@ -2337,6 +2363,10 @@ class ICanHealthBleManager(
                     "Sensor info: ${data.toHexString()} " +
                         "model=$vendorModelName sw=$vendorSoftwareVersion ${bundledKeyContext()}"
                 )
+                maybeFetchVendorCalibrationCode(data)
+                if (!ICanHealthParser.isSensorInfoMissingCalibration(data)) {
+                    scheduleCorrectCodeWrite()
+                }
                 startPostAuthSetup("sensor-info")
             }
 
@@ -2375,6 +2405,133 @@ class ICanHealthBleManager(
                 "serial=$serialFromDevice sensorId=$SerialNumber addr=$mActiveDeviceAddress)"
         )
         return resolved
+    }
+
+    /**
+     * A sensor that answers the vendor sensor-info with the `0xFFFF` marker is fresh: it has
+     * never been provisioned with the vendor `correctCode` and its RACP history will be refused
+     * until that code is written (F7 initParameter + F2 correctCode, the vendor sequence).
+     *
+     * The vendor phone fetches the per-sensor table from its own iot cloud right after the
+     * handshake; here the same table is requested directly ([ICanHealthCloudCode]) so it is
+     * available on-device for the provisioning write path. The fetch runs on its own worker,
+     * is skipped without configured credentials, and never touches the BLE flow below.
+     */
+    private fun maybeFetchVendorCalibrationCode(sensorInfo: ByteArray) {
+        val context = Applic.app ?: return
+        val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
+        if (sn.isEmpty()) {
+            if (!ICanHealthParser.isSensorInfoMissingCalibration(sensorInfo)) return
+            Log.i(TAG, "Fresh sensor without a known box SN — cloud code fetch skipped")
+            return
+        }
+        val cached = ICanHealthCloudCode.cachedCode(context, sn)
+        // A provisioned sensor with the table already cached needs nothing; a fresh
+        // sensor (F6 = 0xFFFF) always ends up fetched, an older one — only until its
+        // first successful fetch. The 10-minute throttle lives inside the worker.
+        if (cached != null && !ICanHealthParser.isSensorInfoMissingCalibration(sensorInfo)) return
+        ICanHealthCloudCode.fetchAndCacheAsync(context, sn)
+    }
+
+    /**
+     * Vendor mirror of the sensor provisioning write. The 2026-10-20 capture shows the
+     * vendor phone writing the correctCode table after the sensor accepted `1A` and the
+     * session start time: three `[F2 10 <16 B>]` writes ~3 s later, each one acked
+     * `1C F2 01`. The challenge comes from the same session's `F3` response and the table
+     * from the cloud-fetched cache ([maybeFetchVendorCalibrationCode] warms it on the
+     * `F6 = 0xFFFF` marker). Dry-run arms nothing and only logs the packets.
+     */
+    private fun scheduleCorrectCodeWrite() {
+        if (correctCodeChainActive) return
+        val challenge = lastAuthChallenge
+        if (challenge == null || challenge.size != 4) {
+            Log.i(TAG, "CorrectCode write skipped: no 4-byte session challenge")
+            return
+        }
+        if (negotiatedMtu < 20) {
+            Log.i(TAG, "CorrectCode write skipped: MTU ${negotiatedMtu} cannot fit an 18-byte chunk")
+            return
+        }
+        val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
+        if (sn.isEmpty()) {
+            Log.i(TAG, "CorrectCode write skipped: no onboarding SN for this sensor")
+            return
+        }
+        val context = Applic.app
+        if (context == null) {
+            Log.i(TAG, "CorrectCode write skipped: app context unavailable")
+            return
+        }
+        val codeJson = ICanHealthCloudCode.cachedCode(context, sn)
+        val floats = codeJson?.let { ICanHealthCloudCodeProtocol.parseCodeFloats(it) }
+        if (floats.isNullOrEmpty()) {
+            Log.i(TAG, "CorrectCode write skipped: no cached table for ${ICanHealthCloudCode.maskSn(sn)}")
+            return
+        }
+        val chunks = ICanHealthCorrectCode.buildCorrectCodeChunks(floats, challenge)
+        if (chunks == null) {
+            Log.w(TAG, "CorrectCode encode failed for ${ICanHealthCloudCode.maskSn(sn)}")
+            return
+        }
+        correctCodeChainActive = true
+        correctCodeChunks = chunks
+        correctCodeNextChunk = 0
+        if (CORRECT_CODE_WRITE_DRY_RUN) {
+            Log.i(
+                TAG,
+                "CorrectCode dry-run: challenge=${challenge.toHexString()} chunks=" +
+                    chunks.joinToString(separator = "") { it.toHexString() }
+            )
+            resetCorrectCodeState()
+            return
+        }
+        Log.i(TAG, "CorrectCode write armed, first chunk in ${CORRECT_CODE_WRITE_DELAY_MS} ms")
+        val start = Runnable { sendCorrectCodeChunk(0) }
+        correctCodeStartRunnable = start
+        handler.postDelayed(start, CORRECT_CODE_WRITE_DELAY_MS)
+    }
+
+    private fun sendCorrectCodeChunk(index: Int) {
+        val chunks = correctCodeChunks
+        if (!correctCodeChainActive || chunks == null || index !in chunks.indices) {
+            resetCorrectCodeState()
+            return
+        }
+        correctCodeNextChunk = index
+        Log.i(TAG, "CorrectCode write ${index + 1}/${chunks.size}: ${chunks[index].toHexString()}")
+        enqueueOp(GattOp.Write(ICanHealthConstants.CGM_SPECIFIC_OPS, chunks[index]))
+        drainGattQueue()
+        val timeout = Runnable {
+            Log.w(TAG, "CorrectCode chunk ${index + 1} ack timeout — aborting the chain")
+            resetCorrectCodeState()
+        }
+        correctCodeTimeoutRunnable = timeout
+        handler.postDelayed(timeout, CORRECT_CODE_CHUNK_TIMEOUT_MS)
+    }
+
+    private fun onCorrectCodeAck() {
+        correctCodeTimeoutRunnable?.let { handler.removeCallbacks(it) }
+        correctCodeTimeoutRunnable = null
+        val chunks = correctCodeChunks ?: return
+        val next = correctCodeNextChunk + 1
+        if (next >= chunks.size) {
+            Log.i(TAG, "CorrectCode write complete: ${chunks.size}/${chunks.size} chunks acked")
+            resetCorrectCodeState()
+            return
+        }
+        val sendNext = Runnable { sendCorrectCodeChunk(next) }
+        correctCodeStartRunnable = sendNext
+        handler.postDelayed(sendNext, CORRECT_CODE_CHUNK_GAP_MS)
+    }
+
+    private fun resetCorrectCodeState() {
+        correctCodeStartRunnable?.let { handler.removeCallbacks(it) }
+        correctCodeStartRunnable = null
+        correctCodeTimeoutRunnable?.let { handler.removeCallbacks(it) }
+        correctCodeTimeoutRunnable = null
+        correctCodeChunks = null
+        correctCodeNextChunk = 0
+        correctCodeChainActive = false
     }
 
     private fun enqueuePreAuthReads() {
@@ -4266,6 +4423,7 @@ class ICanHealthBleManager(
         pendingHistoryBackfillReason = null
         pendingHistoryBatch.clear()
         lastAuthChallenge = null
+        resetCorrectCodeState()
         authRetryCount = 0
         receivedGlucoseThisConnection = false
         currentSequenceObservedAtMs = 0L
