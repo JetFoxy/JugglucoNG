@@ -144,19 +144,48 @@ internal object ICanHealthCloudCode {
         retryFutures.remove(normalized)?.cancel(false)
     }
 
-    /** Cached parameterCode JSON for `sn`, or null. */
+    /** Cached parameterCode JSON for `sn`, or null. Prefers the cloud cache; falls back
+     *  to a manually pushed table file (see [tableFileName]). */
     @JvmStatic
     fun cachedCode(context: Context, sn: String): String? {
+        val normalized = (sn ?: "").trim()
         val prefs = runCatching {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         }.getOrNull() ?: return null
-        return try {
-            val stored = prefs.getString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + sn, null)
-            stored?.takeIf { it.isNotBlank() }
+        val stored = try {
+            prefs.getString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + normalized, null)
         } catch (t: Throwable) {
             Log.stack(TAG, "cachedCode", t)
             null
         }
+        if (!stored.isNullOrBlank()) return stored
+        val file = java.io.File(context.filesDir, tableFileName(normalized))
+        if (!file.isFile) return null
+        return runCatching { parseTableFileContent(file.readText()) }.getOrNull()
+    }
+
+    /** Table file pushed from a PC (see [parseTableFileContent]); `sn` is the short box serial. */
+    internal fun tableFileName(sn: String): String = "ican-cgm-code-$sn.json"
+
+    /**
+     * Manual fallback source for the per-SN table when the phone's own network cannot
+     * reach the vendor cloud: the table is fetched on a PC with
+     * `tools/ican-capture/fetch_cgm_code.py` and pushed to `<filesDir>/ican-cgm-code-<sn>.json`.
+     * Accepts the raw parameterCode JSON or the full response envelope; the content must
+     * parse into a complete x1..x15 table.
+     */
+    internal fun parseTableFileContent(text: String): String? {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return null
+        val candidate = runCatching {
+            val json = JSONObject(trimmed)
+            json.optJSONObject("data")?.optString("code")?.takeIf { it.isNotBlank() } ?: trimmed
+        }.getOrDefault(trimmed)
+        val floats = ICanHealthCloudCodeProtocol.parseCodeFloats(candidate) ?: return null
+        for (index in 1..ICanHealthCorrectCode.TABLE_VALUES) {
+            if (!floats.containsKey("x$index")) return null
+        }
+        return candidate
     }
 
     /** True while a fetch worker attempt for `sn` is queued or running. */

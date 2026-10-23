@@ -23,6 +23,12 @@ with a default fallback, not an SN-hash generated value.
 Credentials come from ~/.config/ican-cloud-creds.json (not committed):
   {"appId": "...", "appSecret": "...", "base": "https://iot.ru.sinocareintl.com/api/"}
 
+Manual fallback for a phone whose network cannot reach the cloud:
+  python3 fetch_cgm_code.py <SN> --out ican-cgm-code-<SN>.json
+  adb push ican-cgm-code-<SN>.json /storage/emulated/0/Android/data/tk.glucodata.ng.debug/files/
+  (or run-as copy into filesDir) — the app picks the file up as its table source
+  (ICanHealthCloudCode.parseTableFileContent, pushed-file fallback).
+
 usage: fetch_cgm_code.py SN [SN ...]
 """
 import base64

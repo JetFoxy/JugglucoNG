@@ -2529,7 +2529,8 @@ class ICanHealthBleManager(
             ICanHealthCloudStatusNotifier.notifyCalibrationPending(context)
             return
         }
-        // A real (cached) table landing on a sensor clears any stale pending notice.
+        // A real (cached or manually pushed) table landing on a sensor clears any stale
+        // pending notice.
         ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
         correctCodeChainActive = true
         correctCodeChunks = chunks

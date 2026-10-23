@@ -275,6 +275,31 @@ class ICanHealthCloudCodeTests {
         assertEquals(any2, withDefault.table)
     }
 
+    // --- manual table file fallback -----------------------------------------
+
+    @Test
+    fun tableFileParsesRawJsonEnvelopeAndRejectsIncomplete() {
+        val raw = (1..25).joinToString(",", prefix = "{", postfix = "}") { index ->
+            "\"x$index\":\"$index.5\""
+        }
+        System.err.println("RAW=[$raw]")
+        assertEquals(raw, ICanHealthCloudCode.parseTableFileContent(raw))
+
+        val envelope = "{\"code\":200,\"success\":true,\"data\":{\"code\":\"" + raw.replace("\"", "\\\"") + "\"}}"
+        assertEquals(raw, ICanHealthCloudCode.parseTableFileContent(envelope))
+
+        val missingX15 = raw.replace(""""x15":"15.5",""", "")
+        assertNull(ICanHealthCloudCode.parseTableFileContent(missingX15))
+        assertNull(ICanHealthCloudCode.parseTableFileContent("not json"))
+        assertNull(ICanHealthCloudCode.parseTableFileContent(""))
+        assertNull(ICanHealthCloudCode.parseTableFileContent("""{"code":400,"data":{}}"""))
+    }
+
+    @Test
+    fun tableFileNameUsesShortBoxSerial() {
+        assertEquals("ican-cgm-code-84F01FF00000A.json", ICanHealthCloudCode.tableFileName("84F01FF00000A"))
+    }
+
     // --- helpers ------------------------------------------------------------
 
     /**
