@@ -100,6 +100,7 @@ class ICanHealthBleManager(
         // for the live write tests (plan doc §7.8, T1b/T2).
         private const val CORRECT_CODE_WRITE_DRY_RUN = false
         private const val CORRECT_CODE_WRITE_DELAY_MS = 3_000L
+        private const val CORRECT_CODE_FETCH_GRACE_MS = 20_000L
         private const val CORRECT_CODE_CHUNK_GAP_MS = 250L
 
         /** Tight ack window, started once the chunk write actually left the radio. */
@@ -218,6 +219,7 @@ class ICanHealthBleManager(
     private var correctCodeStartRunnable: Runnable? = null
     private var correctCodeTimeoutRunnable: Runnable? = null
     private var correctCodePendingChunk: ByteArray? = null
+    private var correctCodeRecheckRunnable: Runnable? = null
     private var gattWriteInFlight: GattOp.Write? = null
     @Volatile private var configuredAuthUserId: String? = null
     @Volatile private var recoveredAuthUserId: String? = null
@@ -602,6 +604,8 @@ class ICanHealthBleManager(
         handler.removeCallbacks(sensorInfoFallbackRunnable)
         handler.removeCallbacks(mtuRequestTimeoutRunnable)
         handler.removeCallbacks(gattOpTimeoutRunnable)
+        correctCodeRecheckRunnable?.let { handler.removeCallbacks(it) }
+        correctCodeRecheckRunnable = null
         historyBackfillRequested = false
         historyBackfillPhase = HistoryBackfillPhase.NONE
         awaitingFreshStatusForHistoryBackfill = false
@@ -2495,14 +2499,33 @@ class ICanHealthBleManager(
         }
         val codeJson = ICanHealthCloudCode.cachedCode(context, sn)
         val floats = codeJson?.let { ICanHealthCloudCodeProtocol.parseCodeFloats(it) }
-        if (floats.isNullOrEmpty()) {
-            Log.i(TAG, "CorrectCode write skipped: no cached table for ${ICanHealthCloudCode.maskSn(sn)}")
+        val decision = ICanCloudOfflineLadder.decide(
+            cachedTable = floats,
+            fetchInFlight = ICanHealthCloudCode.isFetchInFlight(sn),
+            defaultTable = ICanHealthCloudCode.defaultCorrectCode(),
+        )
+        if (decision.source == ICanCloudOfflineLadder.Source.WAIT_FETCH) {
+            Log.i(
+                TAG,
+                "CorrectCode write deferred: cloud fetch for ${ICanHealthCloudCode.maskSn(sn)} is in flight",
+            )
+            scheduleCorrectCodeRecheck()
             return
         }
-        val chunks = ICanHealthCorrectCode.buildCorrectCodeChunks(floats, challenge)
+        val fromDefault = decision.source == ICanCloudOfflineLadder.Source.USE_DEFAULT
+        if (fromDefault) {
+            Log.i(
+                TAG,
+                "CorrectCode: vendor cloud table unavailable for ${ICanHealthCloudCode.maskSn(sn)} — using the offline vendor default table",
+            )
+        }
+        val chunks = decision.table?.let { ICanHealthCorrectCode.buildCorrectCodeChunks(it, challenge) }
         if (chunks == null) {
-            Log.w(TAG, "CorrectCode encode failed for ${ICanHealthCloudCode.maskSn(sn)}")
+            ICanHealthCloudStatusNotifier.notifyServerUnavailable(context, usedDefaultTable = false)
             return
+        }
+        if (fromDefault) {
+            ICanHealthCloudStatusNotifier.notifyServerUnavailable(context, usedDefaultTable = true)
         }
         correctCodeChainActive = true
         correctCodeChunks = chunks
@@ -2520,6 +2543,16 @@ class ICanHealthBleManager(
         val start = Runnable { sendCorrectCodeChunk(0) }
         correctCodeStartRunnable = start
         handler.postDelayed(start, CORRECT_CODE_WRITE_DELAY_MS)
+    }
+
+    private fun scheduleCorrectCodeRecheck() {
+        correctCodeRecheckRunnable?.let { handler.removeCallbacks(it) }
+        val recheck = Runnable {
+            correctCodeRecheckRunnable = null
+            scheduleCorrectCodeWrite()
+        }
+        correctCodeRecheckRunnable = recheck
+        handler.postDelayed(recheck, CORRECT_CODE_FETCH_GRACE_MS)
     }
 
     private fun sendCorrectCodeChunk(index: Int) {
@@ -2572,6 +2605,8 @@ class ICanHealthBleManager(
         correctCodeStartRunnable = null
         correctCodeTimeoutRunnable?.let { handler.removeCallbacks(it) }
         correctCodeTimeoutRunnable = null
+        correctCodeRecheckRunnable?.let { handler.removeCallbacks(it) }
+        correctCodeRecheckRunnable = null
         // An aborted chain must not leave its queued (not yet sent) chunk in the GATT
         // queue — it would go on air later with nobody listening for the ack.
         correctCodePendingChunk?.let { pending ->

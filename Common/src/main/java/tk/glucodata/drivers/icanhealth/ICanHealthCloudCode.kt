@@ -115,6 +115,51 @@ internal object ICanHealthCloudCode {
         }
     }
 
+    /** True while a fetch worker attempt for `sn` is queued or running. */
+    @JvmStatic
+    fun isFetchInFlight(sn: String): Boolean = attemptsInFlight.contains(sn.trim())
+
+    /**
+     * The vendor cloud's own answer for a device SN it has no row for, captured 2026-10-23
+     * with blind probes (two different unknown SNs returned this table byte-identically,
+     * stable across repeat requests). This is what the vendor phone would write on a real
+     * sensor it cannot identify server-side, so as a no-network fallback it matches the
+     * vendor behavior. Per §7.8 the server bakes the per-sensor x13 scale into real rows;
+     * the default row carries its fallback x13 = 0.4, which the next online bind replaces
+     * once the true per-SN table lands in the cache.
+     */
+    private val BUNDLED_DEFAULT_CORRECT_CODE: Map<String, Float> = mapOf(
+        "x1" to 0.015f,
+        "x2" to 32.0f,
+        "x3" to 25.0f,
+        "x4" to 1.0f,
+        "x5" to 0.8f,
+        "x6" to 0.0f,
+        "x7" to 40.0f,
+        "x8" to 0.3f,
+        "x9" to 1.0f,
+        "x10" to 1.2f,
+        "x11" to 13.0f,
+        "x12" to 1.5f,
+        "x13" to 0.4f,
+        "x14" to 3.5f,
+        "x15" to 15.0f,
+        "x16" to 15.0f,
+        "x17" to 0.1f,
+        "x18" to 0.6f,
+        "x19" to 0.2f,
+        "x20" to 0.6f,
+        "x21" to 0.1f,
+        "x22" to 16.0f,
+        "x23" to 1.0f,
+        "x24" to 2.1f,
+        "x25" to 2.2f,
+    )
+
+    /** The bundled vendor default calibration table ([BUNDLED_DEFAULT_CORRECT_CODE]). */
+    @JvmStatic
+    fun defaultCorrectCode(): Map<String, Float> = BUNDLED_DEFAULT_CORRECT_CODE
+
     /** Synchronous fetch; must be called off the main thread (mirror AiDexCnCloudClient). */
     @JvmStatic
     fun fetch(context: Context, creds: ICanCloudCreds?, sn: String): ICanCloudCodeResult? {
@@ -427,5 +472,39 @@ internal object ICanCloudCredsLoader {
         val secret = json.optString("appSecret").trim()
         if (appId.isEmpty() || secret.isEmpty()) return null
         return ICanCloudCreds(appId, secret, json.optString("base", "").trim())
+    }
+}
+
+/**
+ * The offline fallback ladder for the correctCode provisioning write, decided at
+ * `scheduleCorrectCodeWrite` time:
+ *
+ * 1. [`USE_CACHE`] — the per-SN table the cloud delivered earlier (the real per-sensor
+ *    scale, including the server-baked x13).
+ * 2. [`WAIT_FETCH`] — the cache is empty but a fetch worker attempt is in flight for
+ *    this SN; defer the decision briefly so an online sensor gets its real table
+ *    instead of the fallback.
+ * 3. [`USE_DEFAULT`] — the bundled vendor default table ([ICanHealthCloudCode
+ *    .defaultCorrectCode]): what the vendor cloud itself hands out for SNs it does not
+ *    know, so the still-uncalibrated sensor gets provisioned even offline.
+ *
+ * Skipping the write entirely remains a `scheduleCorrectCodeWrite` decision: it happens
+ * only if the encoder cannot produce chunks (crypto provider failure), because
+ * [USE_DEFAULT] is a compile-time constant and always present.
+ */
+internal object ICanCloudOfflineLadder {
+    internal enum class Source { USE_CACHE, WAIT_FETCH, USE_DEFAULT }
+
+    internal data class Decision(val source: Source, val table: Map<String, Float>?)
+
+    internal fun decide(
+        cachedTable: Map<String, Float>?,
+        fetchInFlight: Boolean,
+        defaultTable: Map<String, Float>?,
+    ): Decision = when {
+        !cachedTable.isNullOrEmpty() -> Decision(Source.USE_CACHE, cachedTable)
+        fetchInFlight -> Decision(Source.WAIT_FETCH, null)
+        !defaultTable.isNullOrEmpty() -> Decision(Source.USE_DEFAULT, defaultTable)
+        else -> Decision(Source.USE_DEFAULT, null)
     }
 }

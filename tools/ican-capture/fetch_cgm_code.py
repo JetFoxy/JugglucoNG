@@ -13,6 +13,13 @@ Pipeline (verified 2026-10-22, no hooks, no vendor app, no Frida):
   v: AES-256-CBC, IV = first 16 ASCII chars of the AES key, NoPadding (payload is a
      16-byte multiple). Envelope: {"code":200,"data":{"code":"<parameterCode JSON>"}}.
 
+Probing (2026-10-23): an unregistered/bogus SN gets a stable DEFAULT table
+(x8=0.3 x9=1.0 x10=1.2 x11=13.0 x12=1.5, x13=0.4 before the client-side
+c(shortSN) override) every time, byte-identical across repeat requests; the
+server generates a fresh AES key per request (k differs), the payload does
+not. Known SNs return their own stable rows. So the table is a per-SN lookup
+with a default fallback, not an SN-hash generated value.
+
 Credentials come from ~/.config/ican-cloud-creds.json (not committed):
   {"appId": "...", "appSecret": "...", "base": "https://iot.ru.sinocareintl.com/api/"}
 

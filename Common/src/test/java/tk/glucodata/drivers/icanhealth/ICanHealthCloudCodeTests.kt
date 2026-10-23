@@ -206,6 +206,75 @@ class ICanHealthCloudCodeTests {
         assertEquals("first", first)
     }
 
+    // --- offline ladder: vendor default table + decision ---------------------
+
+    @Test
+    fun bundledDefaultCorrectCodeMatchesProbedFallback() {
+        // The vendor cloud returns this exact table for SNs it does not know, stably,
+        // byte-identical across repeat requests (2026-10-23 blind probes). Pinned so a
+        // change to the offline fallback is a conscious edit, like the credentials pair.
+        val default = ICanHealthCloudCode.defaultCorrectCode()
+        listOf(
+            "x1" to 0.015f,
+            "x2" to 32.0f,
+            "x3" to 25.0f,
+            "x4" to 1.0f,
+            "x5" to 0.8f,
+            "x6" to 0.0f,
+            "x7" to 40.0f,
+            "x8" to 0.3f,
+            "x9" to 1.0f,
+            "x10" to 1.2f,
+            "x11" to 13.0f,
+            "x12" to 1.5f,
+            "x13" to 0.4f,
+            "x14" to 3.5f,
+            "x15" to 15.0f,
+        ).forEach { (key, expected) -> assertEquals(expected, default[key]) }
+        for (index in 16..25) {
+            assertTrue(default.containsKey("x$index"))
+        }
+    }
+
+    @Test
+    fun bundledDefaultTableEncodesFreshSensorChunks() {
+        // The offline fallback must survive the same encoder as a cloud table,
+        // including the x6 = 0.0 zero that a parse-side null-out would drop.
+        val values = ICanHealthCorrectCode.valuesFromCorrectCode(
+            ICanHealthCloudCode.defaultCorrectCode(),
+        )
+        assertEquals(15, values?.size)
+        assertEquals(0, values?.get(5))
+
+        val chunks = ICanHealthCorrectCode.buildCorrectCodeChunks(
+            ICanHealthCloudCode.defaultCorrectCode(),
+            byteArrayOf(0, 0, 0, 0),
+        )
+        assertEquals(3, chunks?.size)
+        assertTrue(chunks?.all { it.size == 18 } == true)
+    }
+
+    @Test
+    fun offlineLadderPrefersCacheWaitsForFetchThenDefaults() {
+        val any1 = mapOf("x1" to 1.0f)
+        val any2 = mapOf("x1" to 2.0f)
+
+        assertEquals(
+            ICanCloudOfflineLadder.Source.USE_CACHE,
+            ICanCloudOfflineLadder.decide(cachedTable = any1, fetchInFlight = false, defaultTable = any2).source,
+        )
+        assertEquals(any1, ICanCloudOfflineLadder.decide(cachedTable = any1, fetchInFlight = false, defaultTable = any2).table)
+
+        assertEquals(
+            ICanCloudOfflineLadder.Source.WAIT_FETCH,
+            ICanCloudOfflineLadder.decide(cachedTable = null, fetchInFlight = true, defaultTable = any2).source,
+        )
+
+        val withDefault = ICanCloudOfflineLadder.decide(cachedTable = null, fetchInFlight = false, defaultTable = any2)
+        assertEquals(ICanCloudOfflineLadder.Source.USE_DEFAULT, withDefault.source)
+        assertEquals(any2, withDefault.table)
+    }
+
     // --- helpers ------------------------------------------------------------
 
     /**
