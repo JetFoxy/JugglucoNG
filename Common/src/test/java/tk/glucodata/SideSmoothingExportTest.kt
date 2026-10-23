@@ -25,6 +25,7 @@ import kotlin.math.max
  * Env:
  *  - `UKF_DATASETS`  directory with the traces (default `~/Downloads/ukf_datasets`)
  *  - `SIDE_SMOOTHING_OUT`  output directory (default: the same one)
+ *  - `SIDE_DATASETS`  comma separated dataset names (default: the six of the plan)
  *
  * The input is `stock`, else `calibrated`, as the other export does. Two sessions that overlap in
  * time keep the first one in file order, as the AAPS loader does, so both sides filter one series.
@@ -33,7 +34,8 @@ class SideSmoothingExportTest {
 
     private val mgdlPerMmol = 18.0182
 
-    private val datasets = listOf("aidex", "sibionics2", "sibionics_other", "libre2", "ican", "syai_54DC")
+    private val datasets = System.getenv("SIDE_DATASETS")?.split(',')?.filter { it.isNotBlank() }
+        ?: listOf("aidex", "sibionics2", "sibionics_other", "libre2", "ican", "syai_54DC")
 
     private data class Row(val index: String, val timestampMs: Long, val raw: String, val value: Double)
 
