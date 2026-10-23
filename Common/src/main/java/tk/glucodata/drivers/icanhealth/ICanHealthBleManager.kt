@@ -220,6 +220,7 @@ class ICanHealthBleManager(
     private var correctCodeTimeoutRunnable: Runnable? = null
     private var correctCodePendingChunk: ByteArray? = null
     private var correctCodeRecheckRunnable: Runnable? = null
+    @Volatile private var lastSensorInfoFresh = true
     @Volatile private var correctCodeNotifyDefaultOnCompletion = false
     private var gattWriteInFlight: GattOp.Write? = null
     @Volatile private var configuredAuthUserId: String? = null
@@ -2297,7 +2298,7 @@ class ICanHealthBleManager(
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_STATUS))
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_SESSION_START_TIME))
                     drainGattQueue()
-                    scheduleCorrectCodeWrite()
+                    scheduleCorrectCodeWrite(allowDefaultFallback = lastSensorInfoFresh)
                 } else {
                     Log.w(TAG, "Start sensor command rejected: ${data.toHexString()}")
                     // Recovery path for half-activated WARMUP state: if the sensor
@@ -2396,6 +2397,7 @@ class ICanHealthBleManager(
                 )
                 maybeFetchVendorCalibrationCode(data)
                 val fresh = ICanHealthParser.isSensorInfoMissingCalibration(data)
+                lastSensorInfoFresh = fresh
                 if (!fresh || startCommandIssuedThisConnection || !shouldAttemptStandaloneStart()) {
                     // Provisioned sensor: this is the only write window. Fresh sensor: defer to
                     // the 1A-success path while this connection still plans to send `1A`; once
