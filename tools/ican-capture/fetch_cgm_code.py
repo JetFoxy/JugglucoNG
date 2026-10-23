@@ -24,8 +24,8 @@ Credentials come from ~/.config/ican-cloud-creds.json (not committed):
   {"appId": "...", "appSecret": "...", "base": "https://iot.ru.sinocareintl.com/api/"}
 
 Manual fallback for a phone whose network cannot reach the cloud:
-  python3 fetch_cgm_code.py <SN> --out ican-cgm-code-<SN>.json
-  adb push ican-cgm-code-<SN>.json /storage/emulated/0/Android/data/tk.glucodata.ng.debug/files/
+  python3 fetch_cgm_code.py <SN> --out <dir>   (writes ican-cgm-code-<SN>.json into <dir>)
+  adb push <dir>/ican-cgm-code-<SN>.json /storage/emulated/0/Android/data/tk.glucodata.ng.debug/files/
   (or run-as copy into filesDir) — the app picks the file up as its table source
   (ICanHealthCloudCode.parseTableFileContent, pushed-file fallback).
 
@@ -111,10 +111,21 @@ def fetch(sn):
 
 
 def main(argv):
-    if not argv:
+    outdir = None
+    sns = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--out":
+            outdir = argv[i + 1] if i + 1 < len(argv) else None
+            i += 2
+            continue
+        sns.append(arg)
+        i += 1
+    if not sns:
         print(__doc__)
         return 2
-    for sn in argv:
+    for sn in sns:
         ts = str(int(time.time() * 1000))
         try:
             aes, code = fetch(sn)
@@ -126,6 +137,11 @@ def main(argv):
             continue
         print(sn, "aesKey", aes)
         print(json.dumps(code, sort_keys=True))
+        if outdir:
+            path = os.path.join(outdir, "ican-cgm-code-%s.json" % sn)
+            with open(path, "w") as fh:
+                fh.write(code)
+            print(sn, "table saved to", path)
     return 0
 
 
