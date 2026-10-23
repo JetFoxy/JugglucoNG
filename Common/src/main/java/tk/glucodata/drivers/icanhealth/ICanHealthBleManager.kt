@@ -221,7 +221,6 @@ class ICanHealthBleManager(
     private var correctCodePendingChunk: ByteArray? = null
     private var correctCodeRecheckRunnable: Runnable? = null
     @Volatile private var lastSensorInfoFresh = true
-    @Volatile private var correctCodeNotifyDefaultOnCompletion = false
     private var gattWriteInFlight: GattOp.Write? = null
     @Volatile private var configuredAuthUserId: String? = null
     @Volatile private var recoveredAuthUserId: String? = null
@@ -2298,7 +2297,7 @@ class ICanHealthBleManager(
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_STATUS))
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_SESSION_START_TIME))
                     drainGattQueue()
-                    scheduleCorrectCodeWrite(allowDefaultFallback = lastSensorInfoFresh)
+                    scheduleCorrectCodeWrite()
                 } else {
                     Log.w(TAG, "Start sensor command rejected: ${data.toHexString()}")
                     // Recovery path for half-activated WARMUP state: if the sensor
@@ -2406,7 +2405,7 @@ class ICanHealthBleManager(
                     // `fresh` controls the offline-default fallback: an already-provisioned
                     // sensor must keep its installed calibration when the per-SN table is
                     // unavailable, instead of being overwritten with the generic default.
-                    scheduleCorrectCodeWrite(allowDefaultFallback = fresh)
+                    scheduleCorrectCodeWrite()
                 }
                 startPostAuthSetup("sensor-info")
             }
@@ -2482,7 +2481,7 @@ class ICanHealthBleManager(
      * from the cloud-fetched cache ([maybeFetchVendorCalibrationCode] warms it on the
      * `F6 = 0xFFFF` marker). Dry-run arms nothing and only logs the packets.
      */
-    private fun scheduleCorrectCodeWrite(allowDefaultFallback: Boolean = true) {
+    private fun scheduleCorrectCodeWrite() {
         if (correctCodeChainActive) return
         val challenge = lastAuthChallenge
         if (challenge == null || challenge.size != 4) {
@@ -2508,7 +2507,7 @@ class ICanHealthBleManager(
         val decision = ICanCloudOfflineLadder.decide(
             cachedTable = floats,
             fetchInFlight = ICanHealthCloudCode.isFetchInFlight(sn),
-            defaultTable = if (allowDefaultFallback) ICanHealthCloudCode.defaultCorrectCode() else null,
+            defaultTable = null,
         )
         if (decision.source == ICanCloudOfflineLadder.Source.WAIT_FETCH) {
             Log.i(
@@ -2518,33 +2517,20 @@ class ICanHealthBleManager(
             scheduleCorrectCodeRecheck()
             return
         }
-        val fromDefault = decision.source == ICanCloudOfflineLadder.Source.USE_DEFAULT && decision.table != null
-        if (fromDefault) {
-            Log.i(
-                TAG,
-                "CorrectCode: vendor cloud table unavailable for ${ICanHealthCloudCode.maskSn(sn)} — using the offline vendor default table",
-            )
-        }
         val chunks = decision.table?.let { ICanHealthCorrectCode.buildCorrectCodeChunks(it, challenge) }
         if (chunks == null) {
-            if (fromDefault) {
-                ICanHealthCloudStatusNotifier.notifyServerUnavailable(context, usedDefaultTable = false)
-            } else if (decision.source == ICanCloudOfflineLadder.Source.USE_DEFAULT) {
-                // Provisioned sensor with no cached table and no default allowed:
-                // leave its already-installed calibration untouched.
-                Log.i(
-                    TAG,
-                    "CorrectCode write skipped: no cached table for provisioned sensor ${ICanHealthCloudCode.maskSn(sn)} — installed calibration preserved",
-                )
-            }
+            // No real per-SN table available (cloud unreachable or not yet fetched):
+            // do NOT write the generic default table — it scales readings wrongly.
+            // Preserve whatever calibration the sensor already has and tell the user.
+            Log.i(
+                TAG,
+                "CorrectCode write skipped: no cached per-SN table for ${ICanHealthCloudCode.maskSn(sn)} — calibration pending, installed calibration preserved",
+            )
+            ICanHealthCloudStatusNotifier.notifyCalibrationPending(context)
             return
         }
-        if (fromDefault) {
-            correctCodeNotifyDefaultOnCompletion = true
-        } else {
-            // A real (cached) table landing on a sensor clears any stale notice.
-            ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
-        }
+        // A real (cached) table landing on a sensor clears any stale pending notice.
+        ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
         correctCodeChainActive = true
         correctCodeChunks = chunks
         correctCodeNextChunk = 0
@@ -2610,11 +2596,6 @@ class ICanHealthBleManager(
         val next = correctCodeNextChunk + 1
         if (next >= chunks.size) {
             Log.i(TAG, "CorrectCode write complete: ${chunks.size}/${chunks.size} chunks acked")
-            if (correctCodeNotifyDefaultOnCompletion) {
-                correctCodeNotifyDefaultOnCompletion = false
-                // Report the offline fallback only after the whole table landed.
-                Applic.app?.let { ICanHealthCloudStatusNotifier.notifyServerUnavailable(it, usedDefaultTable = true) }
-            }
             resetCorrectCodeState()
             return
         }
@@ -2630,7 +2611,6 @@ class ICanHealthBleManager(
         correctCodeTimeoutRunnable = null
         correctCodeRecheckRunnable?.let { handler.removeCallbacks(it) }
         correctCodeRecheckRunnable = null
-        correctCodeNotifyDefaultOnCompletion = false
         // An aborted chain must not leave its queued (not yet sent) chunk in the GATT
         // queue — it would go on air later with nobody listening for the ack.
         correctCodePendingChunk?.let { pending ->

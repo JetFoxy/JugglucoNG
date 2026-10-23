@@ -2,6 +2,5 @@
 <resources>
     <string name="ican_cloud_unavailable_title">iCan calibration server unreachable</string>
     <string name="ican_cloud_unavailable_channel">iCan calibration cloud status</string>
-    <string name="ican_cloud_unavailable_default_used">No network access or the vendor cloud is unreachable. The sensor has been provisioned with the vendor\'s default calibration table (approximate); the per-sensor table will be written automatically on a later connection.</string>
-    <string name="ican_cloud_unavailable_skipped">No network access or the vendor cloud is unreachable. The sensor stays on its factory calibration for now; provisioning will be retried on a later connection.</string>
+    <string name="ican_calibration_pending">The sensor\'s per-sensor calibration could not be fetched (no network or vendor cloud unreachable). The sensor keeps its current calibration; readings may be inaccurate until a connection succeeds and the sensor is reconnected.</string>
 </resources>

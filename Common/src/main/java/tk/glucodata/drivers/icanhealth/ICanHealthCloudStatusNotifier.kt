@@ -31,17 +31,14 @@ internal object ICanHealthCloudStatusNotifier {
     @Volatile
     private var lastNotifiedMs = 0L
 
-    fun notifyServerUnavailable(context: Context, usedDefaultTable: Boolean) {
+    fun notifyCalibrationPending(context: Context) {
         val now = System.currentTimeMillis()
         if (now - lastNotifiedMs < NOTIFY_THROTTLE_MS) return
         lastNotifiedMs = now
         show(
             context,
             context.getString(R.string.ican_cloud_unavailable_title),
-            context.getString(
-                if (usedDefaultTable) R.string.ican_cloud_unavailable_default_used
-                else R.string.ican_cloud_unavailable_skipped
-            ),
+            context.getString(R.string.ican_calibration_pending),
             NOTIFICATION_ID_UNAVAILABLE,
         )
     }

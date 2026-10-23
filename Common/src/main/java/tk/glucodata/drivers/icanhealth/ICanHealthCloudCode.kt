@@ -61,19 +61,28 @@ internal object ICanHealthCloudCode {
     }
     private val attemptsInFlight = ConcurrentHashMap.newKeySet<String>()
     private val lastAttemptMs = ConcurrentHashMap<String, Long>()
+    private val retryCounts = ConcurrentHashMap<String, Int>()
+    private val retryScheduled = ConcurrentHashMap.newKeySet<String>()
+    private val retryExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable).apply { name = "ICanCloudRetry"; isDaemon = true }
+    }
 
     /** Enqueue a fetch for `sn` on the background worker. Never throws, never blocks. */
     @JvmStatic
-    fun fetchAndCacheAsync(context: Context?, sn: String?): Boolean {
+    fun fetchAndCacheAsync(context: Context?, sn: String?, force: Boolean = false): Boolean {
         val normalizedSn = (sn ?: "").trim()
         if (context == null || normalizedSn.isEmpty()) return false
         val prefs = runCatching {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         }.getOrNull() ?: return false
-        if (cachedCode(context, normalizedSn) != null) return false
+        if (cachedCode(context, normalizedSn) != null) {
+            retryCounts.remove(normalizedSn)
+            retryScheduled.remove(normalizedSn)
+            return false
+        }
         val now = System.currentTimeMillis()
         val last = lastAttemptMs[normalizedSn] ?: 0L
-        if (now - last < RETRY_THROTTLE_MS) return false
+        if (!force && now - last < RETRY_THROTTLE_MS) return false
         if (!attemptsInFlight.add(normalizedSn)) return false
         lastAttemptMs[normalizedSn] = now
         executor.execute {
@@ -90,14 +99,31 @@ internal object ICanHealthCloudCode {
                         .putString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + normalizedSn, result.parameterCodeJson)
                         .commit()
                     Log.i(TAG, "Cached vendor calibration code for ${maskSn(normalizedSn)} (${result.codeFloats.size} floats)")
+                    retryCounts.remove(normalizedSn)
+                    retryScheduled.remove(normalizedSn)
+                } else {
+                    scheduleRetry(context, normalizedSn)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Cloud fetch for ${maskSn(normalizedSn)} failed: ${t.message ?: t.javaClass.simpleName}")
+                scheduleRetry(context, normalizedSn)
             } finally {
                 attemptsInFlight.remove(normalizedSn)
             }
         }
         return true
+    }
+
+    private fun scheduleRetry(context: Context, sn: String) {
+        val attempt = retryCounts.merge(sn, 1, Int::plus) ?: 1
+        val delayMs = (30_000L * (1L shl (attempt - 1).coerceAtMost(4))).coerceAtMost(RETRY_THROTTLE_MS)
+        if (retryScheduled.contains(sn)) return
+        retryScheduled.add(sn)
+        Log.i(TAG, "Scheduling cloud fetch retry for ${maskSn(sn)} in ${delayMs / 1000}s (attempt $attempt)")
+        retryExecutor.schedule({
+            retryScheduled.remove(sn)
+            fetchAndCacheAsync(context, sn, force = true)
+        }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
 
     /** Cached parameterCode JSON for `sn`, or null. */
