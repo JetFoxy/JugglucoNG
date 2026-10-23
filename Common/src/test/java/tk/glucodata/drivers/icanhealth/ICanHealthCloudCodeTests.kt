@@ -140,7 +140,7 @@ class ICanHealthCloudCodeTests {
 
     @Test
     fun maskSnNeverExposesTheFullSerial() {
-        assertTrue(ICanHealthCloudCode.maskSn("84F01FF13594A").startsWith("len=13, suffix="))
+        assertTrue(ICanHealthCloudCode.maskSn("84F01FF00000A").startsWith("len=13, suffix="))
         assertEquals("<empty>", ICanHealthCloudCode.maskSn(""))
         assertEquals("<empty>", ICanHealthCloudCode.maskSn(null))
     }
