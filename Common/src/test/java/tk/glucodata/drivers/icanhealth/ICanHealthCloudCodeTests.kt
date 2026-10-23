@@ -145,6 +145,67 @@ class ICanHealthCloudCodeTests {
         assertEquals("<empty>", ICanHealthCloudCode.maskSn(null))
     }
 
+    // --- vendor creds candidates -------------------------------------------
+
+    @Test
+    fun bundledVendorKeyPairIsPinned() {
+        // The vendor SDK cloud pair is deliberately pinned: any change to it must be a
+        // conscious edit (it is the same pair every iCan/Luch vendor build carries).
+        assertEquals("610001", ICanCloudCredsLoader.BUNDLED_CLOUD_APP_ID)
+        assertEquals("1395554be35742351fe165a69b50e0f8", ICanCloudCredsLoader.BUNDLED_CLOUD_APP_SECRET)
+    }
+
+    @Test
+    fun credsJsonParsesBothSingleObjectAndArray() {
+        val single = ICanCloudCredsLoader.parseCredsJson(
+            """{"appId":"610001","appSecret":"s1","base":"https://iot.ru.sinocareintl.com/api/"}""",
+        )
+        assertEquals(1, single?.size)
+        assertEquals("s1", single?.single()?.appSecret)
+        assertEquals("https://iot.ru.sinocareintl.com/api/", single?.single()?.baseUrl)
+
+        val pair = ICanCloudCredsLoader.parseCredsJson(
+            """[
+                 {"appId":"a1","appSecret":"s1","base":"https://first/api/"},
+                 {"appId":"","appSecret":"dropped-entry"},
+                 {"appId":"a2","appSecret":"s2"}
+               ]""",
+        )
+        assertEquals(2, pair?.size)
+        assertEquals(arrayOf("a1", "a2"), pair?.map { it.appId }?.toTypedArray())
+
+        assertNull(ICanCloudCredsLoader.parseCredsJson("not json"))
+        assertNull(ICanCloudCredsLoader.parseCredsJson("""{"appSecret":"no-appId"}"""))
+    }
+
+    @Test
+    fun credsTryInOrderUsesFirstSuccessAndSkipsFailures() {
+        val a = ICanCloudCreds("a", "sa", "")
+        val b = ICanCloudCreds("b", "sb", "")
+        val seen = mutableListOf<String>()
+        @Suppress("UNCHECKED_CAST")
+        val ok = ICanCloudCredsLoader.tryInOrder(listOf(a, b)) { creds ->
+            seen.add(creds.appId)
+            if (creds.appId == "b") "second" else null
+        } as String?
+        assertEquals("second", ok)
+        assertEquals(listOf("a", "b"), seen)
+
+        seen.clear()
+        val none = ICanCloudCredsLoader.tryInOrder(listOf(a, b)) { creds ->
+            seen.add(creds.appId)
+            null
+        }
+        assertNull(none)
+        assertEquals(listOf("a", "b"), seen)
+
+        val first = ICanCloudCredsLoader.tryInOrder(listOf(a, b)) { creds ->
+            seen.add(creds.appId)
+            "first"
+        }
+        assertEquals("first", first)
+    }
+
     // --- helpers ------------------------------------------------------------
 
     /**

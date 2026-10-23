@@ -19,6 +19,7 @@ import java.util.zip.GZIPInputStream
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import org.json.JSONArray
 import org.json.JSONObject
 import tk.glucodata.Log
 
@@ -77,11 +78,13 @@ internal object ICanHealthCloudCode {
         lastAttemptMs[normalizedSn] = now
         executor.execute {
             try {
-                val result = fetch(
-                    context,
-                    ICanCloudCredsLoader.load(context, prefs),
-                    normalizedSn,
-                )
+                val candidates = ICanCloudCredsLoader.load(context, prefs)
+                val result = ICanCloudCredsLoader.tryInOrder(candidates) { creds ->
+                    if (candidates.size > 1) {
+                        Log.i(TAG, "Trying vendor cloud candidate ${creds.appId} (${creds.baseUrl})")
+                    }
+                    fetch(context, creds, normalizedSn)
+                }
                 if (result != null) {
                     prefs.edit()
                         .putString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + normalizedSn, result.parameterCodeJson)
@@ -354,28 +357,75 @@ internal object ICanHealthCloudCodeProtocol {
 }
 
 /**
- * Runtime credential resolution, never compiled into the build. See [ICanCloudCreds].
+ * Runtime credential resolution. Order: prefs override, `<filesDir>/ican-cloud-creds.json`
+ * (single object or an array of them), then the bundled vendor SDK pair below. The first
+ * candidate the fetch worker succeeds with wins.
+ *
+ * The bundled pair is the vendor SDK's own cloud key pair, identical in every iCan/Luch
+ * vendor build (CE and RU alike); it was recovered at runtime from the plaintext-side
+ * `RUSSIA_ENV` of `ru.luch.testcgm` and is published deliberately as a bundled vendor key,
+ * mirroring `ICanHealthConstants.DEFAULT_CORRECT_CODE_AES_KEY_ASCII`. It is not user data.
  */
 internal object ICanCloudCredsLoader {
     internal const val CREDS_FILE_NAME = "ican-cloud-creds.json"
 
-    fun load(context: Context, prefsOverride: SharedPreferences): ICanCloudCreds? {
+    /** Vendor SDK cloud key pair; see the object kdoc for provenance. */
+    internal const val BUNDLED_CLOUD_APP_ID = "610001"
+    internal const val BUNDLED_CLOUD_APP_SECRET = "1395554be35742351fe165a69b50e0f8"
+
+    fun load(context: Context, prefsOverride: SharedPreferences): List<ICanCloudCreds> {
+        val candidates = ArrayList<ICanCloudCreds>(3)
         prefsOverride.also { prefs ->
             val appId = prefs.getString(ICanHealthConstants.PREF_CLOUD_APP_ID, null)?.trim()
             val secret = prefs.getString(ICanHealthConstants.PREF_CLOUD_APP_SECRET, null)?.trim()
             val base = prefs.getString(ICanHealthConstants.PREF_CLOUD_BASE_URL, null)?.trim()
             if (!appId.isNullOrBlank() && !secret.isNullOrBlank()) {
-                return ICanCloudCreds(appId, secret, base.orEmpty())
+                candidates.add(ICanCloudCreds(appId, secret, base.orEmpty()))
             }
         }
         val file = java.io.File(context.filesDir, CREDS_FILE_NAME)
-        if (!file.isFile) return null
+        if (file.isFile) {
+            parseCredsJson(file.readText())?.let { candidates.addAll(it) }
+        }
+        candidates.add(ICanCloudCreds(BUNDLED_CLOUD_APP_ID, BUNDLED_CLOUD_APP_SECRET, ""))
+        return candidates.distinct()
+    }
+
+    /**
+     * Fetch by trying candidates in order; the first non-null result wins. Pure helper so
+     * the ordering policy is testable without network access.
+     */
+    internal fun <T> tryInOrder(
+        candidates: List<ICanCloudCreds>,
+        attempt: (ICanCloudCreds) -> T?,
+    ): T? {
+        for (creds in candidates) {
+            val result = attempt(creds) ?: continue
+            return result
+        }
+        return null
+    }
+
+    /** Accepts a single creds object or an array of them, tolerating per-entry blanks. */
+    internal fun parseCredsJson(text: String): List<ICanCloudCreds>? {
         return runCatching {
-            val json = JSONObject(file.readText())
-            val appId = json.optString("appId").trim()
-            val secret = json.optString("appSecret").trim()
-            if (appId.isEmpty() || secret.isEmpty()) return null
-            ICanCloudCreds(appId, secret, json.optString("base", "").trim())
+            val trimmed = text.trim()
+            if (trimmed.startsWith("[")) {
+                val array = JSONArray(trimmed)
+                (0 until array.length()).mapNotNull { i ->
+                    entry(array.getJSONObject(i))
+                }
+            } else {
+                val only = entry(JSONObject(trimmed)) ?: return null
+                listOf(only)
+            }
         }.getOrNull()
+    }
+
+    private fun entry(json: JSONObject): ICanCloudCreds? {
+        val appId = json.optString("appId").trim()
+        val secret = json.optString("appSecret").trim()
+        if (appId.isEmpty() || secret.isEmpty()) return null
+        return ICanCloudCreds(appId, secret, json.optString("base", "").trim())
     }
 }
