@@ -72,6 +72,17 @@ object ICanHealthRegistry {
     }
 
     @JvmStatic
+    fun isDeviceSnRegistered(context: Context?, sn: String?): Boolean {
+        if (context == null) return false
+        val normalized = ICanHealthConstants.normalizeOnboardingDeviceSn(sn)
+        if (normalized.isEmpty()) return false
+        return readRecords(context).any { record ->
+            val stored = prefs(context).getString("${ICanHealthConstants.PREF_DEVICE_SN_PREFIX}${record.sensorId}", null)
+            ICanHealthConstants.normalizeOnboardingDeviceSn(stored) == normalized
+        }
+    }
+
+    @JvmStatic
     fun resolveCanonicalSensorId(context: Context?, sensorId: String?): String? {
         return findRecord(context, sensorId)?.sensorId
     }
@@ -234,6 +245,7 @@ object ICanHealthRegistry {
         val normalizedStoredSn = ICanHealthConstants.normalizeOnboardingDeviceSn(storedDeviceSn)
         if (normalizedStoredSn.isNotEmpty()) {
             editor.remove("${ICanHealthConstants.PREF_CGM_CODE_PREFIX}$normalizedStoredSn")
+            ICanHealthCloudCode.cancelRetry(normalizedStoredSn)
         }
         editor.commit()
     }

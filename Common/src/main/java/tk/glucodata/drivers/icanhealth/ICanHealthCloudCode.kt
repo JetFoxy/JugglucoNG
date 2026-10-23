@@ -63,6 +63,7 @@ internal object ICanHealthCloudCode {
     private val lastAttemptMs = ConcurrentHashMap<String, Long>()
     private val retryCounts = ConcurrentHashMap<String, Int>()
     private val retryScheduled = ConcurrentHashMap.newKeySet<String>()
+    private val retryFutures = ConcurrentHashMap<String, java.util.concurrent.ScheduledFuture<*>>()
     private val retryExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable).apply { name = "ICanCloudRetry"; isDaemon = true }
     }
@@ -120,10 +121,27 @@ internal object ICanHealthCloudCode {
         if (retryScheduled.contains(sn)) return
         retryScheduled.add(sn)
         Log.i(TAG, "Scheduling cloud fetch retry for ${maskSn(sn)} in ${delayMs / 1000}s (attempt $attempt)")
-        retryExecutor.schedule({
+        val future = retryExecutor.schedule({
             retryScheduled.remove(sn)
+            retryFutures.remove(sn)
+            if (!ICanHealthRegistry.isDeviceSnRegistered(context, sn)) {
+                Log.i(TAG, "Cloud fetch retry skipped: sensor for ${maskSn(sn)} no longer registered")
+                retryCounts.remove(sn)
+                return@schedule
+            }
             fetchAndCacheAsync(context, sn, force = true)
         }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+        retryFutures[sn] = future
+    }
+
+    /** Cancel any pending retry for `sn` (e.g. when its sensor is removed). */
+    @JvmStatic
+    fun cancelRetry(sn: String?) {
+        val normalized = (sn ?: "").trim()
+        if (normalized.isEmpty()) return
+        retryScheduled.remove(normalized)
+        retryCounts.remove(normalized)
+        retryFutures.remove(normalized)?.cancel(false)
     }
 
     /** Cached parameterCode JSON for `sn`, or null. */
