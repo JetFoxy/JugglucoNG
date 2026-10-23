@@ -151,6 +151,60 @@ class SideSmoothingExportTest {
         }
     }
 
+    /**
+     * Metric 5: the live value against the value after a backfill filled the hole.
+     *
+     * The live path estimates the sample after a hole from what it has, and a backfill later adds the
+     * missed readings, so the same minute is computed twice from different inputs. A hole is cut out
+     * of the real trace at evenly spread places and the sample after it is estimated both ways. A
+     * hole above [GlucoseChartGap.THRESHOLD_MS] restarts the filter on the live side, which is the
+     * worst case and is kept in the numbers.
+     */
+    @Test
+    fun liveVersusBackfilledAfterAHole() {
+        assumeTrue("dataset directory not present: $dataDir", dataDir.isDirectory)
+        for (name in datasets) {
+            val rows = load(name)
+            if (rows.size < 500) continue
+            val times = LongArray(rows.size) { rows[it].timestampMs }
+            val mgdl = DoubleArray(rows.size) { rows[it].value * mgdlPerMmol }
+            val line = StringBuilder("SIDE_SMOOTHING_HOLES $name")
+            for (spanMin in listOf(5, 10, 15)) {
+                val spanMs = spanMin * 60_000L
+                val first = ArrayList<Double>()
+                val later = ArrayList<Double>()
+                var i = 120
+                while (i < rows.size - 20) {
+                    val holeEnd = times[i] + spanMs
+                    var j = i + 1
+                    while (j < rows.size && times[j] <= holeEnd) j++
+                    // Only holes that really cut samples out of an otherwise continuous stretch.
+                    val continuous = times[i + 1] - times[i] <= GlucoseChartGap.THRESHOLD_MS &&
+                        times[minOf(rows.size - 1, j + 5)] - times[j] <= 10 * 60_000L
+                    if (j > i + 1 && j + 5 < rows.size && continuous) {
+                        val keep = (0 until rows.size).filter { it <= i || it >= j }
+                        val t2 = LongArray(keep.size) { times[keep[it]] }
+                        val v2 = DoubleArray(keep.size) { mgdl[keep[it]] }
+                        for ((offset, bucket) in listOf(0 to first, 5 to later)) {
+                            val full = CausalGlucoseFilter.estimateAt(times, mgdl, j + offset)!!.mgdl
+                            val cut = CausalGlucoseFilter.estimateAt(t2, v2, keep.indexOf(j + offset))!!.mgdl
+                            bucket.add(abs(full - cut))
+                        }
+                    }
+                    i += 97
+                }
+                if (first.isNotEmpty()) {
+                    fun q(v: List<Double>, p: Double) = v.sorted()[((v.size - 1) * p).toInt()]
+                    line.append(String.format(Locale.US,
+                        " | %dmin n=%d next: med %.2f p95 %.2f max %.2f; +5: med %.2f p95 %.2f max %.2f",
+                        spanMin, first.size, q(first, .5), q(first, .95), first.max(),
+                        q(later, .5), q(later, .95), later.max()))
+                }
+            }
+            println(line)
+        }
+    }
+
     private companion object {
         const val MIN_TRIPLETS = 10
         const val R_MIN = 4.0
