@@ -53,6 +53,12 @@ internal object ICanHealthCloudStatusNotifier {
         )
     }
 
+    fun clearServerUnavailable(context: Context) {
+        val manager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        manager.cancel(NOTIFICATION_ID_UNAVAILABLE)
+    }
+
     private fun show(context: Context, title: String, text: String, notificationId: Int) {
         val manager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return

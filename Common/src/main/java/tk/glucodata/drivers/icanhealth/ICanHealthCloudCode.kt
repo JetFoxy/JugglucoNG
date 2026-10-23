@@ -430,7 +430,7 @@ internal object ICanCloudCredsLoader {
         }
         val file = java.io.File(context.filesDir, CREDS_FILE_NAME)
         if (file.isFile) {
-            parseCredsJson(file.readText())?.let { candidates.addAll(it) }
+            runCatching { file.readText() }.getOrNull()?.let { parseCredsJson(it)?.let { entries -> candidates.addAll(entries) } }
         }
         candidates.add(ICanCloudCreds(BUNDLED_CLOUD_APP_ID, BUNDLED_CLOUD_APP_SECRET, ""))
         return candidates.distinct()

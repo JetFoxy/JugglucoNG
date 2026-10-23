@@ -60,9 +60,10 @@ def gather_blobs(snap):
 def main():
     snap = sys.argv[1]
     blobs = [bytes.fromhex(h) for h in sys.argv[2:]]
-    files = list(gather_blobs(snap))
-    print("files:", len(files))
+    files = gather_blobs(snap)
+    count = 0
     for p, d in files:
+        count += 1
         for m in MARKERS:
             i = d.find(m)
             if i >= 0:
@@ -79,6 +80,7 @@ def main():
             i = d.find(b)
             if i >= 0:
                 print("BLOB %s +0x%x  %s" % (p, i, b.hex()))
+    print("files:", count)
 
 
 if __name__ == "__main__":
