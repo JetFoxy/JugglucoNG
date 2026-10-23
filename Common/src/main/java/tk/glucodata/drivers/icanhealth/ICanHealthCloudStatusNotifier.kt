@@ -5,8 +5,8 @@
 // was applied instead of calibrating silently. Deliberately plain, like
 // SensorHandoverNotifier — a state change to notice, not an alarm.
 //
-// The texts are hardcoded while the shared strings.xml is owned by another workstream;
-// move them to resources with the localizable strings when that lock is lifted.
+// Texts live in res/values/strings_ican.xml (a separate file so this change does not
+// touch the shared strings.xml owned by another workstream).
 
 package tk.glucodata.drivers.icanhealth
 
@@ -28,16 +28,6 @@ internal object ICanHealthCloudStatusNotifier {
     private const val NOTIFICATION_ID_UNAVAILABLE = 0x4943
     private const val NOTIFY_THROTTLE_MS = 30L * 60L * 1000L
 
-    private const val TITLE = "iCan calibration server unreachable"
-    private const val DEFAULT_USED_TEXT =
-        "No network access or the vendor cloud is unreachable. The sensor has been " +
-            "provisioned with the vendor's default calibration table (approximate); the " +
-            "per-sensor table will be written automatically on a later connection."
-    private const val SKIPPED_TEXT =
-        "No network access or the vendor cloud is unreachable. The sensor stays on its " +
-            "factory calibration for now; provisioning will be retried on a later connection."
-    private const val CHANNEL_NAME = "iCan calibration cloud status"
-
     @Volatile
     private var lastNotifiedMs = 0L
 
@@ -47,8 +37,11 @@ internal object ICanHealthCloudStatusNotifier {
         lastNotifiedMs = now
         show(
             context,
-            TITLE,
-            if (usedDefaultTable) DEFAULT_USED_TEXT else SKIPPED_TEXT,
+            context.getString(R.string.ican_cloud_unavailable_title),
+            context.getString(
+                if (usedDefaultTable) R.string.ican_cloud_unavailable_default_used
+                else R.string.ican_cloud_unavailable_skipped
+            ),
             NOTIFICATION_ID_UNAVAILABLE,
         )
     }
@@ -99,7 +92,7 @@ internal object ICanHealthCloudStatusNotifier {
         }
         val channel = NotificationChannel(
             CHANNEL_ID,
-            CHANNEL_NAME,
+            context.getString(R.string.ican_cloud_unavailable_channel),
             NotificationManager.IMPORTANCE_DEFAULT,
         )
         manager.createNotificationChannel(channel)
