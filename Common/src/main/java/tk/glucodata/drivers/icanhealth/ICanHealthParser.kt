@@ -595,6 +595,10 @@ object ICanHealthParser {
     fun isSensorInfoMissingCalibration(data: ByteArray): Boolean =
         parseSensorInfoMarker(data) == 0xFFFF
 
+    fun parseCorrectCodeResult(data: ByteArray): Int? =
+        if (data.size >= 3 && data[0] == 0x1c.toByte() && data[1] == 0xf2.toByte())
+            data[2].toInt() and 0xff else null
+
     fun parseRawDeviceSerial(data: ByteArray): String {
         if (data.isEmpty()) return ""
         val printableAscii = data.all { byte ->

@@ -38,13 +38,13 @@ internal data class ICanCloudCodeResult(
 /**
  * Vendor iot-cloud credentials for the calibration-code endpoint.
  *
- * They belong to the vendor SDK builds (each market tenant carries its own pair) and are
- * deliberately kept out of the repository. They are read at runtime from, in priority order:
+ * The vendor SDK pair is bundled below. Runtime overrides are read in priority order:
  *
  * 1. SharedPreferences keys [ICanHealthConstants.PREF_CLOUD_APP_ID],
  *    [ICanHealthConstants.PREF_CLOUD_APP_SECRET], [ICanHealthConstants.PREF_CLOUD_BASE_URL] —
  *    in the app's main preference file, e.g. set via an adb shell on a debug build.
  * 2. `<filesDir>/ican-cloud-creds.json` with fields `appId`, `appSecret`, `base`.
+ * 3. The bundled SDK tenant configuration.
  *
  * These are the same values the vendor SDK itself carries in
  * `com.sinocare.cgm.cgm_sdk.cgm.EnvConfigEnum`; `base` defaults to the RU tenant when omitted.
@@ -64,6 +64,7 @@ internal object ICanHealthCloudCode {
     private val retryCounts = ConcurrentHashMap<String, Int>()
     private val retryScheduled = ConcurrentHashMap.newKeySet<String>()
     private val retryFutures = ConcurrentHashMap<String, java.util.concurrent.ScheduledFuture<*>>()
+    private val fetchOwnership = ICanHealthCloudFetchOwnership()
     private val retryExecutor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable).apply { name = "ICanCloudRetry"; isDaemon = true }
     }
@@ -72,13 +73,19 @@ internal object ICanHealthCloudCode {
     @JvmStatic
     fun fetchAndCacheAsync(context: Context?, sn: String?, force: Boolean = false): Boolean {
         val normalizedSn = (sn ?: "").trim()
-        if (context == null || normalizedSn.isEmpty()) return false
+        if (context == null || ICanHealthProvisioningPolicy.factoryCode(normalizedSn) == null) return false
+        val ticket = fetchOwnership.begin(normalizedSn)
+        return enqueueFetch(context, normalizedSn, force, ticket)
+    }
+
+    private fun enqueueFetch(context: Context, normalizedSn: String, force: Boolean,
+                             ticket: ICanHealthCloudFetchOwnership.Ticket): Boolean {
+        if (!fetchOwnership.current(ticket)) return false
         val prefs = runCatching {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         }.getOrNull() ?: return false
         if (cachedCode(context, normalizedSn) != null) {
-            retryCounts.remove(normalizedSn)
-            retryScheduled.remove(normalizedSn)
+            cancelRetry(normalizedSn)
             return false
         }
         val now = System.currentTimeMillis()
@@ -88,6 +95,7 @@ internal object ICanHealthCloudCode {
         lastAttemptMs[normalizedSn] = now
         executor.execute {
             try {
+                if (!fetchOwnership.current(ticket)) return@execute
                 val candidates = ICanCloudCredsLoader.load(context, prefs)
                 val result = ICanCloudCredsLoader.tryInOrder(candidates) { creds ->
                     if (candidates.size > 1) {
@@ -95,19 +103,26 @@ internal object ICanHealthCloudCode {
                     }
                     fetch(context, creds, normalizedSn)
                 }
+                if (!fetchOwnership.current(ticket)) return@execute
                 if (result != null) {
-                    prefs.edit()
-                        .putString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + normalizedSn, result.parameterCodeJson)
-                        .commit()
+                    val committed = fetchOwnership.commitIfCurrent(ticket) {
+                        prefs.edit()
+                            .putString(ICanHealthConstants.PREF_CGM_CODE_PREFIX + normalizedSn, result.parameterCodeJson)
+                            .commit()
+                    }
+                    if (!committed) {
+                        scheduleRetry(context, normalizedSn, ticket)
+                        return@execute
+                    }
                     Log.i(TAG, "Cached vendor calibration code for ${maskSn(normalizedSn)} (${result.codeFloats.size} floats)")
                     retryCounts.remove(normalizedSn)
                     retryScheduled.remove(normalizedSn)
                 } else {
-                    scheduleRetry(context, normalizedSn)
+                    scheduleRetry(context, normalizedSn, ticket)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Cloud fetch for ${maskSn(normalizedSn)} failed: ${t.message ?: t.javaClass.simpleName}")
-                scheduleRetry(context, normalizedSn)
+                if (fetchOwnership.current(ticket)) scheduleRetry(context, normalizedSn, ticket)
             } finally {
                 attemptsInFlight.remove(normalizedSn)
             }
@@ -115,7 +130,8 @@ internal object ICanHealthCloudCode {
         return true
     }
 
-    private fun scheduleRetry(context: Context, sn: String) {
+    private fun scheduleRetry(context: Context, sn: String, ticket: ICanHealthCloudFetchOwnership.Ticket) {
+        if (!fetchOwnership.current(ticket)) return
         val attempt = retryCounts.merge(sn, 1, Int::plus) ?: 1
         val delayMs = (30_000L * (1L shl (attempt - 1).coerceAtMost(4))).coerceAtMost(RETRY_THROTTLE_MS)
         if (retryScheduled.contains(sn)) return
@@ -124,12 +140,12 @@ internal object ICanHealthCloudCode {
         val future = retryExecutor.schedule({
             retryScheduled.remove(sn)
             retryFutures.remove(sn)
-            if (!ICanHealthRegistry.isDeviceSnRegistered(context, sn)) {
+            if (!fetchOwnership.current(ticket) || !ICanHealthRegistry.isDeviceSnRegistered(context, sn)) {
                 Log.i(TAG, "Cloud fetch retry skipped: sensor for ${maskSn(sn)} no longer registered")
                 retryCounts.remove(sn)
                 return@schedule
             }
-            fetchAndCacheAsync(context, sn, force = true)
+            enqueueFetch(context, sn, true, ticket)
         }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
         retryFutures[sn] = future
     }
@@ -139,6 +155,7 @@ internal object ICanHealthCloudCode {
     fun cancelRetry(sn: String?) {
         val normalized = (sn ?: "").trim()
         if (normalized.isEmpty()) return
+        fetchOwnership.cancel(normalized)
         retryScheduled.remove(normalized)
         retryCounts.remove(normalized)
         retryFutures.remove(normalized)?.cancel(false)
@@ -158,7 +175,11 @@ internal object ICanHealthCloudCode {
             Log.stack(TAG, "cachedCode", t)
             null
         }
-        if (!stored.isNullOrBlank()) return stored
+        if (!stored.isNullOrBlank()) {
+            if (ICanHealthCloudCodeProtocol.parseProvisioningCode(stored) != null) return stored
+            // Older builds may have cached the server fallback as a genuine per-SN row.
+            prefs.edit().remove(ICanHealthConstants.PREF_CGM_CODE_PREFIX + normalized).commit()
+        }
         val file = java.io.File(context.filesDir, tableFileName(normalized))
         if (!file.isFile) return null
         return runCatching { parseTableFileContent(file.readText()) }.getOrNull()
@@ -181,7 +202,7 @@ internal object ICanHealthCloudCode {
             val json = JSONObject(trimmed)
             json.optJSONObject("data")?.optString("code")?.takeIf { it.isNotBlank() } ?: trimmed
         }.getOrDefault(trimmed)
-        val floats = ICanHealthCloudCodeProtocol.parseCodeFloats(candidate) ?: return null
+        val floats = ICanHealthCloudCodeProtocol.parseProvisioningCode(candidate) ?: return null
         for (index in 1..ICanHealthCorrectCode.TABLE_VALUES) {
             if (!floats.containsKey("x$index")) return null
         }
@@ -195,42 +216,11 @@ internal object ICanHealthCloudCode {
     /**
      * The vendor cloud's own answer for a device SN it has no row for, captured 2026-10-23
      * with blind probes (two different unknown SNs returned this table byte-identically,
-     * stable across repeat requests). This is what the vendor phone would write on a real
-     * sensor it cannot identify server-side. Retained as reference data; the driver does
-     * not automatically write it as a no-network fallback. The server's x13 is a placeholder:
-     * the SDK list builder derives it from the box serial before encoding any server row.
+     * stable across repeat requests). Retained as reference data; this row is rejected at
+     * every provisioning input. The SDK list builder derives x13 from the box serial.
      */
-    private val BUNDLED_DEFAULT_CORRECT_CODE: Map<String, Float> = mapOf(
-        "x1" to 0.015f,
-        "x2" to 32.0f,
-        "x3" to 25.0f,
-        "x4" to 1.0f,
-        "x5" to 0.8f,
-        "x6" to 0.0f,
-        "x7" to 40.0f,
-        "x8" to 0.3f,
-        "x9" to 1.0f,
-        "x10" to 1.2f,
-        "x11" to 13.0f,
-        "x12" to 1.5f,
-        "x13" to 0.4f,
-        "x14" to 3.5f,
-        "x15" to 15.0f,
-        "x16" to 15.0f,
-        "x17" to 0.1f,
-        "x18" to 0.6f,
-        "x19" to 0.2f,
-        "x20" to 0.6f,
-        "x21" to 0.1f,
-        "x22" to 16.0f,
-        "x23" to 1.0f,
-        "x24" to 2.1f,
-        "x25" to 2.2f,
-    )
-
-    /** The bundled vendor default calibration table ([BUNDLED_DEFAULT_CORRECT_CODE]). */
     @JvmStatic
-    fun defaultCorrectCode(): Map<String, Float> = BUNDLED_DEFAULT_CORRECT_CODE
+    fun defaultCorrectCode(): Map<String, Float> = ICanHealthProvisioningPolicy.defaultTable
 
     /** Synchronous fetch; must be called off the main thread (mirror AiDexCnCloudClient). */
     @JvmStatic
@@ -251,7 +241,10 @@ internal object ICanHealthCloudCode {
             Log.w(TAG, "envelope decode failed: ${t.message ?: t.javaClass.simpleName}")
             return null
         } ?: return null
-        val floats = ICanHealthCloudCodeProtocol.parseCodeFloats(codeJson) ?: return null
+        val floats = ICanHealthCloudCodeProtocol.parseProvisioningCode(codeJson) ?: run {
+            Log.w(TAG, "Parameter row rejected: incomplete or generic; verify the factory serial")
+            return null
+        }
         return ICanCloudCodeResult(deviceSn = sn, parameterCodeJson = codeJson, codeFloats = floats)
     }
 
@@ -453,9 +446,7 @@ internal object ICanHealthCloudCodeProtocol {
             val raw = json.opt("x$index") ?: return null
             val value = when (raw) {
                 is String -> raw.toFloat()
-                is Int -> raw.toFloat()
-                is Long -> raw.toFloat()
-                is Double -> raw.toFloat()
+                is Number -> raw.toFloat()
                 else -> return null
             }
             if (!value.isFinite()) return null
@@ -463,6 +454,10 @@ internal object ICanHealthCloudCodeProtocol {
         }
         result
     }.getOrNull()
+
+    /** Shared by fetched responses, old cache entries and manually supplied files. */
+    internal fun parseProvisioningCode(codeJson: String): Map<String, Float>? =
+        parseCodeFloats(codeJson)?.takeUnless { ICanHealthProvisioningPolicy.isGenericTable(it) }
 
     private fun decodeBase64(encoded: String): ByteArray? = runCatching {
         val normalized = encoded.trim().replace("\\s", "")
@@ -556,13 +551,8 @@ internal object ICanCloudCredsLoader {
  * 2. [`WAIT_FETCH`] — the cache is empty but a fetch worker attempt is in flight for
  *    this SN; defer the decision briefly so an online sensor gets its real table
  *    instead of the fallback.
- * 3. [`USE_DEFAULT`] — the bundled vendor default table ([ICanHealthCloudCode
- *    .defaultCorrectCode]): what the vendor cloud itself hands out for SNs it does not
- *    know, so the still-uncalibrated sensor gets provisioned even offline.
- *
- * Skipping the write entirely remains a `scheduleCorrectCodeWrite` decision: it happens
- * only if the encoder cannot produce chunks (crypto provider failure), because
- * [USE_DEFAULT] is a compile-time constant and always present.
+ * 3. [`USE_DEFAULT`] — an explicitly supplied fallback, or null when none is allowed.
+ *    The production caller supplies null, so missing genuine parameters skip the write.
  */
 internal object ICanCloudOfflineLadder {
     internal enum class Source { USE_CACHE, WAIT_FETCH, USE_DEFAULT }

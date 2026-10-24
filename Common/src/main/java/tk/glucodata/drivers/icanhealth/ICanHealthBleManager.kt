@@ -41,6 +41,7 @@ import tk.glucodata.logi
 import tk.glucodata.Natives
 import tk.glucodata.NightscoutUploadWake
 import tk.glucodata.Notify
+import tk.glucodata.R
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SensorIdentity
 import tk.glucodata.SuperGattCallback
@@ -220,7 +221,9 @@ class ICanHealthBleManager(
     private var correctCodeTimeoutRunnable: Runnable? = null
     private var correctCodePendingChunk: ByteArray? = null
     private var correctCodeRecheckRunnable: Runnable? = null
-    @Volatile private var lastSensorInfoFresh = true
+    @Volatile private var lastSensorInfoMarker: Int? = null
+    private var correctCodeFactorySerial: String? = null
+    private var correctCodeChallenge: ByteArray? = null
     private var gattWriteInFlight: GattOp.Write? = null
     @Volatile private var configuredAuthUserId: String? = null
     @Volatile private var recoveredAuthUserId: String? = null
@@ -1166,10 +1169,7 @@ class ICanHealthBleManager(
     override fun mygetDeviceName(): String =
         serialFromDevice?.takeIf { it.isNotBlank() } ?: super.mygetDeviceName()
 
-    override fun matchDeviceName(deviceName: String?, address: String?): Boolean =
-        matchDeviceName(deviceName, address, null)
-
-    override fun matchDeviceName(deviceName: String?, address: String?, scanResult: ScanResult?): Boolean {
+    override fun matchDeviceName(deviceName: String?, address: String?): Boolean {
         val trimmedName = deviceName?.trim()?.takeIf { it.isNotEmpty() } ?: return false
         val candidateAddress = address?.trim()?.uppercase(Locale.US)
         if (candidateAddress != null && candidateAddress in rejectedOnboardingAddresses) {
@@ -1181,11 +1181,11 @@ class ICanHealthBleManager(
         }
         return notePickedByOnboardingScan(
             candidateAddress,
-            matchesUnaddressedName(trimmedName, scanResult),
+            matchesUnaddressedName(trimmedName),
         )
     }
 
-    private fun matchesUnaddressedName(trimmedName: String, scanResult: ScanResult?): Boolean {
+    private fun matchesUnaddressedName(trimmedName: String): Boolean {
         val expectedDisplayName = mygetDeviceName().trim().takeIf { it.isNotEmpty() }
         if (expectedDisplayName != null && trimmedName.equals(expectedDisplayName, ignoreCase = true)) {
             return true
@@ -1197,20 +1197,9 @@ class ICanHealthBleManager(
         if (serialFromDevice != null && advertisedCanonical.equals(serialFromDevice, ignoreCase = true)) {
             return true
         }
-        if (!ICanHealthConstants.isICanHealthDevice(trimmedName)) {
-            return false
-        }
-        // The broad name fallback (any 12-32 char alnum name) also matches a UART
-        // glucometer or an Anytime serial. If the advertisement lists services but not
-        // 0x181F, it is not our CGM: refuse it now instead of connecting twice before the
-        // post-connect strike rejection. Adverts with no service UUIDs are still tried
-        // (some iCan firmware omits 0x181F), and exact serial/name matches above are never
-        // gated.
-        val record = scanResult?.scanRecord ?: return true
-        return ICanHealthConstants.advertisesCgmOrNoService(
-            record.serviceUuids.orEmpty().map { it.uuid },
-            record.serviceData?.keys.orEmpty().map { it.uuid },
-        )
+        // Advertisements can omit CGM while listing other services. Reject non-CGM
+        // candidates only from the discovered GATT table, using the existing strike gate.
+        return ICanHealthConstants.isICanHealthDevice(trimmedName)
     }
 
     private fun notePickedByOnboardingScan(address: String?, matched: Boolean): Boolean {
@@ -1461,11 +1450,15 @@ class ICanHealthBleManager(
 
     @Deprecated("Deprecated in Java")
     override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+        if (gatt !== mBluetoothGatt) return
         val data = characteristic.value ?: return
         Log.i(TAG, "WIRE rx notify ${shortUuid(characteristic.uuid)} ${data.toHexString()}")
         when (characteristic.uuid) {
             ICanHealthConstants.CGM_MEASUREMENT -> handleGlucoseNotification(data)
-            ICanHealthConstants.CGM_SPECIFIC_OPS -> handleVendorAuthResponse(data)
+            ICanHealthConstants.CGM_SPECIFIC_OPS -> {
+                val copy = data.copyOf()
+                handler.post { if (gatt === mBluetoothGatt) handleVendorAuthResponse(copy) }
+            }
             ICanHealthConstants.RACP -> handleRacpResponse(data)
             // Lazy: hex-encodes the whole payload, and this fires per unhandled notification.
             else -> logd(TAG) { "Unhandled notify ${characteristic.uuid}: ${data.toHexString()}" }
@@ -1736,12 +1729,18 @@ class ICanHealthBleManager(
         characteristic: BluetoothGattCharacteristic,
         status: Int,
     ) {
+        if (gatt !== mBluetoothGatt) return
         val write = gattWriteInFlight
         if (status != BluetoothGatt.GATT_SUCCESS) {
             Log.w(TAG, "Write failed for ${characteristic.uuid} status=$status")
         }
         val pending = correctCodePendingChunk
         finishGattOp()
+        if (status != BluetoothGatt.GATT_SUCCESS && pending != null &&
+            write?.charUuid == ICanHealthConstants.CGM_SPECIFIC_OPS && write.data.contentEquals(pending)) {
+            handler.post { if (gatt === mBluetoothGatt && correctCodePendingChunk === pending) resetCorrectCodeState() }
+            return
+        }
         // A CorrectCode chunk just went on air: restart the tight ack window now that
         // queue backlog (setup reads ahead of it) is no longer in the way.
         if (status == BluetoothGatt.GATT_SUCCESS &&
@@ -2268,13 +2267,20 @@ class ICanHealthBleManager(
                 }
             }
 
-            data.size == 3 &&
-                data[0] == 0x1C.toByte() &&
-                data[1] == 0xF2.toByte() &&
-                data[2] == 0x01.toByte() -> {
+            ICanHealthParser.parseCorrectCodeResult(data) != null -> {
                 // onCharacteristicChanged runs on a Binder thread; keep the chain state
                 // confined to the handler thread.
-                handler.post { if (correctCodeChainActive) onCorrectCodeAck() }
+                val result = ICanHealthParser.parseCorrectCodeResult(data)
+                val owner = mBluetoothGatt
+                val pending = correctCodePendingChunk
+                handler.post {
+                    if (owner !== mBluetoothGatt || !correctCodeChainActive || pending == null ||
+                        correctCodePendingChunk !== pending) return@post
+                    if (result == 1) onCorrectCodeAck() else {
+                        Log.w(TAG, "CorrectCode rejected by sensor; aborting the chain")
+                        resetCorrectCodeState()
+                    }
+                }
             }
 
             ICanHealthParser.parseStartSensorResult(data) != null -> {
@@ -2394,17 +2400,16 @@ class ICanHealthBleManager(
                     "Sensor info: ${data.toHexString()} " +
                         "model=$vendorModelName sw=$vendorSoftwareVersion ${bundledKeyContext()}"
                 )
+                lastSensorInfoMarker = ICanHealthParser.parseSensorInfoMarker(data)
+                if (lastSensorInfoMarker != null && lastSensorInfoMarker != 0xffff) {
+                    resetCorrectCodeState()
+                    ICanHealthCloudCode.cancelRetry(ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn))
+                    Applic.app?.let { ICanHealthCloudStatusNotifier.clearServerUnavailable(it) }
+                }
                 maybeFetchVendorCalibrationCode(data)
-                val fresh = ICanHealthParser.isSensorInfoMissingCalibration(data)
-                lastSensorInfoFresh = fresh
-                if (!fresh || startCommandIssuedThisConnection || !shouldAttemptStandaloneStart()) {
-                    // Provisioned sensor: this is the only write window. Fresh sensor: defer to
-                    // the 1A-success path while this connection still plans to send `1A`; once
-                    // `1A` is out (or will never be), sensor-info is the remaining chance —
-                    // otherwise a table fetched after `1A` would never reach the sensor.
-                    // `fresh` controls the offline-default fallback: an already-provisioned
-                    // sensor must keep its installed calibration when the per-SN table is
-                    // unavailable, instead of being overwritten with the generic default.
+                if (lastSensorInfoMarker == 0xffff &&
+                    (startCommandIssuedThisConnection || !shouldAttemptStandaloneStart())) {
+                    // A fresh sensor's 1A-success path is the normal provisioning window.
                     scheduleCorrectCodeWrite()
                 }
                 startPostAuthSetup("sensor-info")
@@ -2450,7 +2455,8 @@ class ICanHealthBleManager(
     /**
      * A sensor that answers the vendor sensor-info with the `0xFFFF` marker is fresh: it has
      * never been provisioned with the vendor `correctCode` and its RACP history will be refused
-     * until that code is written (F7 initParameter + F2 correctCode, the vendor sequence).
+     * until that code is written. The captured regular CE path uses three F2 packets;
+     * the SDK's separate F7/init branch is not established by that capture.
      *
      * The vendor phone fetches the per-sensor table from its own iot cloud right after the
      * handshake; here the same table is requested directly ([ICanHealthCloudCode]) so it is
@@ -2458,18 +2464,15 @@ class ICanHealthBleManager(
      * is skipped without configured credentials, and never touches the BLE flow below.
      */
     private fun maybeFetchVendorCalibrationCode(sensorInfo: ByteArray) {
+        if (!isAuthenticated) return
         val context = Applic.app ?: return
         val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
-        if (sn.isEmpty()) {
-            if (!ICanHealthParser.isSensorInfoMissingCalibration(sensorInfo)) return
-            Log.i(TAG, "Fresh sensor without a known box SN — cloud code fetch skipped")
+        if (ICanHealthProvisioningPolicy.eligibility(
+                ICanHealthParser.parseSensorInfoMarker(sensorInfo), sn) != ICanHealthProvisioningPolicy.Eligibility.FRESH) {
             return
         }
         val cached = ICanHealthCloudCode.cachedCode(context, sn)
-        // A provisioned sensor with the table already cached needs nothing; a fresh
-        // sensor (F6 = 0xFFFF) always ends up fetched, an older one — only until its
-        // first successful fetch. The 10-minute throttle lives inside the worker.
-        if (cached != null && !ICanHealthParser.isSensorInfoMissingCalibration(sensorInfo)) return
+        if (cached != null) return
         ICanHealthCloudCode.fetchAndCacheAsync(context, sn)
     }
 
@@ -2482,7 +2485,22 @@ class ICanHealthBleManager(
      * `F6 = 0xFFFF` marker). Dry-run arms nothing and only logs the packets.
      */
     private fun scheduleCorrectCodeWrite() {
-        if (correctCodeChainActive) return
+        if (correctCodeChainActive || !isAuthenticated) return
+        val context = Applic.app ?: return
+        val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
+        when (ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, sn)) {
+            ICanHealthProvisioningPolicy.Eligibility.INSTALLED_TABLE -> {
+                ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
+                return
+            }
+            ICanHealthProvisioningPolicy.Eligibility.INVALID_FACTORY_SERIAL -> {
+                Log.w(TAG, "CorrectCode needs the full 13-character factory serial; legacy connection identity is insufficient")
+                setUiStatus(UiStatusKind.CUSTOM, context.getString(R.string.invalid_code_format))
+                return
+            }
+            ICanHealthProvisioningPolicy.Eligibility.UNKNOWN_SENSOR -> return
+            ICanHealthProvisioningPolicy.Eligibility.FRESH -> Unit
+        }
         val challenge = lastAuthChallenge
         if (challenge == null || challenge.size != 4) {
             Log.i(TAG, "CorrectCode write skipped: no 4-byte session challenge")
@@ -2492,18 +2510,8 @@ class ICanHealthBleManager(
             Log.i(TAG, "CorrectCode write skipped: MTU ${negotiatedMtu} cannot fit an 18-byte chunk")
             return
         }
-        val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
-        if (sn.isEmpty()) {
-            Log.i(TAG, "CorrectCode write skipped: no onboarding SN for this sensor")
-            return
-        }
-        val context = Applic.app
-        if (context == null) {
-            Log.i(TAG, "CorrectCode write skipped: app context unavailable")
-            return
-        }
         val codeJson = ICanHealthCloudCode.cachedCode(context, sn)
-        val floats = codeJson?.let { ICanHealthCloudCodeProtocol.parseCodeFloats(it) }
+        val floats = codeJson?.let { ICanHealthCloudCodeProtocol.parseProvisioningCode(it) }
         val decision = ICanCloudOfflineLadder.decide(
             cachedTable = floats,
             fetchInFlight = ICanHealthCloudCode.isFetchInFlight(sn),
@@ -2517,8 +2525,7 @@ class ICanHealthBleManager(
             scheduleCorrectCodeRecheck()
             return
         }
-        val chunks = decision.table?.let { ICanHealthCorrectCode.buildCorrectCodeChunks(it, challenge, sn) }
-        if (chunks == null) {
+        if (decision.table == null) {
             // No real per-SN table available (cloud unreachable or not yet fetched):
             // do NOT write the generic default table — it scales readings wrongly.
             // Preserve whatever calibration the sensor already has and tell the user.
@@ -2529,10 +2536,17 @@ class ICanHealthBleManager(
             ICanHealthCloudStatusNotifier.notifyCalibrationPending(context)
             return
         }
+        val chunks = ICanHealthCorrectCode.buildCorrectCodeChunks(decision.table, challenge, sn)
+        if (chunks == null) {
+            Log.w(TAG, "CorrectCode table cannot be encoded; no parameter writes scheduled")
+            return
+        }
         // A real (cached or manually pushed) table landing on a sensor clears any stale
         // pending notice.
         ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
         correctCodeChainActive = true
+        correctCodeFactorySerial = sn
+        correctCodeChallenge = challenge.copyOf()
         correctCodeChunks = chunks
         correctCodeNextChunk = 0
         if (CORRECT_CODE_WRITE_DRY_RUN) {
@@ -2561,6 +2575,13 @@ class ICanHealthBleManager(
     }
 
     private fun sendCorrectCodeChunk(index: Int) {
+        val serial = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
+        if (stop || uiPaused || !isAuthenticated ||
+            ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, serial) != ICanHealthProvisioningPolicy.Eligibility.FRESH ||
+            serial != correctCodeFactorySerial || lastAuthChallenge?.contentEquals(correctCodeChallenge ?: byteArrayOf()) != true) {
+            resetCorrectCodeState()
+            return
+        }
         val chunks = correctCodeChunks
         if (!correctCodeChainActive || chunks == null || index !in chunks.indices) {
             resetCorrectCodeState()
@@ -2623,6 +2644,8 @@ class ICanHealthBleManager(
         }
         correctCodePendingChunk = null
         correctCodeChunks = null
+        correctCodeFactorySerial = null
+        correctCodeChallenge = null
         correctCodeNextChunk = 0
         correctCodeChainActive = false
     }
@@ -4483,6 +4506,8 @@ class ICanHealthBleManager(
         clearReconnect: Boolean = true,
         clearServices: Boolean = true,
     ) {
+        lastSensorInfoMarker = null
+        resetCorrectCodeState()
         gattQueue.clear()
         gattOpActive = false
         handler.removeCallbacks(noDataWatchdog)

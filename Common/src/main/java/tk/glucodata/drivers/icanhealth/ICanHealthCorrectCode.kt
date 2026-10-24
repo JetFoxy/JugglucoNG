@@ -95,10 +95,10 @@ object ICanHealthCorrectCode {
         challenge: ByteArray,
         factorySerial: String,
     ): List<ByteArray>? {
-        if (!factorySerial.matches(Regex("[0-9A-Za-z]{13}")) ||
-            !factorySerial.substring(9, 11).all { it in '0'..'9' }) return null
+        val boxCode = ICanHealthProvisioningPolicy.factoryCode(factorySerial) ?: return null
+        if (ICanHealthProvisioningPolicy.isGenericTable(correctCode)) return null
         val perBox = correctCode.toMutableMap()
-        perBox["x13"] = factorySerial.substring(9, 11).toInt() / 100f
+        perBox["x13"] = boxCode
         return encodeTable(valuesFromCorrectCode(perBox) ?: return null, challenge)
     }
 

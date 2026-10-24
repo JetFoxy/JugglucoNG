@@ -2,8 +2,9 @@
 
 One capture of a **fresh sensor activated by the vendor app** answers three open questions at once:
 
-1. **C2 framing** (PR #680): the exact `F2` chunk run and `F7` commit bytes — the only thing keeping
-   the debug-gated write path from going to hardware.
+1. **C2 framing** (PR #680): the exact `F2` chunk run and sensor acknowledgements.
+   The preserved regular CE capture has three F2 writes and no F7. The SDK's
+   separate init/F7 branch must not be assumed to be part of this activation path.
 2. **C1 / Track B**: the SDK's own `parameterCode:` line plus the wire shape of a real fetch, which
    is what the missing `sign`/`appId` reproduction needs.
 3. **C3 semantics**: whether `planCalib`'s `newBg` is the fingerstick or the record's glucose — the

@@ -678,22 +678,6 @@ object ICanHealthConstants {
     fun isConclusivelyNotCgm(serviceUuids: Collection<UUID>): Boolean =
         CGM_SERVICE !in serviceUuids && serviceUuids.any { it !in GENERIC_GATT_SERVICES }
 
-    /**
-     * True when an advertisement's service list is compatible with an iCan CGM: either it
-     * advertises no services at all (some iCan firmware omits 0x181F from the advert), or it
-     * lists the CGM service. An advertisement that lists services but not 0x181F belongs to a
-     * different peripheral — the broad 12-32 character alnum name fallback would otherwise
-     * claim a UART glucometer ("SatelliteOnline…") before the post-connect strike rejection.
-     */
-    @JvmStatic
-    fun advertisesCgmOrNoService(
-        serviceUuids: Collection<UUID>,
-        serviceDataKeys: Collection<UUID>,
-    ): Boolean {
-        if (serviceUuids.isEmpty() && serviceDataKeys.isEmpty()) return true
-        return CGM_SERVICE in serviceUuids || CGM_SERVICE in serviceDataKeys
-    }
-
     @JvmStatic
     fun isLikelyPersistedSensorName(name: String?): Boolean {
         if (name == null) return false
@@ -886,8 +870,7 @@ object ICanHealthConstants {
 
     /**
      * Per-install vendor iot-cloud credentials ([tk.glucodata.drivers.icanhealth.ICanCloudCreds]).
-     * These are runtime-only secrets (vendor `EnvConfigEnum` values); they are never shipped in
-     * the build. When unset, `<filesDir>/ican-cloud-creds.json` is used instead.
+     * These override `<filesDir>/ican-cloud-creds.json` and the bundled vendor SDK pair.
      */
     const val PREF_CLOUD_APP_ID = "icanhealth_cloud_app_id"
 

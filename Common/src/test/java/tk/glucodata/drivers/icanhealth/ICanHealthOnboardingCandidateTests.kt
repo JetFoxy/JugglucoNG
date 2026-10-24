@@ -59,31 +59,19 @@ class ICanHealthOnboardingCandidateTests {
     }
 
     @Test
-    fun nameFallbackIsSkippedWhenTheAdvertListsNonCgmServices() {
-        // Trace juggluco-trace-20261005-084717.log: the "SatelliteOnline5885" glucometer
-        // advertises a Nordic UART service (6e400001) and no 0x181F; the broad name fallback
-        // must not claim it and connect twice before the post-connect rejection.
+    fun aNamedCandidateNeedsGattDiscoveryEvenWhenItsAdvertListsAnotherService() {
         val nus = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
-        assertFalse(
-            ICanHealthConstants.advertisesCgmOrNoService(
-                serviceUuids = listOf(gap, gattService, nus),
-                serviceDataKeys = emptyList(),
-            )
-        )
+        assertTrue(ICanHealthConstants.isICanHealthDevice("SatelliteOnline5885"))
+        // A full discovery can disqualify the glucometer, while a real CGM may have
+        // advertised the same subset and expose CGM only during discovery.
+        assertTrue(ICanHealthConstants.isConclusivelyNotCgm(listOf(gap, gattService, nus)))
+        assertFalse(ICanHealthConstants.isConclusivelyNotCgm(listOf(gap, gattService, nus, ICanHealthConstants.CGM_SERVICE)))
     }
 
     @Test
-    fun nameFallbackIsKeptForAdvertsWithoutServicesOrWithTheCgmService() {
-        // The Anytime "SN9150002398" transmitter advertises no service UUIDs, and the real
-        // Sinocare CGM advertises 0x181F; both must still be tried.
-        assertTrue(ICanHealthConstants.advertisesCgmOrNoService(emptyList(), emptyList()))
-        assertTrue(
-            ICanHealthConstants.advertisesCgmOrNoService(
-                serviceUuids = listOf(gap, ICanHealthConstants.CGM_SERVICE),
-                serviceDataKeys = emptyList(),
-            )
-        )
-        // 0x181F carried only as service data still counts.
-        assertTrue(ICanHealthConstants.advertisesCgmOrNoService(emptyList(), listOf(ICanHealthConstants.CGM_SERVICE)))
+    fun serviceDiscoveryRetainsCandidatesWhenOnlyGenericServicesArrive() {
+        assertFalse(ICanHealthConstants.isConclusivelyNotCgm(emptyList()))
+        assertFalse(ICanHealthConstants.isConclusivelyNotCgm(listOf(gap, gattService)))
+        assertFalse(ICanHealthConstants.isConclusivelyNotCgm(listOf(ICanHealthConstants.CGM_SERVICE)))
     }
 }

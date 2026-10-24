@@ -1740,15 +1740,6 @@ public abstract class SuperGattCallback extends BluetoothGattCallback {
         return false;
     }
 
-    /**
-     * Name match with the advertisement at hand, for drivers that must not claim a
-     * broadcast whose advertised services contradict them. The default keeps the old
-     * behaviour so every existing override is unaffected.
-     */
-    public boolean matchDeviceName(String deviceName, String address, ScanResult scanResult) {
-        return matchDeviceName(deviceName, address);
-    }
-
     public UUID getService() {
         return null;
     }

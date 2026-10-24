@@ -237,9 +237,8 @@ class ICanHealthCloudCodeTests {
     }
 
     @Test
-    fun bundledDefaultTableEncodesFreshSensorChunks() {
-        // The offline fallback must survive the same encoder as a cloud table,
-        // including the x6 = 0.0 zero that a parse-side null-out would drop.
+    fun bundledDefaultReferenceCannotProduceProvisioningChunks() {
+        // Reference parsing remains possible, but the write API rejects this server fallback.
         val values = ICanHealthCorrectCode.valuesFromCorrectCode(
             ICanHealthCloudCode.defaultCorrectCode(),
         )
@@ -251,8 +250,7 @@ class ICanHealthCloudCodeTests {
             byteArrayOf(0, 0, 0, 0),
             "ABC0000004000",
         )
-        assertEquals(3, chunks?.size)
-        assertTrue(chunks?.all { it.size == 18 } == true)
+        assertNull(chunks)
     }
 
     @Test
