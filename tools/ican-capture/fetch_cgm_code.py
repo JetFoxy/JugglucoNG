@@ -24,10 +24,22 @@ Credentials come from ~/.config/ican-cloud-creds.json (not committed):
   {"appId": "...", "appSecret": "...", "base": "https://iot.ru.sinocareintl.com/api/"}
 
 Manual fallback for a phone whose network cannot reach the cloud:
-  python3 fetch_cgm_code.py <SN> --out <dir>   (writes ican-cgm-code-<SN>.json into <dir>)
-  adb push <dir>/ican-cgm-code-<SN>.json /storage/emulated/0/Android/data/tk.glucodata.ng.debug/files/
-  (or run-as copy into filesDir) — the app picks the file up as its table source
-  (ICanHealthCloudCode.parseTableFileContent, pushed-file fallback).
+  Requires the installed debuggable tk.glucodata.ng.debug app, launched once.
+  Run from the repository root; replace SN with the sensor's 13-character box serial:
+
+  set -eu
+  SN='REPLACE_WITH_BOX_SERIAL'
+  OUT='./ican-table'
+  APP_ID='tk.glucodata.ng.debug'
+  mkdir -p "$OUT"
+  python3 tools/ican-capture/fetch_cgm_code.py "$SN" --out "$OUT"
+  TABLE="ican-cgm-code-$SN.json"
+  adb shell -T "run-as $APP_ID sh -c 'umask 077; mkdir -p files; cat > files/$TABLE'" < "$OUT/$TABLE"
+  adb shell "run-as $APP_ID test -s files/$TABLE"
+
+  The redirect runs inside run-as, placing the file in the app's internal filesDir,
+  where cachedCode reads it (ICanHealthCloudCode.parseTableFileContent).
+  Use adb -s <device-id> for each adb command if multiple devices are connected.
 
 usage: fetch_cgm_code.py SN [SN ...]
 """
