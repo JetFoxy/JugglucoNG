@@ -1,7 +1,6 @@
 // JugglucoNG — iCanHealth (Sinocare iCan i3/i6/i7) Driver
 // ICanHealthCorrectCode.kt — encodes the vendor "correctCode" calibration table into
-// the three encrypted `[F2 10]` chunks a sensor accepts mid-provisioning (after the
-// F6/F7 exchange, before 0x1A starts the session).
+// the three encrypted `[F2 10]` chunks sent after start and the session clock.
 //
 // Cipher and layout reverse-engineered from the vendor SDK's packer (bean.a/g.a,
 // NCall/VMP-protected) and validated byte-for-byte against two independent device
@@ -15,12 +14,13 @@
 //   plaintext = aux(challenge) XOR data
 //
 // data is the calibration table itself, 15 values as uint16-LE, always
-// round(value * 1000) of the values the vendor cloud delivered (x1..x15):
-//   x1..x5   -> block0[4..13]         x6..x10  -> block1[1..12]
-//   x11 low  -> block1[13]            x11 high -> block2[1]   (value 11 splits)
-//   x12      -> block2[2..3]          x13      -> block2[4..5]
-//   x13 (column) carries the per-sensor scaling the vendor cloud already baked in;
-//   JNG never recomputes it.
+// trunc(value * 1000f) after float32 multiplication (x1..x15):
+//   x1..x5   -> block0[4..13]         x6..x11  -> block1[1..12]
+//   x12 low  -> block1[13]            x12 high -> block2[1]
+//   x13      -> block2[2..3]          x14      -> block2[4..5]
+//   x15      -> block2[6..7]
+// The SDK list builder replaces the server's x13 with the decimal box-serial
+// substring [9,11), divided by 100f, before applying this conversion.
 //
 // aux embeds the 4 auth-challenge bytes c0..c3 (wire order of the F3 response,
 // `06 F3 01 c0 c1 c2 c3`) at the same rule positions the F4 auth IV uses:
@@ -46,7 +46,7 @@ object ICanHealthCorrectCode {
 
     private const val AES_BLOCK = 16
 
-    /** Value 12 (vendor x11) splits: low byte in block 1 tail, high byte in block 2 head. */
+    /** Value 12 (vendor x12) splits: low byte in block 1 tail, high byte in block 2 head. */
     private const val SPLIT_VALUE_INDEX = 11
 
     /** Table values as uint16 after the vendor scaling, or null when the table is incomplete. */
@@ -56,7 +56,7 @@ object ICanHealthCorrectCode {
         for (index in 1..TABLE_VALUES) {
             val raw = correctCode["x$index"] ?: return null
             if (!raw.isFinite()) return null
-            values[index - 1] = Math.round(raw.toDouble() * 1000.0).toInt() and 0xFFFF
+            values[index - 1] = (raw * 1000f).toInt() and 0xFFFF
         }
         return values
     }
@@ -88,12 +88,19 @@ object ICanHealthCorrectCode {
         }
     }
 
-    /** Convenience: run [valuesFromCorrectCode] then [encodeTable]. */
+    /** Build the SDK's per-box list before quantization; never mutate the cached server table. */
     @JvmStatic
     fun buildCorrectCodeChunks(
         correctCode: Map<String, Float>,
         challenge: ByteArray,
-    ): List<ByteArray>? = encodeTable(valuesFromCorrectCode(correctCode) ?: return null, challenge)
+        factorySerial: String,
+    ): List<ByteArray>? {
+        if (!factorySerial.matches(Regex("[0-9A-Za-z]{13}")) ||
+            !factorySerial.substring(9, 11).all { it in '0'..'9' }) return null
+        val perBox = correctCode.toMutableMap()
+        perBox["x13"] = factorySerial.substring(9, 11).toInt() / 100f
+        return encodeTable(valuesFromCorrectCode(perBox) ?: return null, challenge)
+    }
 
     /** Concatenates chunks for a single ATT write when the MTU allows it (3 × 18 bytes). */
     @JvmStatic

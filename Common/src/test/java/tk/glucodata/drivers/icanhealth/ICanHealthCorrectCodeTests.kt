@@ -13,6 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.json.JSONArray
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
@@ -38,7 +39,7 @@ class ICanHealthCorrectCodeTests {
     }
 
     @Test
-    fun valuesScaleByThousandRoundAndWrap() {
+    fun valuesScaleByThousandInFloat32TruncateAndWrap() {
         val code = mapOf(
             "x1" to 0.015f, "x2" to 32.0f, "x3" to 0.555f, "x4" to 40.0f,
             "x5" to 0.444f, "x6" to 0.3f, "x7" to 70.0f, "x8" to 0.5f,
@@ -63,6 +64,52 @@ class ICanHealthCorrectCodeTests {
     fun valuesRejectIncompleteTable() {
         val short = mapOf("x1" to 0.015f, "x2" to 32.0f)
         assertNull(ICanHealthCorrectCode.valuesFromCorrectCode(short))
+    }
+
+    @Test
+    fun boxSerialReplacesOnlyX13BeforeEncoding() {
+        val table = (1..25).associate { "x$it" to 1f }.toMutableMap()
+        table["x13"] = 0.4f // Synthetic server placeholder, not this box's coefficient.
+        val f3 = challenge(0x11, 0x22, 0x33, 0x44)
+        for (serial in listOf("ABC0000005900", "abc0000005900")) {
+            val actual = ICanHealthCorrectCode.buildCorrectCodeChunks(table, f3, serial)!!
+            val expected = ICanHealthCorrectCode.encodeTable(IntArray(15) { 1000 }.also { it[12] = 590 }, f3)!!
+            actual.zip(expected).forEach { (a, b) -> assertArrayEquals(b, a) }
+        }
+        val another = ICanHealthCorrectCode.buildCorrectCodeChunks(table, f3, "ABC0000005800")!!
+        val anotherExpected = ICanHealthCorrectCode.encodeTable(IntArray(15) { 1000 }.also { it[12] = 580 }, f3)!!
+        another.zip(anotherExpected).forEach { (a, b) -> assertArrayEquals(b, a) }
+        assertEquals(0.4f, table["x13"]!!, 0f)
+        assertEquals(1f, table["x12"]!!, 0f)
+        assertEquals(1f, table["x14"]!!, 0f)
+    }
+
+    @Test
+    fun missingOrInvalidFactorySerialCannotProduceProvisioningChunks() {
+        val table = (1..25).associate { "x$it" to 1f }
+        for (serial in listOf("", "ABC000000590", "0123456789ABCDEF012345", "ABC000000XX00", "ABC000000５９00")) {
+            assertNull(ICanHealthCorrectCode.buildCorrectCodeChunks(table, challenge(1, 2, 3, 4), serial))
+        }
+    }
+
+    @Test
+    fun quantizationAndPacketsMatchTheSdkBoundaryOracle() {
+        // Actual SDK outputs from synthetic lists/challenges, not a replica of this encoder.
+        val json = javaClass.getResourceAsStream("/ican/provisioning-boundaries.json")!!
+            .bufferedReader().use { it.readText() }
+        val cases = JSONArray(json)
+        assertEquals(10, cases.length())
+        repeat(cases.length()) { index ->
+            val case = cases.getJSONObject(index)
+            val table = (1..15).associate { "x$it" to 1f }.toMutableMap()
+            table["x1"] = case.getDouble("value").toFloat()
+            val values = ICanHealthCorrectCode.valuesFromCorrectCode(table)!!
+            val chunks = ICanHealthCorrectCode.encodeTable(values, challenge(0x11, 0x22, 0x33, 0x44))!!
+            chunks.forEachIndexed { chunk, bytes ->
+                assertEquals("SDK case $index chunk $chunk", case.getJSONArray("packets").getString(chunk),
+                    bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) })
+            }
+        }
     }
 
     @Test

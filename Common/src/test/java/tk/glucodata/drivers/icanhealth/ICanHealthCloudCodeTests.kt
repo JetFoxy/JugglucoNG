@@ -249,6 +249,7 @@ class ICanHealthCloudCodeTests {
         val chunks = ICanHealthCorrectCode.buildCorrectCodeChunks(
             ICanHealthCloudCode.defaultCorrectCode(),
             byteArrayOf(0, 0, 0, 0),
+            "ABC0000004000",
         )
         assertEquals(3, chunks?.size)
         assertTrue(chunks?.all { it.size == 18 } == true)

@@ -196,10 +196,9 @@ internal object ICanHealthCloudCode {
      * The vendor cloud's own answer for a device SN it has no row for, captured 2026-10-23
      * with blind probes (two different unknown SNs returned this table byte-identically,
      * stable across repeat requests). This is what the vendor phone would write on a real
-     * sensor it cannot identify server-side, so as a no-network fallback it matches the
-     * vendor behavior. Per §7.8 the server bakes the per-sensor x13 scale into real rows;
-     * the default row carries its fallback x13 = 0.4, which the next online bind replaces
-     * once the true per-SN table lands in the cache.
+     * sensor it cannot identify server-side. Retained as reference data; the driver does
+     * not automatically write it as a no-network fallback. The server's x13 is a placeholder:
+     * the SDK list builder derives it from the box serial before encoding any server row.
      */
     private val BUNDLED_DEFAULT_CORRECT_CODE: Map<String, Float> = mapOf(
         "x1" to 0.015f,
@@ -553,7 +552,7 @@ internal object ICanCloudCredsLoader {
  * `scheduleCorrectCodeWrite` time:
  *
  * 1. [`USE_CACHE`] — the per-SN table the cloud delivered earlier (the real per-sensor
- *    scale, including the server-baked x13).
+ *    table; the encoder's list builder derives x13 from the box serial).
  * 2. [`WAIT_FETCH`] — the cache is empty but a fetch worker attempt is in flight for
  *    this SN; defer the decision briefly so an online sensor gets its real table
  *    instead of the fallback.

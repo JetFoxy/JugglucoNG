@@ -2517,7 +2517,7 @@ class ICanHealthBleManager(
             scheduleCorrectCodeRecheck()
             return
         }
-        val chunks = decision.table?.let { ICanHealthCorrectCode.buildCorrectCodeChunks(it, challenge) }
+        val chunks = decision.table?.let { ICanHealthCorrectCode.buildCorrectCodeChunks(it, challenge, sn) }
         if (chunks == null) {
             // No real per-SN table available (cloud unreachable or not yet fetched):
             // do NOT write the generic default table — it scales readings wrongly.
