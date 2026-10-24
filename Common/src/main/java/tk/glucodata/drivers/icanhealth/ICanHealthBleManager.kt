@@ -1455,10 +1455,9 @@ class ICanHealthBleManager(
         Log.i(TAG, "WIRE rx notify ${shortUuid(characteristic.uuid)} ${data.toHexString()}")
         when (characteristic.uuid) {
             ICanHealthConstants.CGM_MEASUREMENT -> handleGlucoseNotification(data)
-            ICanHealthConstants.CGM_SPECIFIC_OPS -> {
-                val copy = data.copyOf()
-                handler.post { if (gatt === mBluetoothGatt) handleVendorAuthResponse(copy) }
-            }
+            // Auth handlers advance the GATT queue alongside read/write callbacks.
+            // Only the F2 acknowledgement's chain bookkeeping is posted to handler.
+            ICanHealthConstants.CGM_SPECIFIC_OPS -> handleVendorAuthResponse(data)
             ICanHealthConstants.RACP -> handleRacpResponse(data)
             // Lazy: hex-encodes the whole payload, and this fires per unhandled notification.
             else -> logd(TAG) { "Unhandled notify ${characteristic.uuid}: ${data.toHexString()}" }
@@ -2495,7 +2494,7 @@ class ICanHealthBleManager(
             }
             ICanHealthProvisioningPolicy.Eligibility.INVALID_FACTORY_SERIAL -> {
                 Log.w(TAG, "CorrectCode needs the full 13-character factory serial; legacy connection identity is insufficient")
-                setUiStatus(UiStatusKind.CUSTOM, context.getString(R.string.invalid_code_format))
+                setUiStatus(UiStatusKind.CUSTOM, context.getString(R.string.ican_full_box_serial_required))
                 return
             }
             ICanHealthProvisioningPolicy.Eligibility.UNKNOWN_SENSOR -> return

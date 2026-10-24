@@ -4,7 +4,8 @@ The full 13-character factory serial remains required for the proven regular
 CE/RU list builder. Existing 8/9/12-character connection identities remain valid
 for discovery and streaming; they do not supply enough evidence to invent the
 factory calibration code. A fresh sensor with an unsupported identity now takes
-the invalid-code path, separately from a missing genuine table. It does not
+an identity-error path, separately from a missing genuine table. Its status
+explicitly requires the full 13-character serial number from the iCan box. It does not
 receive a misleading cloud-unavailable notification for that identity error.
 
 F6 with any installed marker bypasses lookup, parameter writes and pending
@@ -29,9 +30,15 @@ this observed regular CE transaction. No speculative F7 is added. The existing
 genuine reference table still reproduces all three captured F2 packets through
 the guarded builder.
 
-Negative F2 replies now abort immediately. Queued vendor notifications check the
-current GATT owner, and each delayed parameter chunk checks authentication,
-fresh-marker eligibility, factory identity and challenge again.
+Negative F2 replies now abort immediately. Vendor notifications reject stale GATT
+owners and run inline on the Bluetooth callback thread, alongside read/write
+completions. Posting all vendor replies to the driver's handler introduced a race
+between handshake queue operations and Bluetooth completions; that dispatch change
+is reverted. F2 acknowledgement bookkeeping retains its handler post and checks
+the current GATT and pending-chunk owners. Each delayed parameter chunk checks
+authentication, fresh-marker eligibility, factory identity and challenge again.
+Source-wiring regression tests guard this dispatch boundary; they do not establish
+thread safety of every existing timer or lifecycle path in the driver.
 
 Advertisement-based exclusion is removed. Advertised services can be a subset
 of the real GATT services; their omission of 0x181F does not prove a non-CGM
