@@ -3110,4 +3110,27 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="settings_search_hint">Ayarlarda ara</string>
     <string name="settings_search_no_results">“%1$s” ile eşleşen ayar yok</string>
     <string name="settings_search_clear">Aramayı temizle</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Deneysel ürün yazılımı testi</string>
+    <string name="ottai_ota_warning">Yalnızca CN sensörleri. Başarısız bir güncelleme sensörü kullanılamaz hâle getirebilir. Bu ekranı açık tutun ve telefonu sensöre yakın tutun.</string>
+    <string name="ottai_ota_connecting">Etkinleştirmeden bağlanılıyor…</string>
+    <string name="ottai_ota_authenticating">Sensör kimliği doğrulanıyor…</string>
+    <string name="ottai_ota_checking">Ürün yazılımı denetleniyor ve indiriliyor…</string>
+    <string name="ottai_ota_recovery">Kurtarma paketi hazır. Kaydedilen paket baştan yüklenir.</string>
+    <string name="ottai_ota_ready">Ürün yazılımı hazır. Sensör etkinleştirilmedi.</string>
+    <string name="ottai_ota_no_update">Ürün yazılımı güncellemesi sunulmadı</string>
+    <string name="ottai_ota_installing">Ürün yazılımı yükleniyor…</string>
+    <string name="ottai_ota_reconnecting">Yeniden bağlanılıyor ve yüklü sürüm denetleniyor…</string>
+    <string name="ottai_ota_preparing">Kimlik bilgileri yenileniyor ve fabrika parametreleri yazılıyor…</string>
+    <string name="ottai_ota_complete">Hazırlık tamamlandı. Bu pencereyi kapatıp sensörü etkinleştirmek için normal şekilde bağlanın.</string>
+    <string name="ottai_ota_failed">Test durduruldu. Yeniden denemeden önce izleme günlüğünü kontrol edin. Tamamlanmamış güncellemeler etkinleştirmeyi engeller.</string>
+    <string name="ottai_ota_version">Sensör: %1$s · Güncelleme: %2$s</string>
+    <string name="ottai_ota_package">%1$d bayt · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Tanılama kodu: %1$s</string>
+    <string name="ottai_ota_install">Ürün yazılımını yükle</string>
+    <string name="ottai_ota_parameters">Yalnızca fabrika parametrelerini yaz</string>
+    <string name="ottai_ota_confirm">Bu deneysel güncelleme yüklensin mi? Sensör kalıcı olarak kullanılamaz hâle gelebilir. Sürüm ve fabrika parametreleri doğrulandıktan sonra ayrıca etkinleştirilir.</string>
+    <string name="ottai_ota_parameters_confirm">Desteklenen fabrika katsayıları ve kalibrasyon yazılsın mı? Bu işlem ürün yazılımını güncellemeden veya sensör ömrünü başlatmadan yapılandırmayı değiştirir.</string>
+    <string name="ottai_ota_check">Ürün yazılımını denetle (deneysel)</string>
 </resources>

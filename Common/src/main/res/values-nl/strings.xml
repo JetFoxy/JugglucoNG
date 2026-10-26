@@ -3125,4 +3125,27 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="settings_search_hint">Instellingen zoeken</string>
     <string name="settings_search_no_results">Geen instellingen gevonden voor ‘%1$s’</string>
     <string name="settings_search_clear">Zoekopdracht wissen</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Experimentele firmwaretest</string>
+    <string name="ottai_ota_warning">Alleen CN-sensoren. Een mislukte update kan de sensor onbruikbaar maken. Houd dit scherm open en de telefoon dicht bij de sensor.</string>
+    <string name="ottai_ota_connecting">Verbinden zonder activering…</string>
+    <string name="ottai_ota_authenticating">Sensoridentiteit controleren…</string>
+    <string name="ottai_ota_checking">Firmware controleren en downloaden…</string>
+    <string name="ottai_ota_recovery">Herstelpakket gereed. De installatie begint opnieuw met het opgeslagen pakket.</string>
+    <string name="ottai_ota_ready">Firmwarepakket gereed. De sensor is niet geactiveerd.</string>
+    <string name="ottai_ota_no_update">Geen firmwareupdate aangeboden</string>
+    <string name="ottai_ota_installing">Firmware installeren…</string>
+    <string name="ottai_ota_reconnecting">Opnieuw verbinden en de geïnstalleerde versie controleren…</string>
+    <string name="ottai_ota_preparing">Inloggegevens vernieuwen en fabrieksparameters schrijven…</string>
+    <string name="ottai_ota_complete">Voorbereiding voltooid. Sluit dit venster en verbind normaal om de sensor te activeren.</string>
+    <string name="ottai_ota_failed">Firmwaretest gestopt. Controleer het tracelogboek voordat je opnieuw probeert. Onvoltooide updates blokkeren activering.</string>
+    <string name="ottai_ota_version">Sensor: %1$s · Update: %2$s</string>
+    <string name="ottai_ota_package">%1$d bytes · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Diagnosecode: %1$s</string>
+    <string name="ottai_ota_install">Firmware installeren</string>
+    <string name="ottai_ota_parameters">Alleen fabrieksparameters schrijven</string>
+    <string name="ottai_ota_confirm">Deze experimentele update installeren? Dit kan de sensor permanent uitschakelen. Activering volgt apart na controle van de versie en fabrieksparameters.</string>
+    <string name="ottai_ota_parameters_confirm">De ondersteunde fabriekscoëfficiënten en kalibratie schrijven? Dit wijzigt de configuratie zonder firmwareupdate of het starten van de levensduur.</string>
+    <string name="ottai_ota_check">Firmware controleren (experimenteel)</string>
 </resources>

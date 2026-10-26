@@ -132,6 +132,8 @@ object OttaiCloudClient {
         val retainTime: Long,        // destruction value (ms) -> BLE p.E; 0 => server default
         val deviceVersion: String,
         val deviceId: Int,
+        val calibrationValueK: Double? = null,
+        val calibrationValueB: Double? = null,
     )
 
     data class DeviceValidation(
@@ -982,6 +984,8 @@ object OttaiCloudClient {
             retainTime = vo.optLongLoose("retainTime"),
             deviceVersion = vo.optString("deviceVersion").orEmptyIfNull(),
             deviceId = vo.optInt("id", 0),
+            calibrationValueK = vo.optionalFiniteDouble("calibrationValueK"),
+            calibrationValueB = vo.optionalFiniteDouble("calibrationValueB"),
         )
     }
 
@@ -1011,8 +1015,51 @@ object OttaiCloudClient {
             preheatPeriodMs = resp.preheatPeriodTime,
             deviceVersion = resp.deviceVersion,
             deviceId = resp.deviceId,
+            calibrationValueK = resp.calibrationValueK,
+            calibrationValueB = resp.calibrationValueB,
         )
     }
+
+    internal data class OtaOffer(val downloadUrl: String?, val required: Boolean, val allowed: Boolean)
+
+    internal fun parseOtaOffer(json: JSONObject): OtaOffer {
+        val data = json.optJSONObject("data") ?: json.optJSONObject("result")
+            ?: throw IllegalArgumentException("ota_response")
+        require(data.has("requiredUpgrade") && data.has("allowUpgrade")) { "ota_flags" }
+        val url = data.optString("downloadUrl").takeIf { it.isNotBlank() && it != "null" }
+        return OtaOffer(url, data.getBoolean("requiredUpgrade"), data.getBoolean("allowUpgrade"))
+    }
+
+    /** Explicit CN field test only. No firmware request runs from the managed driver. */
+    internal fun judgeOta(ctx: Context, mac: String, firmware: String): OtaOffer {
+        require(loadCnOtaSession(ctx)) { "cn_session" }
+        val result = httpGetWithResult(
+            base(ctx) + OttaiConstants.EP_OTA_JUDGE,
+            mapOf("mac" to mac, "deviceVersion" to firmware, "deviceType" to "cgm"),
+            headers(ctx, now(), base(ctx)),
+        )
+        require(result.failure == null) { "ota_judge" }
+        return parseOtaOffer(result.body ?: throw IllegalArgumentException("ota_response"))
+    }
+
+    internal fun loadCnOtaSession(ctx: Context): Boolean =
+        base(ctx) == OttaiConstants.API_BASE &&
+            OttaiRegistry.loadSessionProfile(ctx) == OttaiRegistry.SessionProfile.CN_PHONE &&
+            OttaiRegistry.loadAccessToken(ctx).isNotBlank()
+
+    internal fun reportOtaSuccess(ctx: Context, mac: String, source: String, target: String) {
+        require(loadCnOtaSession(ctx)) { "cn_session" }
+        httpPostJson(base(ctx) + OttaiConstants.EP_OTA_REPORT, JSONObject().apply {
+            put("mac", mac)
+            put("sourceVersion", source)
+            put("targetVersion", target)
+            put("upgradeStatus", 1)
+            put("remark", "JugglucoNG experimental; version readback verified")
+        }.toString(), headers(ctx, now(), base(ctx)))
+    }
+
+    private fun JSONObject.optionalFiniteDouble(key: String): Double? =
+        if (!has(key) || isNull(key)) null else optDouble(key, Double.NaN).takeIf { it.isFinite() }
 
     // ---- HTTP ----
 

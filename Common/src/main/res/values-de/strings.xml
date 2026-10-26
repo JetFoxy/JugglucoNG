@@ -3195,4 +3195,27 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="settings_search_hint">Einstellungen durchsuchen</string>
     <string name="settings_search_no_results">Keine Einstellung passt zu „%1$s“</string>
     <string name="settings_search_clear">Suche löschen</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Experimenteller Firmwaretest</string>
+    <string name="ottai_ota_warning">Nur für CN-Sensoren. Ein fehlgeschlagenes Update kann den Sensor unbrauchbar machen. Diesen Bildschirm geöffnet und das Telefon nahe am Sensor halten.</string>
+    <string name="ottai_ota_connecting">Verbindung ohne Aktivierung…</string>
+    <string name="ottai_ota_authenticating">Sensoridentität wird geprüft…</string>
+    <string name="ottai_ota_checking">Firmware wird geprüft und heruntergeladen…</string>
+    <string name="ottai_ota_recovery">Wiederherstellungspaket bereit. Das gespeicherte Paket wird von Anfang an installiert.</string>
+    <string name="ottai_ota_ready">Firmwarepaket bereit. Der Sensor ist nicht aktiviert.</string>
+    <string name="ottai_ota_no_update">Kein Firmwareupdate angeboten</string>
+    <string name="ottai_ota_installing">Firmware wird installiert…</string>
+    <string name="ottai_ota_reconnecting">Erneute Verbindung und Prüfung der installierten Version…</string>
+    <string name="ottai_ota_preparing">Zugangsdaten werden aktualisiert und Werksparameter geschrieben…</string>
+    <string name="ottai_ota_complete">Vorbereitung abgeschlossen. Diesen Dialog schließen und den Sensor zur Aktivierung normal verbinden.</string>
+    <string name="ottai_ota_failed">Firmwaretest gestoppt. Vor einem erneuten Versuch das Trace-Protokoll prüfen. Unvollständige Updates blockieren die Aktivierung.</string>
+    <string name="ottai_ota_version">Sensor: %1$s · Update: %2$s</string>
+    <string name="ottai_ota_package">%1$d Bytes · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Diagnosecode: %1$s</string>
+    <string name="ottai_ota_install">Firmware installieren</string>
+    <string name="ottai_ota_parameters">Nur Werksparameter schreiben</string>
+    <string name="ottai_ota_confirm">Dieses experimentelle Update installieren? Der Sensor kann dauerhaft ausfallen. Die Aktivierung erfolgt separat nach Prüfung der Version und der Werksparameter.</string>
+    <string name="ottai_ota_parameters_confirm">Die von dieser Firmware unterstützten Werkskoeffizienten und Kalibrierungswerte schreiben? Dies ändert die Sensorkonfiguration ohne Firmwareupdate oder Start der Laufzeit.</string>
+    <string name="ottai_ota_check">Firmware prüfen (experimentell)</string>
 </resources>

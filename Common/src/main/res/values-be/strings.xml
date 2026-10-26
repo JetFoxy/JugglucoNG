@@ -3158,4 +3158,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_hint">Пошук у наладах</string>
     <string name="settings_search_no_results">Няма налад, падобных да «%1$s»</string>
     <string name="settings_search_clear">Ачысціць пошук</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Эксперыментальны тэст прашыўкі</string>
+    <string name="ottai_ota_warning">Толькі для кітайскіх сенсараў. Збой абнаўлення можа вывесці сенсар са строю. Пакіньце гэты экран адкрытым і трымайце тэлефон каля сенсара.</string>
+    <string name="ottai_ota_connecting">Падключэнне без актывацыі…</string>
+    <string name="ottai_ota_authenticating">Праверка сапраўднасці сенсара…</string>
+    <string name="ottai_ota_checking">Праверка і спампоўванне прашыўкі…</string>
+    <string name="ottai_ota_recovery">Пакет аднаўлення гатовы. Усталяванне захаванага пакета пачнецца спачатку.</string>
+    <string name="ottai_ota_ready">Прашыўка гатовая. Сенсар не актываваны.</string>
+    <string name="ottai_ota_no_update">Абнаўленне прашыўкі не прапанавана</string>
+    <string name="ottai_ota_installing">Усталяванне прашыўкі…</string>
+    <string name="ottai_ota_reconnecting">Паўторнае падключэнне і праверка ўсталяванай версіі…</string>
+    <string name="ottai_ota_preparing">Абнаўленне ўліковых даных і запіс заводскіх параметраў…</string>
+    <string name="ottai_ota_complete">Падрыхтоўка завершана. Закрыйце акно і падключыцеся звычайным спосабам для актывацыі сенсара.</string>
+    <string name="ottai_ota_failed">Тэст спынены. Перад паўторам праверце журнал трасіроўкі. Незавершаныя абнаўленні блакуюць актывацыю.</string>
+    <string name="ottai_ota_version">Сенсар: %1$s · Абнаўленне: %2$s</string>
+    <string name="ottai_ota_package">%1$d байтаў · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Код дыягностыкі: %1$s</string>
+    <string name="ottai_ota_install">Усталяваць прашыўку</string>
+    <string name="ottai_ota_parameters">Запісаць толькі заводскія параметры</string>
+    <string name="ottai_ota_confirm">Усталяваць эксперыментальнае абнаўленне? Сенсар можа назаўсёды выйсці са строю. Актывацыя выконваецца асобна пасля праверкі версіі і заводскіх параметраў.</string>
+    <string name="ottai_ota_parameters_confirm">Запісаць падтрыманыя заводскія каэфіцыенты і каліброўку? Гэта зменіць налады без абнаўлення прашыўкі і запуску тэрміну працы сенсара.</string>
+    <string name="ottai_ota_check">Праверыць прашыўку (эксперыментальна)</string>
 </resources>

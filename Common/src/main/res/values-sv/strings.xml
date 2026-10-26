@@ -3082,4 +3082,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_hint">Sök i inställningar</string>
     <string name="settings_search_no_results">Inga inställningar matchar ”%1$s”</string>
     <string name="settings_search_clear">Rensa sökning</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Experimentellt firmwaretest</string>
+    <string name="ottai_ota_warning">Endast CN-sensorer. En misslyckad uppdatering kan göra sensorn obrukbar. Håll skärmen öppen och telefonen nära sensorn.</string>
+    <string name="ottai_ota_connecting">Ansluter utan aktivering…</string>
+    <string name="ottai_ota_authenticating">Verifierar sensorns identitet…</string>
+    <string name="ottai_ota_checking">Kontrollerar och hämtar firmware…</string>
+    <string name="ottai_ota_recovery">Återställningspaket klart. Installationen börjar om från det sparade paketets början.</string>
+    <string name="ottai_ota_ready">Firmwarepaket klart. Sensorn är inte aktiverad.</string>
+    <string name="ottai_ota_no_update">Ingen firmwareuppdatering erbjuds</string>
+    <string name="ottai_ota_installing">Installerar firmware…</string>
+    <string name="ottai_ota_reconnecting">Återansluter och kontrollerar installerad version…</string>
+    <string name="ottai_ota_preparing">Uppdaterar inloggningsuppgifter och skriver fabriksparametrar…</string>
+    <string name="ottai_ota_complete">Förberedelsen är klar. Stäng dialogrutan och anslut normalt för att aktivera sensorn.</string>
+    <string name="ottai_ota_failed">Testet stoppades. Kontrollera spårningsloggen innan du försöker igen. Ofullständiga uppdateringar blockerar aktivering.</string>
+    <string name="ottai_ota_version">Sensor: %1$s · Uppdatering: %2$s</string>
+    <string name="ottai_ota_package">%1$d byte · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Diagnostikkod: %1$s</string>
+    <string name="ottai_ota_install">Installera firmware</string>
+    <string name="ottai_ota_parameters">Skriv endast fabriksparametrar</string>
+    <string name="ottai_ota_confirm">Installera denna experimentella uppdatering? Sensorn kan sluta fungera permanent. Aktivering sker separat efter kontroll av version och fabriksparametrar.</string>
+    <string name="ottai_ota_parameters_confirm">Skriva de fabrikskoefficienter och kalibreringsvärden som stöds? Detta ändrar konfigurationen utan firmwareuppdatering eller start av sensorns livslängd.</string>
+    <string name="ottai_ota_check">Kontrollera firmware (experimentellt)</string>
 </resources>

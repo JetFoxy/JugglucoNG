@@ -89,6 +89,7 @@ import tk.glucodata.SensorBluetooth
 import tk.glucodata.drivers.ottai.OttaiBleManager
 import tk.glucodata.drivers.ottai.OttaiCloudClient
 import tk.glucodata.drivers.ottai.OttaiConstants
+import tk.glucodata.drivers.ottai.OttaiFirmwareSession
 import tk.glucodata.drivers.ottai.OttaiNfc
 import tk.glucodata.drivers.ottai.OttaiRegistry
 import tk.glucodata.ui.components.AppTopBar
@@ -280,6 +281,7 @@ private fun connectOttaiSensor(
     route: OttaiSetupConnectRoute,
 ): Boolean {
     val canonical = OttaiConstants.canonicalSensorId(mac).ifEmpty { return false }
+    if (OttaiFirmwareSession.hasPendingTransfer(context, canonical)) return false
     val ble = OttaiConstants.normalizeBleAddress(
         bleAddress, allowPlain = false,
     ) ?: OttaiConstants.normalizeBleAddress(
@@ -531,6 +533,7 @@ fun OttaiSetupWizard(
     var currentMaterials by remember { mutableStateOf<OttaiRegistry.DeviceMaterials?>(null) }
     var materialLoading by remember { mutableStateOf(false) }
     var credentialBootstrap by remember { mutableStateOf<OttaiBleManager?>(null) }
+    var showFirmwareTest by remember { mutableStateOf(false) }
     var lastAutoFetchId by remember { mutableStateOf("") }
     var materialRefresh by remember { mutableStateOf(0) }
     // The account's sensors (current + past); null = not loaded yet, empty = none.
@@ -1292,7 +1295,14 @@ fun OttaiSetupWizard(
             OttaiSetupStep.QR, OttaiSetupStep.SAVED_SENSORS, OttaiSetupStep.REGISTER -> step = OttaiSetupStep.SEARCH
         }
     }
-    BackHandler(onBack = goBack)
+    if (showFirmwareTest) {
+        OttaiFirmwareTestDialog(cloudId, bleAddress) {
+            showFirmwareTest = false
+            savedRefresh += 1
+            materialRefresh += 1
+        }
+    }
+    BackHandler(enabled = !showFirmwareTest, onBack = goBack)
 
     val onSignedIn: (String) -> Unit = {
         accountMessage = ""
@@ -1375,6 +1385,11 @@ fun OttaiSetupWizard(
                 }
             },
             onImport = launchImport,
+            onFirmware = if (signedIn && region == OttaiRegion.CN && hasMaterials &&
+                OttaiConstants.normalizeBleAddress(bleAddress) != null) ({
+                OttaiSetupScanHold.stopPanelScans()
+                showFirmwareTest = true
+            }) else null,
             onSignIn = { openSignIn() },
             onExport = if (hasMaterials && hasSensorCode) {
                 {
@@ -1455,7 +1470,7 @@ fun OttaiSetupWizard(
                     OttaiSearchStep(
                         ui = ui,
                         restartKey = nfcScanRestartKey,
-                        enabled = !busy && !materialLoading,
+                        enabled = !busy && !materialLoading && !showFirmwareTest,
                         selectedSensor = selectedSensor,
                         scrollRequest = searchScrollRequest,
                         focusSelectedSensor = focusSelectedSensor,

@@ -3134,4 +3134,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_hint">Поиск по настройкам</string>
     <string name="settings_search_no_results">Нет настроек, подходящих под «%1$s»</string>
     <string name="settings_search_clear">Очистить поиск</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Экспериментальное обновление</string>
+    <string name="ottai_ota_warning">Только для китайских сенсоров. Сбой обновления может вывести сенсор из строя. Оставьте этот экран открытым и держите телефон рядом с сенсором.</string>
+    <string name="ottai_ota_connecting">Подключение без активации…</string>
+    <string name="ottai_ota_authenticating">Проверка подлинности сенсора…</string>
+    <string name="ottai_ota_checking">Проверка и загрузка прошивки…</string>
+    <string name="ottai_ota_recovery">Пакет восстановления готов. Установка сохранённого пакета начнётся заново.</string>
+    <string name="ottai_ota_ready">Прошивка готова к установке. Сенсор не активирован.</string>
+    <string name="ottai_ota_no_update">Обновление прошивки не предложено</string>
+    <string name="ottai_ota_installing">Установка прошивки…</string>
+    <string name="ottai_ota_reconnecting">Переподключение и проверка установленной версии…</string>
+    <string name="ottai_ota_preparing">Обновление учётных данных и запись заводских параметров…</string>
+    <string name="ottai_ota_complete">Подготовка завершена. Закройте окно и подключитесь обычным способом для активации сенсора.</string>
+    <string name="ottai_ota_failed">Тест остановлен. Перед повтором проверьте журнал трассировки. Незавершённое обновление блокирует активацию.</string>
+    <string name="ottai_ota_version">Сенсор: %1$s · Обновление: %2$s</string>
+    <string name="ottai_ota_package">%1$d байт · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Код диагностики: %1$s</string>
+    <string name="ottai_ota_install">Установить прошивку</string>
+    <string name="ottai_ota_parameters">Записать только заводские параметры</string>
+    <string name="ottai_ota_confirm">Установить экспериментальное обновление? Сенсор может навсегда выйти из строя. Активация выполняется отдельно после проверки версии и заводских параметров.</string>
+    <string name="ottai_ota_parameters_confirm">Записать заводские коэффициенты и калибровку, поддерживаемые этой прошивкой? Это изменит настройки сенсора без обновления прошивки и запуска срока работы.</string>
+    <string name="ottai_ota_check">Проверить прошивку (экспериментально)</string>
 </resources>

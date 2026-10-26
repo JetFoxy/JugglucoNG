@@ -3180,4 +3180,27 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="settings_search_hint">Тохиргооноос хайх</string>
     <string name="settings_search_no_results">“%1$s”-тэй тохирох тохиргоо алга</string>
     <string name="settings_search_clear">Хайлтыг арилгах</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Туршилтын програм хангамж</string>
+    <string name="ottai_ota_warning">Зөвхөн Хятадын мэдрэгчид. Шинэчлэлт амжилтгүй болбол мэдрэгч ашиглах боломжгүй болж болно. Энэ дэлгэцийг нээлттэй байлгаж, утсаа мэдрэгчийн ойролцоо байлгана уу.</string>
+    <string name="ottai_ota_connecting">Идэвхжүүлэхгүйгээр холбогдож байна…</string>
+    <string name="ottai_ota_authenticating">Мэдрэгчийн таних мэдээллийг шалгаж байна…</string>
+    <string name="ottai_ota_checking">Програм хангамж шалгаж, татаж байна…</string>
+    <string name="ottai_ota_recovery">Сэргээх багц бэлэн. Хадгалсан багцыг эхнээс нь дахин суулгана.</string>
+    <string name="ottai_ota_ready">Програм хангамжийн багц бэлэн. Мэдрэгч идэвхжээгүй.</string>
+    <string name="ottai_ota_no_update">Програм хангамжийн шинэчлэлт алга</string>
+    <string name="ottai_ota_installing">Програм хангамж суулгаж байна…</string>
+    <string name="ottai_ota_reconnecting">Дахин холбогдож суулгасан хувилбарыг шалгаж байна…</string>
+    <string name="ottai_ota_preparing">Нэвтрэх мэдээлэл шинэчилж, үйлдвэрийн параметр бичиж байна…</string>
+    <string name="ottai_ota_complete">Бэлтгэл дууслаа. Энэ цонхыг хааж, мэдрэгчийг идэвхжүүлэхийн тулд ердийн байдлаар холбоно уу.</string>
+    <string name="ottai_ota_failed">Туршилт зогслоо. Дахин оролдохын өмнө мөрдөх бүртгэлийг шалгана уу. Дуусаагүй шинэчлэлт идэвхжүүлэхийг хориглоно.</string>
+    <string name="ottai_ota_version">Мэдрэгч: %1$s · Шинэчлэлт: %2$s</string>
+    <string name="ottai_ota_package">%1$d байт · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Оношилгооны код: %1$s</string>
+    <string name="ottai_ota_install">Програм хангамж суулгах</string>
+    <string name="ottai_ota_parameters">Зөвхөн үйлдвэрийн параметр бичих</string>
+    <string name="ottai_ota_confirm">Энэ туршилтын шинэчлэлтийг суулгах уу? Мэдрэгч бүрмөсөн ажиллахгүй болж болно. Хувилбар болон үйлдвэрийн параметрийг шалгасны дараа тусад нь идэвхжүүлнэ.</string>
+    <string name="ottai_ota_parameters_confirm">Дэмжигдсэн үйлдвэрийн коэффициент болон тохируулгыг бичих үү? Энэ нь програм хангамж шинэчлэхгүй, ашиглалтын хугацааг эхлүүлэхгүйгээр тохиргоог өөрчилнө.</string>
+    <string name="ottai_ota_check">Програм хангамж шалгах (туршилт)</string>
 </resources>

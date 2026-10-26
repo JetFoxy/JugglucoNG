@@ -3089,4 +3089,27 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_hint">Rechercher dans les paramètres</string>
     <string name="settings_search_no_results">Aucun paramètre ne correspond à « %1$s »</string>
     <string name="settings_search_clear">Effacer la recherche</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Test expérimental du micrologiciel</string>
+    <string name="ottai_ota_warning">Capteurs CN uniquement. Un échec peut rendre le capteur inutilisable. Gardez cet écran ouvert et le téléphone près du capteur.</string>
+    <string name="ottai_ota_connecting">Connexion sans activation…</string>
+    <string name="ottai_ota_authenticating">Vérification de l’identité du capteur…</string>
+    <string name="ottai_ota_checking">Vérification et téléchargement du micrologiciel…</string>
+    <string name="ottai_ota_recovery">Paquet de récupération prêt. L’installation reprend le paquet enregistré depuis le début.</string>
+    <string name="ottai_ota_ready">Micrologiciel prêt. Le capteur n’est pas activé.</string>
+    <string name="ottai_ota_no_update">Aucune mise à jour proposée</string>
+    <string name="ottai_ota_installing">Installation du micrologiciel…</string>
+    <string name="ottai_ota_reconnecting">Reconnexion et vérification de la version installée…</string>
+    <string name="ottai_ota_preparing">Actualisation des identifiants et écriture des paramètres d’usine…</string>
+    <string name="ottai_ota_complete">Préparation terminée. Fermez cette fenêtre, puis connectez-vous normalement pour activer le capteur.</string>
+    <string name="ottai_ota_failed">Test arrêté. Consultez le journal de trace avant de réessayer. Une mise à jour inachevée bloque l’activation.</string>
+    <string name="ottai_ota_version">Capteur : %1$s · Mise à jour : %2$s</string>
+    <string name="ottai_ota_package">%1$d octets · SHA-256 : %2$s</string>
+    <string name="ottai_ota_error_code">Code de diagnostic : %1$s</string>
+    <string name="ottai_ota_install">Installer le micrologiciel</string>
+    <string name="ottai_ota_parameters">Écrire uniquement les paramètres d’usine</string>
+    <string name="ottai_ota_confirm">Installer cette mise à jour expérimentale ? Le capteur peut devenir définitivement inutilisable. L’activation se fait séparément après vérification de la version et des paramètres d’usine.</string>
+    <string name="ottai_ota_parameters_confirm">Écrire les coefficients et l’étalonnage d’usine pris en charge ? Cela modifie la configuration sans mettre à jour le micrologiciel ni démarrer la durée de vie du capteur.</string>
+    <string name="ottai_ota_check">Vérifier le micrologiciel (expérimental)</string>
 </resources>

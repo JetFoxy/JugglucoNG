@@ -3128,4 +3128,27 @@
     <string name="settings_search_hint">Szukaj w ustawieniach</string>
     <string name="settings_search_no_results">Brak ustawień pasujących do „%1$s”</string>
     <string name="settings_search_clear">Wyczyść wyszukiwanie</string>
+
+    <!-- Explicit CN preactivation firmware field test. -->
+    <string name="ottai_ota_title">Eksperymentalny test oprogramowania</string>
+    <string name="ottai_ota_warning">Tylko sensory CN. Nieudana aktualizacja może uszkodzić sensor. Pozostaw ten ekran otwarty i trzymaj telefon blisko sensora.</string>
+    <string name="ottai_ota_connecting">Łączenie bez aktywacji…</string>
+    <string name="ottai_ota_authenticating">Weryfikacja tożsamości sensora…</string>
+    <string name="ottai_ota_checking">Sprawdzanie i pobieranie oprogramowania…</string>
+    <string name="ottai_ota_recovery">Pakiet odzyskiwania gotowy. Instalacja zapisanej paczki rozpocznie się od początku.</string>
+    <string name="ottai_ota_ready">Pakiet gotowy. Sensor nie jest aktywowany.</string>
+    <string name="ottai_ota_no_update">Nie zaoferowano aktualizacji</string>
+    <string name="ottai_ota_installing">Instalowanie oprogramowania…</string>
+    <string name="ottai_ota_reconnecting">Ponowne łączenie i sprawdzanie zainstalowanej wersji…</string>
+    <string name="ottai_ota_preparing">Odświeżanie danych dostępu i zapis parametrów fabrycznych…</string>
+    <string name="ottai_ota_complete">Przygotowanie zakończone. Zamknij okno, a następnie połącz się normalnie, aby aktywować sensor.</string>
+    <string name="ottai_ota_failed">Test zatrzymany. Przed ponowieniem sprawdź dziennik śledzenia. Niedokończone aktualizacje blokują aktywację.</string>
+    <string name="ottai_ota_version">Sensor: %1$s · Aktualizacja: %2$s</string>
+    <string name="ottai_ota_package">%1$d bajtów · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Kod diagnostyczny: %1$s</string>
+    <string name="ottai_ota_install">Zainstaluj oprogramowanie</string>
+    <string name="ottai_ota_parameters">Zapisz tylko parametry fabryczne</string>
+    <string name="ottai_ota_confirm">Zainstalować eksperymentalną aktualizację? Może to trwale uszkodzić sensor. Aktywacja nastąpi osobno po sprawdzeniu wersji i parametrów fabrycznych.</string>
+    <string name="ottai_ota_parameters_confirm">Zapisać obsługiwane współczynniki i kalibrację fabryczną? Zmieni to konfigurację bez aktualizacji oprogramowania ani rozpoczęcia czasu pracy sensora.</string>
+    <string name="ottai_ota_check">Sprawdź oprogramowanie (eksperymentalnie)</string>
 </resources>
