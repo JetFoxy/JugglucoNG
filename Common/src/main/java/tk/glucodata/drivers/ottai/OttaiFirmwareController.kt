@@ -130,7 +130,12 @@ internal class OttaiFirmwareController(
             return
         }
         read(OttaiConstants.SERVICE_DEVICE_INFO, OttaiConstants.CHAR_SOFTWARE_VERSION) { bytes ->
-            val version = OttaiOtaProtocol.version(bytes.toString(Charsets.US_ASCII).trimEnd('\u0000'))
+            // Log only this public revision characteristic, bounded and hex encoded so unusual
+            // padding/encoding remains visible without inserting control characters into logs.
+            io.log("software_revision length=${bytes.size} hex=${OttaiCrypto.bytesToHex(bytes.take(64).toByteArray())}")
+            val reported = bytes.toString(Charsets.US_ASCII).trimEnd('\u0000')
+            state = state.copy(firmware = reported.take(64).map { if (it in ' '..'~') it else '?' }.joinToString(""))
+            val version = OttaiOtaProtocol.version(reported)
                 ?: throw IllegalArgumentException("firmware_profile")
             val saved = io.savedImage()
             require(saved == null || saved.mode == mode) { "recovery_mode" }

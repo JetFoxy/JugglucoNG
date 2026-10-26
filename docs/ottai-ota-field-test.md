@@ -46,6 +46,11 @@ falls back after 2.5 seconds; a refused MTU request uses a 300 ms fallback. `Ott
 20-second timeout. On the initial connection, a stall before discovery precedes authentication
 and OTA.
 
+If the check stops with `firmware_profile`, the dialog displays the reported software revision
+(up to 64 printable characters). The trace records `software_revision` with the original byte
+length and first 64 bytes in hex, including padding. This diagnoses unexpected revision formats;
+it does not bypass the supported revision check.
+
 With one sensor, an OTA followed by parameter writes can establish that combined setup path.
 It cannot isolate the effect of firmware from factory provisioning on early readings.
 

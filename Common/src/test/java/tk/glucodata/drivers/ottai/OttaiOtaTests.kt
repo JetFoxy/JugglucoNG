@@ -114,6 +114,7 @@ class OttaiFirmwareControllerTests {
     private class FakeIo(val image: OttaiFirmwareImage) : OttaiFirmwareIo {
         val writes = mutableListOf<Pair<UUID, ByteArray>>()
         val scheduled = ArrayDeque<() -> Unit>()
+        val logs = mutableListOf<String>()
         var connected: ((Result<OttaiFirmwareGatt>) -> Unit)? = null
         var ack: ((Result<Unit>) -> Unit)? = null
         var saved = false
@@ -168,7 +169,7 @@ class OttaiFirmwareControllerTests {
         override fun markTransferStarted(image: OttaiFirmwareImage) { saved = true; journal = image }
         override fun reportVerified(image: OttaiFirmwareImage) { reported = true }
         override fun clearRecovery() { cleared = true }
-        override fun log(message: String) {}
+        override fun log(message: String) { logs += message }
         override fun disconnect() {}
         override fun close(completed: Boolean) { closed = true; closedSuccessfully = completed }
     }
@@ -217,6 +218,38 @@ class OttaiFirmwareControllerTests {
         io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
         if (!badSignature) repeat(2) { io.tick(); io.acknowledge() }
         return controller to io
+    }
+
+    @Test fun rejectedRevisionIsVisibleWithoutAllowingWritesOrCloudRequests() {
+        val io = FakeIo(image)
+        io.readAnswer = { ch ->
+            assertEquals(OttaiConstants.CHAR_SOFTWARE_VERSION, ch)
+            "V1.2.0\u0000".toByteArray()
+        }
+        val controller = OttaiFirmwareController("AABBCCDDEEFF", materials, io) {}
+        controller.start()
+        io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertEquals("firmware_profile", controller.state.errorCode)
+        assertEquals("V1.2.0", controller.state.firmware)
+        assertTrue(io.logs.contains("software_revision length=7 hex=56312e322e3000"))
+        assertTrue(io.closed)
+        assertTrue(io.writes.isEmpty())
+        assertEquals(0, io.offerRequests)
+    }
+
+    @Test fun malformedRevisionDiagnosticsAreBoundedAndCannotInjectLogLines() {
+        val bytes = byteArrayOf(10, 0xff.toByte()) + ByteArray(100) { 'A'.code.toByte() }
+        val io = FakeIo(image).also { it.readAnswer = { bytes } }
+        val controller = OttaiFirmwareController("AABBCCDDEEFF", materials, io) {}
+        controller.start()
+        io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertEquals("??" + "A".repeat(62), controller.state.firmware)
+        assertTrue(io.logs.contains("software_revision length=102 hex=0aff" + "41".repeat(62)))
+        assertTrue(io.logs.none { '\n' in it || '\r' in it })
+        assertTrue(io.writes.isEmpty())
+        assertEquals(0, io.offerRequests)
     }
 
     @Test fun normalCheckStopsBeforeAnyFirmwareOrActivationWrite() {
