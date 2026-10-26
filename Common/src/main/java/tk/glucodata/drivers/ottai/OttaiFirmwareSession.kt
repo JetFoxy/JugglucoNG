@@ -50,6 +50,7 @@ internal class OttaiFirmwareSession private constructor(
     private var expectedService: UUID? = null
     private var operationTimeout: Runnable? = null
     private var discoveryStarted = false
+    private var discoveryGate: OttaiFirmwareDiscovery? = null
     private val recovery = AtomicFile(File(context.filesDir, "ottai-ota/$sensorId.bin"))
     private val controller = OttaiFirmwareController(sensorId, materials, this, mode) { state ->
         main.post { publish(state) }
@@ -115,6 +116,8 @@ internal class OttaiFirmwareSession private constructor(
     override fun rediscover(done: (Result<OttaiFirmwareGatt>) -> Unit) {
         val current = gatt
         if (!idle() || current == null) { controller.fail("rediscovery_unavailable"); return }
+        discoveryGate?.close()
+        discoveryGate = null
         connectCompletion = done
         discoveryStarted = false
         armTimeout("rediscovery_timeout")
@@ -124,7 +127,9 @@ internal class OttaiFirmwareSession private constructor(
     private fun discover(current: BluetoothGatt) {
         if (closed || gatt !== current || discoveryStarted) return
         discoveryStarted = true
-        if (!runCatching { current.discoverServices() }.getOrDefault(false)) controller.fail("discovery_start")
+        val started = runCatching { current.discoverServices() }.getOrDefault(false)
+        log("discovery_requested started=$started mtu=$mtu")
+        if (started) armTimeout("discovery_timeout") else controller.fail("discovery_start")
     }
 
     private val callbacks = object : BluetoothGattCallback() {
@@ -134,18 +139,29 @@ internal class OttaiFirmwareSession private constructor(
                 controller.fail("disconnected_status=$status")
             } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                 current.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                if (!current.requestMtu(247)) discover(current)
-                else after(2_000L) { discover(current) }
+                // Like the normal driver, defer discovery until the last MTU callback settles.
+                // Starting on the first of two callbacks can lose service discovery on Mi9T.
+                discoveryGate?.close()
+                val gate = OttaiFirmwareDiscovery(::after) { discover(current) }
+                discoveryGate = gate
+                val requested = current.requestMtu(247)
+                log("mtu_requested started=$requested")
+                gate.connected(requested)
             }
         }
 
         override fun onMtuChanged(current: BluetoothGatt, value: Int, status: Int) = dispatch(current) {
             if (status == BluetoothGatt.GATT_SUCCESS && value >= 23) mtu = value
             log("mtu=$mtu status=$status")
-            discover(current)
+            discoveryGate?.mtuChanged()
         }
 
         override fun onServicesDiscovered(current: BluetoothGatt, status: Int) = dispatch(current) {
+            if (!discoveryStarted || connectCompletion == null) {
+                log("discovery_callback_ignored status=$status")
+                return@dispatch
+            }
+            log("discovery_callback status=$status")
             if (status != BluetoothGatt.GATT_SUCCESS) { controller.fail("discovery_status=$status"); return@dispatch }
             current.services.forEach { service ->
                 log("service=${service.uuid} chars=${service.characteristics.joinToString { "${it.uuid}:${it.properties}" }}")
@@ -366,6 +382,8 @@ internal class OttaiFirmwareSession private constructor(
 
     override fun disconnect() {
         generation++
+        discoveryGate?.close()
+        discoveryGate = null
         cancelTimeout()
         val old = gatt
         gatt = null

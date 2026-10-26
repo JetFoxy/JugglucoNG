@@ -39,6 +39,13 @@ Keep the dialog open and the phone near the sensor during installation. It keeps
 awake. It is a foreground field test, not a background updater. Android can still stop the
 process, so an unfinished attempt is persisted before the first OTA write.
 
+The test connection waits 1.25 seconds after the last MTU callback before service discovery,
+matching the normal Ottai driver's handling of duplicate MTU callbacks. A missing MTU callback
+falls back after 2.5 seconds; a refused MTU request uses a 300 ms fallback. `OttaiOTA` records
+`mtu_requested`, `discovery_requested` and `discovery_callback`; discovery has a separate
+20-second timeout. On the initial connection, a stall before discovery precedes authentication
+and OTA.
+
 With one sensor, an OTA followed by parameter writes can establish that combined setup path.
 It cannot isolate the effect of firmware from factory provisioning on early readings.
 
