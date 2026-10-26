@@ -889,6 +889,8 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="data_smoothing_graph_only_desc">Gulukoosta hadda, widget-yada iyo digniinaha lama simayo</string>
     <string name="data_smoothing_exchange_only_title">Cabbirrada la diro oo keliya</string>
     <string name="data_smoothing_exchange_only_desc">Sim gudbinta iyo gelinta xogta. Cabbirrada abka ku jira lama simayo</string>
+    <string name="data_smoothing_causal_title">Shaandheeyaha Kalman ee qiimaha hadda</string>
+    <string name="data_smoothing_causal_desc">Wuxuu qiyaasaa akhrinta ugu dambeysay isagoo isticmaalaya oo keliya akhrinta hore (heerka iyo jihada), si qiimaha hadda la muujiyay oo la diray uu la mid noqdo kan taariikhdu kaydiso. Taariikhda garaafka iyo Nightscout waxay sii hayaan daaqadda celceliska</string>
     <string name="data_smoothing_collapse_title">Cabbirro ka yar</string>
     <string name="data_smoothing_collapse_desc">Soo bandhig oo dir cabbirro ka yar</string>
     <string name="data_smoothing_collapse_desc_match">Hal cabbir %1$d daqiiqo kasta</string>
@@ -3176,11 +3178,11 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="nightscout_secret_label">Sirta API ama token-ka gelitaanka</string>
     <string name="nightscout_api_help">v1 u isticmaal sirta API, v3-na token-ka gelitaanka Nightscout.</string>
     <string name="nightscout_iob_help">eIOB iyo COB waxaa lagu diraa qaybta jugglucong ee devicestatus, iyagoo ka gooni ah IOB-ga caadiga ah.</string>
-    <string name="medtrum_sensor_desc">Geli lambarka taxanaha ee ku daabacan balastarka (hexadecimal)</string>
+    <string name="medtrum_sensor_desc">Geli lambarka taxanaha ee ku daabacan gudbiyaha (hexadecimal)</string>
     <string name="medtrum_setup_saved_title">Dareemaha waa la keydiyay</string>
-    <string name="medtrum_setup_searching">Weli lama xiriirin. Balastarku wuu isku xiri doonaa marka uu u dhow yahay.</string>
-    <string name="medtrum_setup_auth_failed">Balastarku wuu diiday lambarkan taxanaha. Hubi lambarka ku daabacan balastarka.</string>
-    <string name="medtrum_setup_device_rejected">Qalabkani ma aha Medtrum balastar. Hubi in balastarku uu dhow yahay oo mar kale isku day.</string>
+    <string name="medtrum_setup_searching">Weli lama xiriirin. Gudbiyuhu wuu isku xiri doonaa marka uu u dhow yahay.</string>
+    <string name="medtrum_setup_auth_failed">Gudbiyuhu wuu diiday lambarkan taxanaha. Hubi lambarka ku daabacan gudbiyaha.</string>
+    <string name="medtrum_setup_device_rejected">Qalabkani ma aha Medtrum gudbiye. Hubi in gudbiyuhu uu dhow yahay oo mar kale isku day.</string>
 
     <string name="alert_sound_volume">Codka digniinta</string>
     <string name="dexcom_share_title">Dexcom Share</string>

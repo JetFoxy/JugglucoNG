@@ -831,6 +831,8 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="data_smoothing_graph_only_desc">Az aktuális glükóz, a widgetek és a riasztások simítás nélkül maradnak</string>
     <string name="data_smoothing_exchange_only_title">Csak a küldött értékekre</string>
     <string name="data_smoothing_exchange_only_desc">Az adásokat és feltöltéseket simítja. Az alkalmazásban az értékek simítás nélkül maradnak</string>
+    <string name="data_smoothing_causal_title">Kalman-szűrő az aktuális értékhez</string>
+    <string name="data_smoothing_causal_desc">A legutóbbi mérést csak a korábbi mérésekből becsüli (szint és trend), így a most megjelenített és elküldött érték megegyezik azzal, amit az előzmények megőriznek. A grafikon előzményei és a Nightscout az átlagolási ablakot használják</string>
     <string name="data_smoothing_collapse_title">Kevesebb mérési érték</string>
     <string name="data_smoothing_collapse_desc">Kevesebb érték megjelenítése és küldése</string>
     <string name="data_smoothing_collapse_desc_match">Egy érték %1$d percenként</string>
@@ -3066,11 +3068,11 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="nightscout_secret_label">API-titok vagy hozzáférési token</string>
     <string name="nightscout_api_help">A v1-hez API-titkot, a v3-hoz Nightscout-hozzáférési tokent használj.</string>
     <string name="nightscout_iob_help">Az eIOB és COB a devicestatus jugglucong mezőjében kerül elküldésre, a hagyományos IOB-tól külön.</string>
-    <string name="medtrum_sensor_desc">Adja meg a tapaszra nyomtatott sorozatszámot (hexadecimális)</string>
+    <string name="medtrum_sensor_desc">Adja meg a jeladóra nyomtatott sorozatszámot (hexadecimális)</string>
     <string name="medtrum_setup_saved_title">Szenzor mentve</string>
-    <string name="medtrum_setup_searching">Még nincs kapcsolat. A tapasz magától csatlakozik, ha hatótávon belül van.</string>
-    <string name="medtrum_setup_auth_failed">A tapasz elutasította ezt a sorozatszámot. Ellenőrizze a tapaszon lévő számot.</string>
-    <string name="medtrum_setup_device_rejected">Ez az eszköz nem Medtrum tapasz. Ellenőrizze, hogy a tapasz a közelben van-e, majd próbálja újra.</string>
+    <string name="medtrum_setup_searching">Még nincs kapcsolat. A jeladó magától csatlakozik, ha hatótávon belül van.</string>
+    <string name="medtrum_setup_auth_failed">A jeladó elutasította ezt a sorozatszámot. Ellenőrizze a jeladón lévő számot.</string>
+    <string name="medtrum_setup_device_rejected">Ez az eszköz nem Medtrum jeladó. Ellenőrizze, hogy a jeladó a közelben van-e, majd próbálja újra.</string>
 
     <string name="alert_sound_volume">Riasztási hang hangereje</string>
     <string name="dexcom_share_title">Dexcom Share</string>

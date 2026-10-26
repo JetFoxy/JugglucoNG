@@ -506,6 +506,8 @@
     <string name="data_smoothing_graph_only_desc">Aktuellt glukosvärde, widgetar och larm förblir outjämnade</string>
     <string name="data_smoothing_exchange_only_title">Endast skickade värden</string>
     <string name="data_smoothing_exchange_only_desc">Jämna ut sändningar och uppladdningar. Värden i appen förblir outjämnade</string>
+    <string name="data_smoothing_causal_title">Kalmanfilter för aktuellt värde</string>
+    <string name="data_smoothing_causal_desc">Uppskattar den senaste mätningen endast från tidigare mätningar (nivå och trend), så att värdet som visas och skickas nu är det som historiken behåller. Diagramhistorik och Nightscout behåller medelvärdesfönstret</string>
     <string name="data_smoothing_collapse_title">Färre mätvärden</string>
     <string name="data_smoothing_collapse_desc">Visa och skicka färre värden</string>
     <string name="data_smoothing_collapse_desc_match">Ett värde var %1$d min</string>
@@ -2991,11 +2993,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">API-hemlighet eller åtkomsttoken</string>
     <string name="nightscout_api_help">Använd API-hemligheten med v1 eller en Nightscout-åtkomsttoken med v3.</string>
     <string name="nightscout_iob_help">eIOB och COB skickas i fältet jugglucong i devicestatus, separat från vanlig IOB.</string>
-    <string name="medtrum_sensor_desc">Ange serienumret som står på plåstret (hexadecimalt)</string>
+    <string name="medtrum_sensor_desc">Ange serienumret som står på sändaren (hexadecimalt)</string>
     <string name="medtrum_setup_saved_title">Sensorn sparad</string>
-    <string name="medtrum_setup_searching">Inte ansluten än. Plåstret ansluter av sig själv när det är inom räckhåll.</string>
-    <string name="medtrum_setup_auth_failed">Plåstret avvisade serienumret. Kontrollera numret som står på plåstret.</string>
-    <string name="medtrum_setup_device_rejected">Den här enheten är inte ett Medtrum-plåster. Kontrollera att plåstret är inom räckhåll och försök igen.</string>
+    <string name="medtrum_setup_searching">Inte ansluten än. Sändaren ansluter av sig själv när den är inom räckhåll.</string>
+    <string name="medtrum_setup_auth_failed">Sändaren avvisade serienumret. Kontrollera numret som står på sändaren.</string>
+    <string name="medtrum_setup_device_rejected">Den här enheten är inte en Medtrum-sändare. Kontrollera att sändaren är inom räckhåll och försök igen.</string>
 
     <string name="alert_sound_volume">Volym för larmljud</string>
     <string name="dexcom_share_title">Dexcom Share</string>
