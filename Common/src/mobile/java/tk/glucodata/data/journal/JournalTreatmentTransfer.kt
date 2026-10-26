@@ -19,6 +19,7 @@ object JournalTreatmentTransfer {
     private const val SOURCE_KIND_FINGERSTICK = "fingerstick"
     private const val SOURCE_KIND_ACTIVITY = "activity"
     private const val SOURCE_KIND_NOTE = "note"
+    private const val SOURCE_KIND_TEMP_BASAL = "temp_basal"
     private const val MIN_VALID_EPOCH_MS = 946_684_800_000L
     private const val MGDL_PER_MMOLL = 18.0182f
 
@@ -27,7 +28,8 @@ object JournalTreatmentTransfer {
         SOURCE_KIND_INSULIN,
         SOURCE_KIND_FINGERSTICK,
         SOURCE_KIND_ACTIVITY,
-        SOURCE_KIND_NOTE
+        SOURCE_KIND_NOTE,
+        SOURCE_KIND_TEMP_BASAL
     )
 
     data class ParsedTreatment(
@@ -109,6 +111,16 @@ object JournalTreatmentTransfer {
                 val note = mergedNotes(entry.title, entry.note) ?: return null
                 json.put("eventType", "Note")
                     .put("notes", note)
+            }
+            JournalEntryType.TEMP_BASAL -> {
+                val rate = entry.amount ?: return null
+                // Nightscout's "duration" is minutes; the milliseconds go in their own field.
+                val durationMinutes = (entry.durationMinutes ?: 0).coerceAtLeast(0)
+                json.put("eventType", "Temp Basal")
+                    .put("rate", rate.toDouble())
+                    .put("absolute", rate.toDouble())
+                    .put("duration", durationMinutes)
+                    .put("durationInMilliseconds", durationMinutes * 60_000L)
             }
         }
 
@@ -248,6 +260,31 @@ object JournalTreatmentTransfer {
                     originSource = originSource,
                 )
             )
+        }
+
+        val isTemporaryBasal = explicitType == JournalEntryType.TEMP_BASAL ||
+            eventKey.contains("temp basal") ||
+            eventKey.contains("temporary basal")
+        if (isTemporaryBasal) {
+            // AAPS puts the delivered rate in U/h under "rate" (already converted from a
+            // percentage when the pump runs percent), so absolute-rate pumps land here too.
+            val rate = treatment.optFiniteFloat("rate", "absolute")
+            if (rate != null) {
+                inputs.add(
+                    JournalEntryInput(
+                        timestamp = safeTimestamp,
+                        type = JournalEntryType.TEMP_BASAL,
+                        title = titleSuffix ?: stringResource(R.string.journal_type_temp_basal),
+                        note = note,
+                        amount = rate,
+                        durationMinutes = treatment.optDurationMinutes(),
+                        source = source,
+                        sourceRecordId = sourceRecordId(sourcePrefix, baseId, SOURCE_KIND_TEMP_BASAL),
+                        nsRemoteId = nightscoutRemoteId,
+                        originSource = originSource,
+                    )
+                )
+            }
         }
 
         val glucoseMgdl = treatment.optGlucoseMgdl()

@@ -379,6 +379,7 @@ private fun JournalEntryType.historyFilterIcon(): ImageVector = when (this) {
     JournalEntryType.FINGERSTICK -> Icons.Default.Bloodtype
     JournalEntryType.ACTIVITY -> Icons.Default.DirectionsRun
     JournalEntryType.NOTE -> Icons.Default.Label
+    JournalEntryType.TEMP_BASAL -> Icons.Default.Vaccines
 }
 
 private fun HistoryFilterOption.historyFilterIcon(): ImageVector = when (this) {
@@ -754,7 +755,10 @@ fun HistoryBrowseScreen(
                 item(key = "history-journal-filter") {
                     val filterOptions = remember {
                         listOf(HistoryFilterOption.Readings) +
-                            JournalEntryType.entries.map { HistoryFilterOption.Journal(it) }
+                            // Temp basal segments never reach this list; they are chart-only.
+                            JournalEntryType.entries
+                                .filterNot { it == JournalEntryType.TEMP_BASAL }
+                                .map { HistoryFilterOption.Journal(it) }
                     }
                     val selectedFilterOptions = remember(showReadingRows, selectedJournalTypes) {
                         buildList {

@@ -8,7 +8,15 @@ enum class JournalEntryType(val storageValue: String) {
     CARBS("carbs"),
     FINGERSTICK("fingerstick"),
     ACTIVITY("activity"),
-    NOTE("note");
+    NOTE("note"),
+
+    /**
+     * A temporary basal imported from AAPS. Not user-addable and not a journal row in the
+     * UI sense: it exists so the graph can hang an "icicle" bar for the segment.
+     * [JournalEntry.amount] holds the delivered rate in U/h, [JournalEntry.durationMinutes]
+     * the segment length.
+     */
+    TEMP_BASAL("temp_basal");
 
     companion object {
         fun fromStorage(value: String?): JournalEntryType {
@@ -16,6 +24,10 @@ enum class JournalEntryType(val storageValue: String) {
         }
     }
 }
+
+/** The journal rows proper: everything but the AAPS temp basal chart segments. */
+fun List<JournalEntry>.withoutTempBasal(): List<JournalEntry> =
+    filterNot { it.type == JournalEntryType.TEMP_BASAL }
 
 enum class JournalIntensity(val storageValue: String) {
     LIGHT("light"),

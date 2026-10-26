@@ -2253,6 +2253,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_quick_actions">Quick log</string>
     <string name="journal_show_tab_title">Show Journal tab</string>
     <string name="journal_show_tab_desc">Add Journal to the main bottom navigation when journal tools are enabled</string>
+    <string name="journal_dashboard_types_title">Show on the main screen</string>
+    <string name="journal_dashboard_types_desc">Hidden entries leave the main chart and the reading list only. They still count toward IOB, COB, the prediction and the dose hints.</string>
+    <string name="journal_dashboard_temp_basal_desc">Bars from the top of the chart for AAPS temp basals</string>
     <string name="journal_events_today">%1$d events today</string>
     <string name="journal_metric_carbs_today">Carbs today</string>
     <string name="journal_metric_insulin_today">Insulin today</string>
@@ -2337,6 +2340,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_type_fingerstick">Fingerstick</string>
     <string name="journal_type_activity">Activity</string>
     <string name="journal_type_note">Note</string>
+    <string name="journal_type_temp_basal">Temp Basal</string>
     <string name="journal_source_pen">Read from pen</string>
     <string name="journal_source_nightscout">Received from Nightscout</string>
     <string name="journal_source_aaps">Received from AAPS</string>

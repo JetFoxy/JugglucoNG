@@ -129,6 +129,7 @@ import tk.glucodata.ui.components.ColorSwatchButton
 import tk.glucodata.ui.components.CompactSheetDragHandle
 import tk.glucodata.ui.ExpressiveColorPickerDialog
 import tk.glucodata.ui.components.MasterSwitchCard
+import tk.glucodata.data.journal.JournalEntryType
 import tk.glucodata.ui.components.SectionLabel
 import tk.glucodata.ui.components.SettingsItem
 import tk.glucodata.ui.components.SettingsSwitchItem
@@ -175,6 +176,7 @@ fun JournalSettingsScreen(
 ) {
     val journalEnabled by viewModel.journalEnabled.collectAsStateWithLifecycle()
     val journalNavigationTabEnabled by viewModel.journalNavigationTabEnabled.collectAsStateWithLifecycle()
+    val journalDashboardHiddenTypes by viewModel.journalDashboardHiddenTypes.collectAsStateWithLifecycle()
     val journalDoseCalculatorEnabled by viewModel.journalDoseCalculatorEnabled.collectAsStateWithLifecycle()
     val journalFoodLibraryEnabled by viewModel.journalFoodLibraryEnabled.collectAsStateWithLifecycle()
     val journalQuickAddAlwaysNow by viewModel.journalQuickAddAlwaysNow.collectAsStateWithLifecycle()
@@ -261,6 +263,42 @@ fun JournalSettingsScreen(
                         )
                     }
                 )
+            }
+            item(key = "dashboard_types_label") {
+                SectionLabel(
+                    text = stringResource(R.string.journal_dashboard_types_title),
+                    topPadding = 4.dp
+                )
+            }
+            item(key = "dashboard_types_group") {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    JournalEntryType.entries.forEachIndexed { index, type ->
+                        SettingsSwitchItem(
+                            title = type.journalActionLabel(),
+                            subtitle = if (type == JournalEntryType.TEMP_BASAL) {
+                                stringResource(R.string.journal_dashboard_temp_basal_desc)
+                            } else {
+                                null
+                            },
+                            checked = type !in journalDashboardHiddenTypes,
+                            onCheckedChange = { viewModel.setJournalTypeShownOnDashboard(type, it) },
+                            icon = type.journalActionIcon(),
+                            iconTint = journalTypeColor(type),
+                            position = when (index) {
+                                0 -> CardPosition.TOP
+                                JournalEntryType.entries.lastIndex -> CardPosition.BOTTOM
+                                else -> CardPosition.MIDDLE
+                            },
+                            enabled = journalEnabled
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.journal_dashboard_types_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 6.dp, end = 16.dp)
+                    )
+                }
             }
             item(key = "journal_intelligence") {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

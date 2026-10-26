@@ -150,6 +150,7 @@ import tk.glucodata.R
 import tk.glucodata.MainActivity
 import tk.glucodata.UiRefreshBus
 import android.widget.Toast
+import tk.glucodata.data.journal.JournalDashboardVisibility
 import tk.glucodata.data.journal.JournalEntry
 import tk.glucodata.data.journal.JournalEntryType
 import tk.glucodata.data.journal.JournalFood
@@ -394,6 +395,8 @@ fun DashboardScreen(
     val predictionCarbAbsorptionGramsPerHour by viewModel.predictionCarbAbsorptionGramsPerHour.collectAsStateWithLifecycle()
     val predictionHorizonMinutes by viewModel.predictionHorizonMinutes.collectAsStateWithLifecycle()
     val journalEntries by viewModel.journalEntries.collectAsStateWithLifecycle()
+    val journalTempBasals by viewModel.journalTempBasals.collectAsStateWithLifecycle()
+    val journalDashboardHiddenTypes by viewModel.journalDashboardHiddenTypes.collectAsStateWithLifecycle()
     val journalInsulinPresets by viewModel.journalInsulinPresets.collectAsStateWithLifecycle()
     val journalFoods by viewModel.journalFoods.collectAsStateWithLifecycle()
     val sensorStatus by viewModel.sensorStatus.collectAsStateWithLifecycle()
@@ -452,14 +455,35 @@ fun DashboardScreen(
     val scopedJournalEntries = remember(journalEnabled, journalEntries) {
         if (!journalEnabled) emptyList() else journalEntries
     }
+    // What the main screen draws: the types the journal settings leave shown, plus the AAPS
+    // temp basal icicles. Hiding is visual only — IOB, COB, the prediction and the dose
+    // hints below keep reading scopedJournalEntries, so a hidden bolus still counts.
+    val dashboardJournalEntries = remember(scopedJournalEntries, journalDashboardHiddenTypes) {
+        JournalDashboardVisibility.visible(scopedJournalEntries, journalDashboardHiddenTypes)
+    }
+    val dashboardTempBasals = remember(journalEnabled, journalTempBasals, journalDashboardHiddenTypes) {
+        if (!journalEnabled || JournalEntryType.TEMP_BASAL in journalDashboardHiddenTypes) {
+            emptyList()
+        } else {
+            journalTempBasals
+        }
+    }
     // Deliberately not keyed on glucoseHistory: the markers do not depend on it,
     // and keying on it rebuilt the list — and so recomposed the chart — on every
     // new reading, once a minute, for an identical result.
-    val journalChartMarkers = remember(journalEnabled, scopedJournalEntries, journalPresetsById, journalFoodsById, unit) {
-        if (!journalEnabled || scopedJournalEntries.isEmpty()) {
+    val journalChartMarkers = remember(
+        journalEnabled,
+        dashboardJournalEntries,
+        dashboardTempBasals,
+        journalPresetsById,
+        journalFoodsById,
+        unit
+    ) {
+        val chartEntries = dashboardJournalEntries + dashboardTempBasals
+        if (!journalEnabled || chartEntries.isEmpty()) {
             emptyList()
         } else {
-            buildJournalChartMarkers(scopedJournalEntries, journalPresetsById, unit, journalFoodsById)
+            buildJournalChartMarkers(chartEntries, journalPresetsById, unit, journalFoodsById)
         }
     }
     val localInsulinSummary = remember(journalEnabled, scopedJournalEntries, journalPresetsById, journalNow) {
@@ -1347,8 +1371,8 @@ fun DashboardScreen(
             val peerSeriesById = remember(multiSensorDisplay) {
                 multiSensorDisplay.series.associateBy { it.sensorId }
             }
-            val recentReadingJournalEntries = remember(recentReadings, scopedJournalEntries) {
-                groupJournalEntriesByReading(recentReadings, scopedJournalEntries)
+            val recentReadingJournalEntries = remember(recentReadings, dashboardJournalEntries) {
+                groupJournalEntriesByReading(recentReadings, dashboardJournalEntries)
             }
             val hasVisibleReadingContent = dashboardDataState.isFresh || recentReadings.isNotEmpty()
 

@@ -753,6 +753,7 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
             JournalEntryType.FINGERSTICK -> "BG Check"
             JournalEntryType.ACTIVITY -> "Exercise"
             JournalEntryType.NOTE -> "Note"
+            JournalEntryType.TEMP_BASAL -> "Temp Basal"
         }
 
     private fun finiteOrNull(value: Float?): Any? =

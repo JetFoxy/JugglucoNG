@@ -36,8 +36,10 @@ import tk.glucodata.SensorIdentity
 import tk.glucodata.data.GlucoseRepository
 import tk.glucodata.data.HistorySync
 import tk.glucodata.data.journal.AapsJournalImport
+import tk.glucodata.data.journal.JournalDashboardVisibility
 import tk.glucodata.data.journal.JournalEntry
 import tk.glucodata.data.journal.JournalEntryInput
+import tk.glucodata.data.journal.JournalEntryType
 import tk.glucodata.data.journal.JournalFood
 import tk.glucodata.data.journal.JournalFoodInput
 import tk.glucodata.data.journal.JournalInsulinPreset
@@ -437,6 +439,9 @@ class DashboardViewModel(
     private val _journalNavigationTabEnabled = MutableStateFlow(false)
     val journalNavigationTabEnabled = _journalNavigationTabEnabled.asStateFlow()
 
+    private val _journalDashboardHiddenTypes = MutableStateFlow<Set<JournalEntryType>>(emptySet())
+    val journalDashboardHiddenTypes = _journalDashboardHiddenTypes.asStateFlow()
+
     private val _journalDoseCalculatorEnabled = MutableStateFlow(false)
     val journalDoseCalculatorEnabled = _journalDoseCalculatorEnabled.asStateFlow()
 
@@ -548,6 +553,11 @@ class DashboardViewModel(
     private val _journalEntries = MutableStateFlow<List<JournalEntry>>(emptyList())
     val journalEntries = _journalEntries.asStateFlow()
 
+    // AAPS temp basal segments, kept apart from the journal rows: the chart hangs them as
+    // icicles, and nothing that lists, counts or doses journal rows should see them.
+    private val _journalTempBasals = MutableStateFlow<List<JournalEntry>>(emptyList())
+    val journalTempBasals = _journalTempBasals.asStateFlow()
+
     private val _journalInsulinPresets = MutableStateFlow<List<JournalInsulinPreset>>(emptyList())
     val journalInsulinPresets = _journalInsulinPresets.asStateFlow()
 
@@ -621,7 +631,11 @@ class DashboardViewModel(
     private fun ensureJournalEntriesObserved() {
         if (journalEntriesJob?.isActive == true) return
         journalEntriesJob = viewModelScope.launch {
-            journalRepository.observeEntries().collect { _journalEntries.value = it }
+            journalRepository.observeEntriesWithTempBasal().collect { entries ->
+                val (tempBasals, rows) = entries.partition { it.type == JournalEntryType.TEMP_BASAL }
+                _journalEntries.value = rows
+                _journalTempBasals.value = tempBasals
+            }
         }
     }
 
@@ -848,6 +862,9 @@ class DashboardViewModel(
         val journalEnabled = prefs.getBoolean("dashboard_journal_enabled", true)
         _journalEnabled.value = journalEnabled
         _journalNavigationTabEnabled.value = prefs.getBoolean(JOURNAL_NAVIGATION_TAB_KEY, false)
+        _journalDashboardHiddenTypes.value = JournalDashboardVisibility.decode(
+            prefs.getStringSet(JournalDashboardVisibility.HIDDEN_TYPES_KEY, null)
+        )
         _journalDoseCalculatorEnabled.value = prefs.getBoolean(JOURNAL_DOSE_CALCULATOR_KEY, false)
         _stateDoseHintEnabled.value = prefs.getBoolean(STATE_DOSE_HINT_KEY, true)
         _stateDoseHintCorrectInRange.value = prefs.getBoolean(STATE_DOSE_HINT_IN_RANGE_KEY, true)
@@ -1801,6 +1818,14 @@ class DashboardViewModel(
         val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
         prefs.edit().putBoolean(JOURNAL_NAVIGATION_TAB_KEY, enabled).apply()
         _journalNavigationTabEnabled.value = enabled
+    }
+
+    fun setJournalTypeShownOnDashboard(type: JournalEntryType, visible: Boolean) {
+        val hidden = JournalDashboardVisibility.toggled(_journalDashboardHiddenTypes.value, type, visible)
+        val context = tk.glucodata.Applic.app
+        val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putStringSet(JournalDashboardVisibility.HIDDEN_TYPES_KEY, JournalDashboardVisibility.encode(hidden)).apply()
+        _journalDashboardHiddenTypes.value = hidden
     }
 
     fun setJournalDoseCalculatorEnabled(enabled: Boolean) {

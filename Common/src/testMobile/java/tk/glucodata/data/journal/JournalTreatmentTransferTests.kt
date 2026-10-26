@@ -220,9 +220,12 @@ class JournalTreatmentTransferTests {
         stringResource = { "Entry" },
     )
 
-    /** AAPS signs every treatment; a temp basal is nothing the journal has a place for. */
+    /**
+     * AAPS signs every treatment; a temp basal becomes a chart segment, never a note
+     * made of the sender stamp.
+     */
     @Test
-    fun anAapsTreatmentCarryingOnlyItsSenderIsNotANote() {
+    fun anAapsTempBasalIsASegmentNotANote() {
         val tempBasal = JSONObject()
             .put("_id", "aaps-temp-basal")
             .put("date", 1_786_794_604_000L)
@@ -231,6 +234,23 @@ class JournalTreatmentTransferTests {
             .put("app", "AAPS")
             .put("duration", 30)
             .put("absolute", 0.4)
+
+        val entry = parseAaps(tempBasal)!!.inputs.single()
+        assertEquals(JournalEntryType.TEMP_BASAL, entry.type)
+        assertEquals(0.4f, entry.amount!!, 0.0001f)
+        assertEquals(30, entry.durationMinutes)
+        assertEquals("aaps:aaps-temp-basal:temp_basal", entry.sourceRecordId)
+    }
+
+    /** A temp basal with no rate carries nothing to draw and takes away what it brought. */
+    @Test
+    fun anAapsTempBasalWithoutARateIsDeleteOnly() {
+        val tempBasal = JSONObject()
+            .put("_id", "aaps-temp-basal")
+            .put("date", 1_786_794_604_000L)
+            .put("eventType", "Temp Basal")
+            .put("enteredBy", "openaps://AndroidAPS")
+            .put("duration", 30)
 
         val parsed = parseAaps(tempBasal)!!
         assertTrue(parsed.inputs.isEmpty())

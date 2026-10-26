@@ -29,6 +29,17 @@ class JournalRepository {
     // write re-mapped every entry ever written on the main thread. flowOn keeps
     // the mapping with the query.
     fun observeEntries(): Flow<List<JournalEntry>> {
+        return observeEntriesWithTempBasal()
+            // Temp basal is an AAPS-imported graph segment, not a journal row.
+            .map { it.withoutTempBasal() }
+            .flowOn(Dispatchers.Default)
+    }
+
+    /**
+     * Every stored row, temp basal included. Only the chart wants the temp basal segments;
+     * everything that lists, counts or doses journal rows uses [observeEntries].
+     */
+    fun observeEntriesWithTempBasal(): Flow<List<JournalEntry>> {
         return dao.observeEntries()
             .map { entries -> entries.map(JournalEntryEntity::toModel) }
             .flowOn(Dispatchers.Default)

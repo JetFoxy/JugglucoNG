@@ -3290,7 +3290,51 @@ fun InteractiveGlucoseChart(
                 }
                 if (visibleJournalMarkers.isNotEmpty()) {
                     val visibleInsulinMarkers = visibleJournalMarkers.filter { it.type == JournalEntryType.INSULIN }
-                    val visibleEventMarkers = visibleJournalMarkers.filter { it.type != JournalEntryType.INSULIN }
+                    val visibleTempBasalMarkers = visibleJournalMarkers.filter { it.type == JournalEntryType.TEMP_BASAL }
+                    val visibleEventMarkers = visibleJournalMarkers.filter {
+                        it.type != JournalEntryType.INSULIN && it.type != JournalEntryType.TEMP_BASAL
+                    }
+
+                    if (visibleTempBasalMarkers.isNotEmpty()) {
+                        // AAPS temp basal as "icicles": bars hung from the top edge, length
+                        // proportional to the delivered rate in U/h; a 0 U/h segment draws nothing.
+                        val maxRate = visibleTempBasalMarkers
+                            .mapNotNull { it.amount }
+                            .filter { it > 0f }
+                            .maxOrNull()
+                            ?.coerceAtLeast(1f)
+                            ?: 1f
+                        val maxBarHeight = chartHeight * 0.32f
+                        val minBarWidth = 1.5.dp.toPx()
+                        // A new temp basal replaces the running one, and the replaced record
+                        // does not always come back shortened: end each at the next one's start.
+                        val tempBasalsByStart = visibleTempBasalMarkers
+                            .sortedBy { it.activeStartMillis ?: it.timestamp }
+                        tempBasalsByStart.forEachIndexed { index, marker ->
+                            val rate = marker.amount ?: 0f
+                            if (rate <= 0f) return@forEachIndexed
+                            val start = marker.activeStartMillis ?: marker.timestamp
+                            val nextStart = tempBasalsByStart.getOrNull(index + 1)
+                                ?.let { it.activeStartMillis ?: it.timestamp }
+                            val end = minOf(
+                                marker.activeEndMillis ?: return@forEachIndexed,
+                                nextStart ?: Long.MAX_VALUE
+                            )
+                            if (end <= start) return@forEachIndexed
+                            val startX = timeToDataX(start).coerceIn(0f, dataWidth)
+                            val endX = timeToDataX(end).coerceIn(0f, dataWidth)
+                            if (endX <= 0f || startX >= dataWidth) return@forEachIndexed
+                            val left = minOf(startX, endX)
+                            val right = maxOf(startX, endX)
+                            val barHit = (rate / maxRate).coerceIn(0f, 1f)
+                            val barHeight = (barHit * maxBarHeight).coerceAtLeast(2.dp.toPx())
+                            drawRect(
+                                color = Color(marker.accentColor),
+                                topLeft = Offset(left, 0f),
+                                size = Size((right - left).coerceAtLeast(minBarWidth), barHeight)
+                            )
+                        }
+                    }
 
                     if (visibleInsulinMarkers.isNotEmpty()) {
                         val baseCurveHeight = (chartHeight * 0.018f).coerceIn(5.dp.toPx(), 12.dp.toPx())
@@ -3628,9 +3672,12 @@ fun InteractiveGlucoseChart(
             val journalChipReachPx = journalChipSideOffsetPx + journalChipChromePx + journalChipMaxTextPx +
                 journalChipLayoutSpec.maxNudge * journalChipNudgePx
             val journalChipReachMillis = (journalChipReachPx * overlayDuration / overlayDataWidthPx).toLong()
+            // Temp basal is drawn only as its icicle: AAPS sets one every few minutes, and a
+            // chip for each would bury the curve.
             val chipMarkers = journalMarkers
                 .filter { marker ->
-                    marker.timestamp in (overlayViewportStart - journalChipReachMillis)..(overlayViewportEnd + journalChipReachMillis)
+                    marker.type != JournalEntryType.TEMP_BASAL &&
+                        marker.timestamp in (overlayViewportStart - journalChipReachMillis)..(overlayViewportEnd + journalChipReachMillis)
                 }
                 .sortedWith(compareBy({ it.timestamp }, { it.entryId }))
             val chipAnchorXs = chipMarkers.map { marker ->
@@ -5356,6 +5403,7 @@ private fun JournalMarkerChip(
                         JournalEntryType.FINGERSTICK -> Icons.Default.Bloodtype
                         JournalEntryType.ACTIVITY -> Icons.Default.DirectionsRun
                         JournalEntryType.NOTE -> Icons.AutoMirrored.Filled.Label
+                        JournalEntryType.TEMP_BASAL -> Icons.Default.Vaccines
                     },
                     contentDescription = null,
                     tint = tint,
