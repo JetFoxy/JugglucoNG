@@ -94,6 +94,11 @@ its separate provisioning flow.
   successful version-appropriate preparation in Fresh sensor mode, or verified target
   firmware/authentication/status observation in Started sensor mode. If the old application still boots, the
   separate parameter-only action can finish preparation without completing the update.
+- When the old application still boots on the saved source revision, the validated journal
+  package is reused without another firmware offer or download. In Fresh sensor mode the
+  authenticated parameter-only action remains available, including after a firmware-download
+  failure. It still needs the CN API to refresh materials and successful factory-write ACKs;
+  bootloader-only recovery cannot run that action.
 - An OTA success report is attempted only after matching BLE version readback and a fresh
   authenticated status allowed by the selected mode. Report failure does not substitute for sensor evidence.
 - Recovery retains the original experiment mode and started-sensor baseline. Select the same
@@ -114,6 +119,9 @@ Factory provisioning follows #727's reported version gates:
 - V1.8 calibration: `0B | AES(session, float64 LE k | float64 LE b)`.
 - Missing/nonfinite values stop preparation. In V1.8 both packets are constructed and
   validated before either factory write. No default calibration is invented.
+- Refreshed preactivation materials are saved with `activeTimeMs = 0`: the bind response's
+  echoed request timestamp is not an activation time. Warmup starts from the later actual
+  activation, and corroborated live anchors can then establish the confirmed start.
 
 Only the recovered V1.3–V1.8 profiles and version-named HTTPS `.gbl` offers are accepted.
 Download redirects must remain HTTPS; cloud authorization headers are not sent to download

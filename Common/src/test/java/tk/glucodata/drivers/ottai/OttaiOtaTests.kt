@@ -129,6 +129,8 @@ class OttaiFirmwareControllerTests {
         var durationSeconds = 28L * 86_400
         var dataNo = 720
         var optionalUnavailable = false
+        var offerFailure: String? = null
+        var offerRequests = 0
         override fun connect(done: (Result<OttaiFirmwareGatt>) -> Unit) { connected = done }
         override fun rediscover(done: (Result<OttaiFirmwareGatt>) -> Unit) {
             done(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
@@ -153,7 +155,10 @@ class OttaiFirmwareControllerTests {
         }
         override fun after(delayMs: Long, action: () -> Unit) { scheduled += action }
         fun tick() { scheduled.removeFirst().invoke() }
-        override fun prepareImage(version: String, done: (Result<OttaiFirmwareImage?>) -> Unit) { done(Result.success(image)) }
+        override fun prepareImage(version: String, done: (Result<OttaiFirmwareImage?>) -> Unit) {
+            offerRequests++
+            done(offerFailure?.let { Result.failure(IllegalStateException(it)) } ?: Result.success(image))
+        }
         override fun refreshMaterials(version: String, done: (Result<OttaiRegistry.DeviceMaterials>) -> Unit) {
             refresh = done
             fresh?.let { done(Result.success(it)) }
@@ -168,9 +173,11 @@ class OttaiFirmwareControllerTests {
     }
 
     private fun normal(version: String = "V1.7.0", command: Int = 0, badSignature: Boolean = false,
-        mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION): Pair<OttaiFirmwareController, FakeIo> {
+        mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION,
+        configure: (FakeIo) -> Unit = {}): Pair<OttaiFirmwareController, FakeIo> {
         val io = FakeIo(image.copy(source = version, target = "V1.8.1"))
         io.commandStatus = command
+        configure(io)
         val device = OttaiBleAuth.generateKeyPair()
         val (x, y) = OttaiBleAuth.publicCoords(device.public as java.security.interfaces.ECPublicKey)
         val time = byteArrayOf(1, 2, 3)
@@ -218,6 +225,66 @@ class OttaiFirmwareControllerTests {
         assertFalse(io.saved)
         assertFalse(io.reported)
         assertFalse(io.cleared)
+    }
+
+    @Test fun oldApplicationRecoveryReusesSavedPackageWhenFirmwareHostIsUnavailable() {
+        val (controller, io) = normal {
+            it.journal = image
+            it.offerFailure = "download_status"
+        }
+        assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
+        assertEquals(0, io.offerRequests)
+        assertTrue(controller.state.recovery)
+        assertTrue(controller.state.canPrepareParameters)
+        assertEquals(image.image.sha256, controller.state.sha256)
+        io.fresh = materials
+        controller.prepareOnly()
+        io.tick(); io.acknowledge()
+        assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+        assertTrue(io.cleared)
+        assertFalse(io.writes.any { it.first == OttaiConstants.CHAR_OTA_CONTROL || it.first == OttaiConstants.CHAR_OTA_DATA })
+    }
+
+    @Test fun authenticatedParameterPreparationSurvivesDownloadFailure() {
+        val (controller, io) = normal { it.offerFailure = "download_status" }
+        assertEquals(OttaiFirmwareStage.NO_UPDATE, controller.state.stage)
+        assertEquals("download_status", controller.state.errorCode)
+        assertTrue(controller.state.canPrepareParameters)
+        io.fresh = materials
+        controller.prepareOnly()
+        io.tick(); io.acknowledge()
+        assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+        assertTrue(io.cleared)
+    }
+
+    @Test fun firmwareDownloadFailureDoesNotEnableProvisioningForStartedSensors() {
+        val (controller, io) = normal(command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR) {
+            it.offerFailure = "download_status"
+        }
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertFalse(controller.state.canPrepareParameters)
+        controller.prepareOnly()
+        assertNull(io.refresh)
+    }
+
+    @Test fun failedParameterWriteLeavesTheRecoveryJournalBlockingActivation() {
+        val (controller, io) = normal { it.journal = image }
+        io.fresh = materials
+        controller.prepareOnly()
+        io.tick()
+        io.acknowledge(Result.failure(IllegalStateException("att_128")))
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertFalse(io.cleared)
+        assertNotNull(io.journal)
+    }
+
+    @Test fun bootloaderRecoveryStillCannotWriteFactoryParameters() {
+        val (controller, io) = recovery()
+        assertFalse(controller.state.canPrepareParameters)
+        controller.prepareOnly()
+        assertNull(io.refresh)
+        assertTrue(io.writes.isEmpty())
+        assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
     }
 
     @Test fun startedModeChecksAndRecordsBaselineWithoutWritingParameters() {

@@ -92,7 +92,8 @@ private fun OttaiFirmwareSessionDialog(sensorId: String, address: String, mode: 
             mode == OttaiFirmwareMode.STARTED_SENSOR -> R.string.ottai_ota_started_ready
             else -> R.string.ottai_ota_ready
         }
-        OttaiFirmwareStage.NO_UPDATE -> R.string.ottai_ota_no_update
+        OttaiFirmwareStage.NO_UPDATE -> if (state.canPrepareParameters && state.errorCode.isNotEmpty())
+            R.string.ottai_ota_parameters else R.string.ottai_ota_no_update
         OttaiFirmwareStage.INSTALLING -> R.string.ottai_ota_installing
         OttaiFirmwareStage.RECONNECTING -> R.string.ottai_ota_reconnecting
         OttaiFirmwareStage.PREPARING -> R.string.ottai_ota_preparing
@@ -133,7 +134,7 @@ private fun OttaiFirmwareSessionDialog(sensorId: String, address: String, mode: 
                     Button(onClick = { confirmInstall = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                         shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.ottai_ota_install)) }
                 }
-                if (mode == OttaiFirmwareMode.PREACTIVATION && !state.recovery &&
+                if (state.canPrepareParameters &&
                     state.stage in setOf(OttaiFirmwareStage.READY, OttaiFirmwareStage.NO_UPDATE)) {
                     OutlinedButton(onClick = { confirmParameters = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                         shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.ottai_ota_parameters)) }

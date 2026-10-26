@@ -39,6 +39,34 @@ class OttaiOtaPersistenceTests {
         assertNull(OttaiRegistry.loadMaterials(context, id).calibrationValueB)
     }
 
+    @Test fun preparationBindEchoCannotBecomeTheWarmupStart() {
+        val now = System.currentTimeMillis()
+        val actualActivationTime = now - 60_000L
+        val preparationTime = actualActivationTime - 3_600_000L
+        val echoed = OttaiRegistry.DeviceMaterials("00".repeat(96), "V0", "1,2", preparationTime,
+            "V1.7.0", 1)
+        val prepared = OttaiFirmwareSession.savePreparedMaterials(context, id, echoed)
+        assertEquals(0L, prepared.activeTimeMs)
+        assertEquals(0L, OttaiRegistry.loadMaterials(context, id).activeTimeMs)
+        val manager = OttaiBleManager(id, 0)
+        try {
+            manager.restoreFromPersistence(context)
+            val anchor = OttaiBleManager::class.java.getDeclaredMethod("warmupAnchorMs").apply { isAccessible = true }
+            assertEquals(0L, anchor.invoke(manager))
+            OttaiBleManager::class.java.getDeclaredField("activationCommandSentAtMs").apply {
+                isAccessible = true
+                setLong(manager, actualActivationTime)
+            }
+            assertEquals(actualActivationTime, anchor.invoke(manager))
+            assertTrue(OttaiConstants.isWithinWarmup(anchor.invoke(manager) as Long, now))
+            val confirm = OttaiBleManager::class.java.getDeclaredMethod("offerConfirmedActiveTime", Long::class.javaPrimitiveType)
+                .apply { isAccessible = true }
+            confirm.invoke(manager, actualActivationTime)
+            confirm.invoke(manager, actualActivationTime)
+            assertEquals(actualActivationTime, OttaiRegistry.loadMaterials(context, id).activeTimeMs)
+        } finally { manager.close() }
+    }
+
     @Test fun otaResponseKeepsMandatoryAndAllowedSeparateAndRejectsMissingFlags() {
         val offer = OttaiCloudClient.parseOtaOffer(JSONObject("""{"data":{"requiredUpgrade":true,"allowUpgrade":false,"downloadUrl":"https://cdn.example/V1.8.0.gbl"}}"""))
         assertTrue(offer.required)

@@ -59,6 +59,15 @@ internal class OttaiFirmwareSession private constructor(
     fun dispose() { handler.post { controller.close() } }
 
     companion object {
+        internal fun savePreparedMaterials(context: Context, sensorId: String,
+            fresh: OttaiRegistry.DeviceMaterials): OttaiRegistry.DeviceMaterials {
+            // bindV3 echoes its request timestamp even for a sensor confirmed unactivated.
+            // Preparation cannot start warmup; only the subsequent activation can supply that.
+            val prepared = fresh.copy(activeTimeMs = 0L)
+            require(OttaiRegistry.saveMaterials(context, sensorId, prepared)) { "materials_save" }
+            return prepared
+        }
+
         fun hasPendingTransfer(context: Context, sensorId: String): Boolean {
             val id = OttaiConstants.canonicalSensorId(sensorId)
             if (!OttaiConstants.looksLikeMac(id)) return false
@@ -317,8 +326,7 @@ internal class OttaiFirmwareSession private constructor(
         }) { result ->
             done(result.mapCatching { fresh ->
                 // Commit only on the still-current session's serial owner, never in a late worker.
-                require(OttaiRegistry.saveMaterials(context, sensorId, fresh)) { "materials_save" }
-                fresh
+                savePreparedMaterials(context, sensorId, fresh)
             })
         }
     }
