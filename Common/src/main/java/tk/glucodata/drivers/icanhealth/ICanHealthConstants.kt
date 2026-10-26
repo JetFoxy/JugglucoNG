@@ -36,6 +36,9 @@ object ICanHealthConstants {
     private val SERIAL_ALNUM_16_32: Regex = Regex("^[0-9A-Z]{16,32}$", RegexOption.IGNORE_CASE)
     private val FULL_CANONICAL_HEX_SENSOR_ID_REGEX = Regex("^[0-9A-Z]{16}$", RegexOption.IGNORE_CASE)
 
+    /** Serial token embedded in an advertised name, e.g. `iCGM-<16 hex>`. */
+    private val ADVERTISED_SERIAL_TOKEN: Regex = Regex("[0-9A-Za-z]{16,32}")
+
     const val TAG = "ICanHealth"
     const val MAX_NATIVE_SENSOR_ID_CHARS = 16
     const val PROVISIONAL_SENSOR_PREFIX = "ICN-"
@@ -337,6 +340,30 @@ object ICanHealthConstants {
         return expected.length == 12 &&
             observed.length >= 8 &&
             expected.substring(2, 9) == observed.substring(1, 8)
+    }
+
+    /**
+     * True when [advertisedName] carries a serial token that belongs to a different sensor than
+     * [onboardingDeviceSn]. Only a token that is actually present is judged: names without one
+     * (`CGM`, `Sinocare CGM`) stay eligible, because the name check is deliberately broad so
+     * unknown OEM rebrands still pair, and the post-connection identity gate rejects a device
+     * that turns out not to be the onboarding sensor.
+     */
+    @JvmStatic
+    fun advertisedNameConflictsWithOnboarding(
+        onboardingDeviceSn: String?,
+        advertisedName: String?,
+    ): Boolean {
+        if (onboardingDeviceSn.isNullOrBlank()) {
+            return false
+        }
+        val name = advertisedName?.trim().orEmpty()
+        if (name.isEmpty()) {
+            return false
+        }
+        val serialToken = ADVERTISED_SERIAL_TOKEN.find(name)?.value ?: return false
+        return !matchesOnboardingIdentity(onboardingDeviceSn, serialToken) &&
+            !matchesOnboardingIdentity(onboardingDeviceSn, name)
     }
 
     private fun sanitizeSensorIdentity(source: String?): String =

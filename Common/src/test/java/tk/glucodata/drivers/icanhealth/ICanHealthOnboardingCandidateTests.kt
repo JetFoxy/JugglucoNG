@@ -74,4 +74,52 @@ class ICanHealthOnboardingCandidateTests {
         assertFalse(ICanHealthConstants.isConclusivelyNotCgm(listOf(gap, gattService)))
         assertFalse(ICanHealthConstants.isConclusivelyNotCgm(listOf(ICanHealthConstants.CGM_SERVICE)))
     }
+
+    @Test
+    fun aNamedCandidateAdvertisingAnotherSensorsSerialIsSkippedDuringOnboarding() {
+        assertTrue(
+            ICanHealthConstants.advertisedNameConflictsWithOnboarding(
+                "ZA1OR03MSE50",
+                "iCGM-0123456789ABCDEF",
+            )
+        )
+    }
+
+    @Test
+    fun aNamedCandidateAdvertisingTheOnboardingSerialStaysEligible() {
+        // Production layout: ZA1OR03MSE50 (active code) -> 01OR03MS00070101 (DIS serial).
+        assertFalse(
+            ICanHealthConstants.advertisedNameConflictsWithOnboarding(
+                "ZA1OR03MSE50",
+                "01OR03MS00070101",
+            )
+        )
+        assertFalse(
+            ICanHealthConstants.advertisedNameConflictsWithOnboarding(
+                "ZA1OR03MSE50",
+                "iCGM-01OR03MS00070101",
+            )
+        )
+    }
+
+    @Test
+    fun aGenericNameWithoutASerialStaysPairableDuringOnboarding() {
+        assertFalse(ICanHealthConstants.advertisedNameConflictsWithOnboarding("ZA1OR03MSE50", "CGM"))
+        assertFalse(ICanHealthConstants.advertisedNameConflictsWithOnboarding("ZA1OR03MSE50", "Sinocare CGM"))
+        assertFalse(ICanHealthConstants.advertisedNameConflictsWithOnboarding("ZA1OR03MSE50", null))
+        assertFalse(ICanHealthConstants.advertisedNameConflictsWithOnboarding("ZA1OR03MSE50", "  "))
+    }
+
+    @Test
+    fun aShortSerialShapedNameStaysOnThePostConnectionGate() {
+        // The Anytime transmitter from the trace: matched by the broad name check, then
+        // rejected once its GATT table shows no CGM service.
+        assertFalse(ICanHealthConstants.advertisedNameConflictsWithOnboarding("ZA1OR03MSE50", "SN9150002398"))
+    }
+
+    @Test
+    fun withoutAnOnboardingSnNoCandidateIsFilteredByName() {
+        assertFalse(ICanHealthConstants.advertisedNameConflictsWithOnboarding(null, "iCGM-0123456789ABCDEF"))
+        assertFalse(ICanHealthConstants.advertisedNameConflictsWithOnboarding("", "iCGM-0123456789ABCDEF"))
+    }
 }
