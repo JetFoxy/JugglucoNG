@@ -82,7 +82,7 @@ object CurrentDisplaySource {
         if (causal) requestedMs.coerceAtLeast(CausalGlucoseFilter.WINDOW_MS) else requestedMs
 
     /** Whether [points] holds a reading no older than [maxAgeMs] at [nowMs]. */
-    internal fun hasFreshReading(points: List<GlucosePoint>, nowMs: Long, maxAgeMs: Long): Boolean =
+    internal fun hasReadingWithin(points: List<GlucosePoint>, nowMs: Long, maxAgeMs: Long): Boolean =
         points.any { nowMs - it.timestamp <= maxAgeMs }
 
     /**
@@ -125,9 +125,10 @@ object CurrentDisplaySource {
         } catch (_: Throwable) {
             emptyList()
         }
-        // The causal filter needs a longer window than a fresh reading does. With no live sample,
-        // a stale point from that longer window must not become the current value.
-        if (current == null && !hasFreshReading(recentPoints, now, maxAgeMillis)) return null
+        // The causal filter loads a longer window than the caller asked for. With no live sample,
+        // a point only that longer window reaches must not become the current value; within
+        // [historyWindowMs] the last reading is shown as before, whatever the smoothing.
+        if (current == null && !hasReadingWithin(recentPoints, now, historyWindowMs)) return null
         val viewMode = resolveSensorViewMode(resolvedSensorId)
         return resolveSnapshot(
             current = current,

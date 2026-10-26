@@ -564,20 +564,22 @@ class CurrentDisplaySourceTests {
     }
 
     @Test
-    fun anExpiredHistoryReadingIsNotCurrent() {
+    fun aReadingOnlyTheCausalWindowReachesIsNotCurrent() {
         val now = 1_700_000_000_000L
-        val maxAge = 15 * 60_000L
+        val requested = DisplayTrendSource.TREND_WINDOW_MS
+        // The last reading stays current for the whole window the caller asked for, as without
+        // the filter: a signal loss of a few minutes must not blank the value.
         assertTrue(
-            CurrentDisplaySource.hasFreshReading(
-                listOf(GlucosePoint(now - 60_000L, 100f, 90f)), now, maxAge
+            CurrentDisplaySource.hasReadingWithin(
+                listOf(GlucosePoint(now - 20 * 60_000L, 100f, 90f)), now, requested
             )
         )
         assertFalse(
-            CurrentDisplaySource.hasFreshReading(
-                listOf(GlucosePoint(now - 40 * 60_000L, 100f, 90f)), now, maxAge
+            CurrentDisplaySource.hasReadingWithin(
+                listOf(GlucosePoint(now - 40 * 60_000L, 100f, 90f)), now, requested
             )
         )
-        assertFalse(CurrentDisplaySource.hasFreshReading(emptyList(), now, maxAge))
+        assertFalse(CurrentDisplaySource.hasReadingWithin(emptyList(), now, requested))
     }
 
     private fun withOffsetCalibration(offsetMgdl: Float, block: () -> Unit) {
