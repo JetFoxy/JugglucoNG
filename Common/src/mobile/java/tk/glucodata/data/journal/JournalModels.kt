@@ -19,6 +19,9 @@ enum class JournalEntryType(val storageValue: String) {
     TEMP_BASAL("temp_basal");
 
     companion object {
+        /** The types a person adds, edits and filters by; temp basal is imported chart data. */
+        val journalRowTypes: List<JournalEntryType> = entries.filterNot { it == TEMP_BASAL }
+
         fun fromStorage(value: String?): JournalEntryType {
             return entries.firstOrNull { it.storageValue == value } ?: NOTE
         }

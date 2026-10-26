@@ -217,6 +217,7 @@ fun buildJournalChartMarkers(
     foodsById: Map<Long, JournalFood> = emptyMap()
 ): List<JournalChartMarker> {
     val isMmol = GlucoseFormatter.isMmol(unit)
+    val tempBasalEnds = tk.glucodata.data.journal.tempBasalEndsMillis(entries)
 
     return entries.map { entry ->
         val preset = entry.insulinPresetId?.let(presetsById::get)
@@ -280,8 +281,8 @@ fun buildJournalChartMarkers(
                 entry.timestamp + (entry.durationMinutes.coerceAtLeast(1) * 60_000L)
             } else if (entry.type == JournalEntryType.CARBS && entry.durationMinutes != null) {
                 entry.timestamp + (entry.durationMinutes.coerceAtLeast(1) * 60_000L)
-            } else if (entry.type == JournalEntryType.TEMP_BASAL && entry.durationMinutes != null) {
-                entry.timestamp + (entry.durationMinutes.coerceAtLeast(1) * 60_000L)
+            } else if (entry.type == JournalEntryType.TEMP_BASAL) {
+                tempBasalEnds[entry.id]
             } else {
                 null
             }
@@ -2501,7 +2502,7 @@ private fun JournalTypeSelector(
     val selectedContentColor = MaterialTheme.colorScheme.onSurface
     val selectedContainerBase = MaterialTheme.colorScheme.surfaceContainerHigh
     ConnectedButtonGroup(
-        options = JournalEntryType.entries,
+        options = JournalEntryType.journalRowTypes,
         selectedOption = selectedType,
         onOptionSelected = onTypeSelected,
         label = { _ -> },
@@ -2863,7 +2864,7 @@ private fun journalInlineChipContent(
 
         JournalEntryType.TEMP_BASAL -> {
             JournalInlineChipContent(
-                label = entry.amount?.let { "${formatFloatForEditor(it)} U/h" } ?: entry.title,
+                label = entry.amount?.let { Applic.app.getString(R.string.journal_rate_units_per_hour, formatFloatForEditor(it)) } ?: entry.title,
                 detail = entry.durationMinutes?.let { Applic.app.getString(R.string.minutes_short_format, it) }
             )
         }
@@ -3531,7 +3532,7 @@ private fun describeJournalEntry(
 
         JournalEntryType.TEMP_BASAL -> {
             listOfNotNull(
-                entry.amount?.let { "${formatFloatForEditor(it)} U/h" },
+                entry.amount?.let { Applic.app.getString(R.string.journal_rate_units_per_hour, formatFloatForEditor(it)) },
                 entry.durationMinutes?.let { Applic.app.getString(R.string.minutes_short_format, it) }
             ).joinToString(" · ")
         }
@@ -3572,7 +3573,7 @@ private fun journalMarkerDetail(
         }
 
         JournalEntryType.TEMP_BASAL -> {
-            entry.amount?.let { "${formatFloatForEditor(it)} U/h" }.orEmpty()
+            entry.amount?.let { Applic.app.getString(R.string.journal_rate_units_per_hour, formatFloatForEditor(it)) }.orEmpty()
         }
     }
 }

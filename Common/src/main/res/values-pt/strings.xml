@@ -1730,6 +1730,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_quick_actions">Registro rápido</string>
     <string name="journal_show_tab_title">Mostrar aba Diário</string>
     <string name="journal_show_tab_desc">Adiciona Diário à navegação inferior principal quando as ferramentas do diário estão ativadas</string>
+    <string name="journal_type_temp_basal">Basal temporária</string>
+    <string name="journal_dashboard_types_title">Mostrar na tela principal</string>
+    <string name="journal_dashboard_types_desc">As entradas ocultas saem apenas do gráfico principal e da lista de leituras. Continuam a contar para IOB, COB, a previsão e as sugestões de dose.</string>
+    <string name="journal_dashboard_temp_basal_desc">Barras no topo do gráfico para basais temporárias do AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s U/h</string>
     <string name="journal_events_today">%1$d eventos hoje</string>
     <string name="journal_metric_carbs_today">Carboidratos hoje</string>
     <string name="journal_metric_insulin_today">Insulina hoje</string>

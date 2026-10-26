@@ -458,7 +458,7 @@ fun HistoryBrowseScreen(
     var viewportSnapshot by remember { mutableStateOf<ChartViewportSnapshot?>(null) }
     var showReadingRows by rememberSaveable { mutableStateOf(true) }
     var selectedJournalTypeFilters by rememberSaveable {
-        mutableStateOf(JournalEntryType.entries.map { it.name })
+        mutableStateOf(JournalEntryType.journalRowTypes.map { it.name })
     }
     val selectedJournalTypes = remember(selectedJournalTypeFilters) {
         selectedJournalTypeFilters.mapNotNull { name ->
@@ -755,10 +755,7 @@ fun HistoryBrowseScreen(
                 item(key = "history-journal-filter") {
                     val filterOptions = remember {
                         listOf(HistoryFilterOption.Readings) +
-                            // Temp basal segments never reach this list; they are chart-only.
-                            JournalEntryType.entries
-                                .filterNot { it == JournalEntryType.TEMP_BASAL }
-                                .map { HistoryFilterOption.Journal(it) }
+                            JournalEntryType.journalRowTypes.map { HistoryFilterOption.Journal(it) }
                     }
                     val selectedFilterOptions = remember(showReadingRows, selectedJournalTypes) {
                         buildList {

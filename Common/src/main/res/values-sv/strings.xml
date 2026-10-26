@@ -1729,6 +1729,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_quick_actions">Snabblogg</string>
     <string name="journal_show_tab_title">Visa journalflik</string>
     <string name="journal_show_tab_desc">Lägg till Journal i den nedre huvudnavigeringen när journalverktyg är aktiverade</string>
+    <string name="journal_type_temp_basal">Tillfällig basal</string>
+    <string name="journal_dashboard_types_title">Visa på huvudskärmen</string>
+    <string name="journal_dashboard_types_desc">Dolda poster försvinner bara från huvuddiagrammet och avläsningslistan. De räknas fortfarande in i IOB, COB, prognosen och dosförslagen.</string>
+    <string name="journal_dashboard_temp_basal_desc">Staplar överst i diagrammet för tillfälliga basaler från AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s E/h</string>
     <string name="journal_events_today">%1$d händelser idag</string>
     <string name="journal_metric_carbs_today">Kolhydrater idag</string>
     <string name="journal_metric_insulin_today">Insulin idag</string>

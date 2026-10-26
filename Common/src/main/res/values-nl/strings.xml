@@ -1772,6 +1772,11 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="journal_quick_actions">Snel loggen</string>
     <string name="journal_show_tab_title">Tab Journal weergeven</string>
     <string name="journal_show_tab_desc">Voeg Journal toe aan de onderste hoofdnavigatie wanneer journalhulpmiddelen zijn ingeschakeld</string>
+    <string name="journal_type_temp_basal">Tijdelijke basaal</string>
+    <string name="journal_dashboard_types_title">Tonen op het hoofdscherm</string>
+    <string name="journal_dashboard_types_desc">Verborgen items verdwijnen alleen uit de hoofdgrafiek en de lijst met metingen. Ze tellen nog steeds mee voor IOB, COB, de voorspelling en de dosishints.</string>
+    <string name="journal_dashboard_temp_basal_desc">Balken bovenaan de grafiek voor tijdelijke basalen uit AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s E/u</string>
     <string name="journal_events_today">%1$d gebeurtenissen vandaag</string>
     <string name="journal_metric_carbs_today">Koolhydraten vandaag</string>
     <string name="journal_metric_insulin_today">Insuline vandaag</string>

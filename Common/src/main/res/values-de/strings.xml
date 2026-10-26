@@ -1863,6 +1863,11 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="journal_quick_actions">Schnell protokollieren</string>
     <string name="journal_show_tab_title">Journal-Reiter anzeigen</string>
     <string name="journal_show_tab_desc">Journal in der unteren Hauptnavigation anzeigen, wenn Journal-Werkzeuge aktiviert sind</string>
+    <string name="journal_type_temp_basal">Temporäre Basalrate</string>
+    <string name="journal_dashboard_types_title">Auf dem Hauptbildschirm zeigen</string>
+    <string name="journal_dashboard_types_desc">Ausgeblendete Einträge verschwinden nur aus dem Hauptdiagramm und der Werteliste. Sie zählen weiter für IOB, COB, die Prognose und die Dosishinweise.</string>
+    <string name="journal_dashboard_temp_basal_desc">Balken oben im Diagramm für temporäre Basalraten aus AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s E/h</string>
     <string name="journal_events_today">%1$d Ereignisse heute</string>
     <string name="journal_metric_carbs_today">Kohlenhydrate heute</string>
     <string name="journal_metric_insulin_today">Insulin heute</string>

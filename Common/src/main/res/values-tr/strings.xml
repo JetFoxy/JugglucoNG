@@ -1757,6 +1757,11 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="journal_quick_actions">Hızlı kayıt</string>
     <string name="journal_show_tab_title">Günlük sekmesini göster</string>
     <string name="journal_show_tab_desc">Günlük araçları etkin olduğunda Günlüğü ana alt gezinmeye ekler</string>
+    <string name="journal_type_temp_basal">Geçici bazal</string>
+    <string name="journal_dashboard_types_title">Ana ekranda göster</string>
+    <string name="journal_dashboard_types_desc">Gizlenen kayıtlar yalnızca ana grafikten ve ölçüm listesinden kalkar. IOB, COB, tahmin ve doz önerilerinde sayılmaya devam eder.</string>
+    <string name="journal_dashboard_temp_basal_desc">AAPS geçici bazalları için grafiğin üstünde çubuklar</string>
+    <string name="journal_rate_units_per_hour">%1$s Ü/sa</string>
     <string name="journal_events_today">Bugün %1$d olay</string>
     <string name="journal_metric_carbs_today">Bugünkü karbonhidrat</string>
     <string name="journal_metric_insulin_today">Bugünkü insülin</string>

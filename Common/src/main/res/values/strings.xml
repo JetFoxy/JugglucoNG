@@ -2256,6 +2256,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_dashboard_types_title">Show on the main screen</string>
     <string name="journal_dashboard_types_desc">Hidden entries leave the main chart and the reading list only. They still count toward IOB, COB, the prediction and the dose hints.</string>
     <string name="journal_dashboard_temp_basal_desc">Bars from the top of the chart for AAPS temp basals</string>
+    <string name="journal_rate_units_per_hour">%1$s U/h</string>
     <string name="journal_events_today">%1$d events today</string>
     <string name="journal_metric_carbs_today">Carbs today</string>
     <string name="journal_metric_insulin_today">Insulin today</string>

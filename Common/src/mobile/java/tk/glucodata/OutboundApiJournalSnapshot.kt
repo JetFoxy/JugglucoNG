@@ -340,7 +340,9 @@ object OutboundApiJournalSnapshot : JournalSnapshotBridge {
         val eventWindowStart = atMillis - SNAPSHOT_EVENT_WINDOW_MS
         val events = JSONArray()
         entries
-            .filter { it.timestamp >= eventWindowStart }
+            // AAPS sets a temp basal every few minutes; left in, they would push the
+            // boluses and meals out of the capped event list.
+            .filter { it.timestamp >= eventWindowStart && it.entryType != JournalEntryType.TEMP_BASAL.storageValue }
             .takeLast(64)
             .forEach { entry ->
                 events.put(entry.toTransferJson(presetEntitiesById, foodsById, includeRecoveryId = false))

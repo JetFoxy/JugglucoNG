@@ -1719,6 +1719,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_quick_actions">Registrazione rapida</string>
     <string name="journal_show_tab_title">Mostra scheda Diario</string>
     <string name="journal_show_tab_desc">Aggiunge Diario alla navigazione inferiore principale quando gli strumenti del diario sono attivi</string>
+    <string name="journal_type_temp_basal">Basale temporanea</string>
+    <string name="journal_dashboard_types_title">Mostra nella schermata principale</string>
+    <string name="journal_dashboard_types_desc">Le voci nascoste spariscono solo dal grafico principale e dall’elenco delle letture. Continuano a contare per IOB, COB, previsione e suggerimenti di dose.</string>
+    <string name="journal_dashboard_temp_basal_desc">Barre in cima al grafico per le basali temporanee di AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s U/h</string>
     <string name="journal_events_today">%1$d eventi oggi</string>
     <string name="journal_metric_carbs_today">Carboidrati oggi</string>
     <string name="journal_metric_insulin_today">Insulina oggi</string>

@@ -145,7 +145,7 @@ fun JournalScreen(
     var selectedChartRange by rememberSaveable { mutableStateOf(TimeRange.H3) }
     var viewportSnapshot by remember { mutableStateOf<ChartViewportSnapshot?>(null) }
     var selectedTypeFilters by rememberSaveable {
-        mutableStateOf(JournalEntryType.entries.map { it.name })
+        mutableStateOf(JournalEntryType.journalRowTypes.map { it.name })
     }
     var chartActionTimestamp by rememberSaveable { mutableStateOf<Long?>(null) }
     // Where the chart draws the tapped time's dot, for the journal menu to grow from.
@@ -751,7 +751,7 @@ private fun JournalTypeFilter(
     val unselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.78f)
     val unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
     ConnectedButtonGroup(
-        options = JournalEntryType.entries,
+        options = JournalEntryType.journalRowTypes,
         selectedOptions = selectedTypes,
         multiSelect = true,
         onOptionSelected = onToggle,

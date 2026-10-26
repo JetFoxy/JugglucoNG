@@ -1772,6 +1772,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_quick_actions">Быстрая запись</string>
     <string name="journal_show_tab_title">Показывать вкладку журнала</string>
     <string name="journal_show_tab_desc">Добавляет журнал в нижнюю навигацию, когда инструменты журнала включены</string>
+    <string name="journal_rate_units_per_hour">%1$s ЕД/ч</string>
     <string name="journal_dashboard_types_title">Показывать на главной</string>
     <string name="journal_dashboard_types_desc">Скрытые записи пропадают только с графика и из списка показаний на главной. В IOB, COB, прогнозе и подсказках дозы они по-прежнему учитываются.</string>
     <string name="journal_dashboard_temp_basal_desc">Полосы сверху графика для временных базалов из AAPS</string>

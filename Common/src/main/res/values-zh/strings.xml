@@ -1745,6 +1745,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_quick_actions">快速记录</string>
     <string name="journal_show_tab_title">显示日志标签</string>
     <string name="journal_show_tab_desc">启用日志工具时，将日志加入主底部导航</string>
+    <string name="journal_type_temp_basal">临时基础率</string>
+    <string name="journal_dashboard_types_title">在主屏幕上显示</string>
+    <string name="journal_dashboard_types_desc">隐藏的记录只会从主图表和读数列表中消失，仍会计入 IOB、COB、预测和剂量提示。</string>
+    <string name="journal_dashboard_temp_basal_desc">图表顶部的条形，表示来自 AAPS 的临时基础率</string>
+    <string name="journal_rate_units_per_hour">%1$s U/小时</string>
     <string name="journal_events_today">今天 %1$d 个事件</string>
     <string name="journal_metric_carbs_today">今日碳水</string>
     <string name="journal_metric_insulin_today">今日胰岛素</string>

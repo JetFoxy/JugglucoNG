@@ -3306,24 +3306,18 @@ fun InteractiveGlucoseChart(
                             ?: 1f
                         val maxBarHeight = chartHeight * 0.32f
                         val minBarWidth = 1.5.dp.toPx()
-                        // A new temp basal replaces the running one, and the replaced record
-                        // does not always come back shortened: end each at the next one's start.
-                        val tempBasalsByStart = visibleTempBasalMarkers
-                            .sortedBy { it.activeStartMillis ?: it.timestamp }
-                        tempBasalsByStart.forEachIndexed { index, marker ->
+                        // activeEndMillis is already cut at the replacing temp basal's start
+                        // (tempBasalEndsMillis), so the window filter above never resurrects
+                        // a replaced segment.
+                        visibleTempBasalMarkers.forEach { marker ->
                             val rate = marker.amount ?: 0f
-                            if (rate <= 0f) return@forEachIndexed
+                            if (rate <= 0f) return@forEach
                             val start = marker.activeStartMillis ?: marker.timestamp
-                            val nextStart = tempBasalsByStart.getOrNull(index + 1)
-                                ?.let { it.activeStartMillis ?: it.timestamp }
-                            val end = minOf(
-                                marker.activeEndMillis ?: return@forEachIndexed,
-                                nextStart ?: Long.MAX_VALUE
-                            )
-                            if (end <= start) return@forEachIndexed
+                            val end = marker.activeEndMillis ?: return@forEach
+                            if (end <= start) return@forEach
                             val startX = timeToDataX(start).coerceIn(0f, dataWidth)
                             val endX = timeToDataX(end).coerceIn(0f, dataWidth)
-                            if (endX <= 0f || startX >= dataWidth) return@forEachIndexed
+                            if (endX <= 0f || startX >= dataWidth) return@forEach
                             val left = minOf(startX, endX)
                             val right = maxOf(startX, endX)
                             val barHit = (rate / maxRate).coerceIn(0f, 1f)

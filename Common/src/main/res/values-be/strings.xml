@@ -1799,6 +1799,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_quick_actions">Хуткі запіс</string>
     <string name="journal_show_tab_title">Паказваць укладку журнала</string>
     <string name="journal_show_tab_desc">Дадае Журнал у галоўную ніжнюю навігацыю, калі інструменты журнала ўключаны</string>
+    <string name="journal_type_temp_basal">Часовы базал</string>
+    <string name="journal_dashboard_types_title">Паказваць на галоўнай</string>
+    <string name="journal_dashboard_types_desc">Схаваныя запісы знікаюць толькі з графіка і спіса паказанняў на галоўнай. У IOB, COB, прагнозе і падказках дозы яны па-ранейшаму ўлічваюцца.</string>
+    <string name="journal_dashboard_temp_basal_desc">Палосы зверху графіка для часовых базалаў з AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s АД/г</string>
     <string name="journal_events_today">%1$d падзей сёння</string>
     <string name="journal_metric_carbs_today">Вугляводы сёння</string>
     <string name="journal_metric_insulin_today">Інсулін сёння</string>

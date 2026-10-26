@@ -2099,6 +2099,11 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="journal_quick_actions">Gyors naplózás</string>
     <string name="journal_show_tab_title">Napló lap megjelenítése</string>
     <string name="journal_show_tab_desc">Napló hozzáadása a fő alsó navigációhoz, ha a naplóeszközök engedélyezve vannak</string>
+    <string name="journal_type_temp_basal">Ideiglenes bázis</string>
+    <string name="journal_dashboard_types_title">Megjelenítés a főképernyőn</string>
+    <string name="journal_dashboard_types_desc">A rejtett bejegyzések csak a fő grafikonról és az értéklistáról tűnnek el. Az IOB, a COB, az előrejelzés és az adagjavaslatok továbbra is számolnak velük.</string>
+    <string name="journal_dashboard_temp_basal_desc">Sávok a grafikon tetején az AAPS ideiglenes bázisaihoz</string>
+    <string name="journal_rate_units_per_hour">%1$s U/ó</string>
     <string name="journal_events_today">%1$d esemény ma</string>
     <string name="journal_metric_carbs_today">Mai szénhidrát</string>
     <string name="journal_metric_insulin_today">Mai inzulin</string>

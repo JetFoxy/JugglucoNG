@@ -1737,6 +1737,11 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="journal_quick_actions">Quick log</string>
     <string name="journal_show_tab_title">Журнал табыг харуулах</string>
     <string name="journal_show_tab_desc">Журналын хэрэгслүүд идэвхтэй үед Журналыг үндсэн доод цэсэнд нэмнэ</string>
+    <string name="journal_type_temp_basal">Түр зуурын базал</string>
+    <string name="journal_dashboard_types_title">Үндсэн дэлгэц дээр харуулах</string>
+    <string name="journal_dashboard_types_desc">Нуусан бичлэгүүд зөвхөн үндсэн график болон хэмжилтийн жагсаалтаас алга болно. IOB, COB, таамаглал, тунгийн зөвлөмжид тооцогдсоор байна.</string>
+    <string name="journal_dashboard_temp_basal_desc">AAPS-ийн түр зуурын базалд зориулсан графикийн дээд талын зурвас</string>
+    <string name="journal_rate_units_per_hour">%1$s U/ц</string>
     <string name="journal_events_today">Өнөөдөр %1$d үйл явдал</string>
     <string name="journal_metric_carbs_today">Өнөөдрийн нүүрс ус</string>
     <string name="journal_metric_insulin_today">Өнөөдрийн инсулин</string>

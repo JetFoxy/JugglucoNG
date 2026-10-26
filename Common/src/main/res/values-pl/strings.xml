@@ -1764,6 +1764,11 @@
     <string name="journal_quick_actions">Szybki wpis</string>
     <string name="journal_show_tab_title">Pokaż kartę dziennika</string>
     <string name="journal_show_tab_desc">Dodaj Dziennik do głównej dolnej nawigacji, gdy narzędzia dziennika są włączone</string>
+    <string name="journal_type_temp_basal">Tymczasowa baza</string>
+    <string name="journal_dashboard_types_title">Pokaż na ekranie głównym</string>
+    <string name="journal_dashboard_types_desc">Ukryte wpisy znikają tylko z głównego wykresu i listy odczytów. Nadal liczą się do IOB, COB, prognozy i podpowiedzi dawki.</string>
+    <string name="journal_dashboard_temp_basal_desc">Paski u góry wykresu dla tymczasowych baz z AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s j./h</string>
     <string name="journal_events_today">%1$d zdarzeń dziś</string>
     <string name="journal_metric_carbs_today">Węglowodany dziś</string>
     <string name="journal_metric_insulin_today">Insulina dziś</string>

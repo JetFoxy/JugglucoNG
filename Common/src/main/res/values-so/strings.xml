@@ -1999,6 +1999,11 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="journal_quick_actions">Log degdeg ah</string>
     <string name="journal_show_tab_title">Muuji tab Journal</string>
     <string name="journal_show_tab_desc">Ku dar Joornaalka marinka hoose ee ugu weyn marka qalabka joornaalka la furo</string>
+    <string name="journal_type_temp_basal">Basal ku meel gaar ah</string>
+    <string name="journal_dashboard_types_title">Ku muuji shaashadda hore</string>
+    <string name="journal_dashboard_types_desc">Gelinnada la qariyay waxay ka baxaan oo keliya shaxda weyn iyo liiska akhrisyada. Weli waa lagu xisaabiyaa IOB, COB, saadaasha iyo talooyinka qiyaasta.</string>
+    <string name="journal_dashboard_temp_basal_desc">Xariijimo dusha sare ee shaxda ee basal-ka ku meel gaarka ah ee AAPS</string>
+    <string name="journal_rate_units_per_hour">%1$s U/saac</string>
     <string name="journal_events_today">%1$d dhacdooyinka maanta</string>
     <string name="journal_metric_carbs_today">Karboor maanta</string>
     <string name="journal_metric_insulin_today">Insulinta maanta</string>
