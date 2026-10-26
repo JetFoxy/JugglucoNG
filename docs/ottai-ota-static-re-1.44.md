@@ -34,7 +34,10 @@ comes only from P2 (an HCI log).
 `CgmCharacteristicType` (`pp.txt`, objects `Obj!CgmCharacteristicType`) — 21 values;
 the index order matches the UUID order in the pool (`pp+0x278b0…0x27950`).
 Verified against anchors: `softVersion` = `2a28`, `currentTime` = `2a2b`,
-`ctlDevice` = `6aa799b6` (ACTIVATE_CMD), `activeDuartion` = `b8fd9848`.
+`ctlDevice` = `6aa799b6`, `activeDuartion` = `b8fd9848`. (Corrected: `ctlDevice` is not
+the ACTIVATE_CMD channel. The activation `[0x03]` goes via `writeCmd` into `convertCmd`
+= `d78d0706`, same as the JugglucoNG driver; `ctlDevice` is a multiplexed control
+channel, see §10.)
 
 | # | enum | UUID | Note |
 |---|---|---|---|
@@ -56,7 +59,7 @@ Verified against anchors: `softVersion` = `2a28`, `currentTime` = `2a2b`,
 | 15 | serviceOTA | `1d14d6ee-fd63-4fa1-bfa4-8f47b42119f0` | SiLabs OTA |
 | 16 | otaControl | `f7bf3564-fb6d-4e53-88a4-5e37e0326063` | |
 | 17 | otaData | `984227f3-34fc-4045-a5d0-2c581f81a153` | |
-| 18 | ctlDevice | `6aa799b6-b374-4148-8f36-6d440c0ec203` | ACTIVATE_CMD |
+| 18 | ctlDevice | `6aa799b6-b374-4148-8f36-6d440c0ec203` | control channel: retain (`…‖0x04`), coefficients (`0x09…`), calibration (`0x0B…`), §10 |
 | 19 | ctlGluDataIdx | `c8693b6f-f850-44cb-b9b4-ac87ed962bac` | do not write (destructive) |
 | 20 | activeDuartion | `b8fd9848-0ccd-423f-bd34-2419aa7ea004` | maxActive, 4 bytes |
 
@@ -83,7 +86,7 @@ nfc_* → ble_permit → ble_scan/connect/discover_service
              └─ otherwise → upgrade_check_success / upgrade_count_limt → continue
   → set_device_coefficient → write_calibration_parameter
   → set_active_duration (b8fd9848) → set_retain_duration
-  → active_start (ctlDevice, ACTIVATE_CMD)
+  → active_start (writeRTC → writeCmd [0x03] into convertCmd d78d0706)
   → bind_device (POST /deviceBind/composite/bind)
 ```
 
@@ -226,3 +229,81 @@ characteristics (`isSupportCharacter`), i.e. effectively the firmware capability
   planned in P0.
 - Risk: confirmation of `0x00`/`0x06` and of the reboot behavior must be obtained before
   the first write to a sensor; otherwise the chance of leaving the device in AppLoader is high.
+
+## 10. Coefficients and calibration written into the sensor (2026-10-26)
+
+Source: `asm/sy_embeded/src/active/cgm_active*.dart`,
+`src/cgm/cgm_transmit_manger.dart`, `src/flow/cgm_bind_manger.dart`,
+`sy_embeded.dart` (`SyEmbededVersionProfile`).
+
+### 10.1 Activation (refinement of §1/§2)
+
+`CgmActive.startCgmActive @0xc054b4`: `readCmd` (`d78d0706`); `cmd > 3` → `false`,
+`cmd == 3` → `true` (already active), otherwise `_active @0xc055d4`:
+`writeRTC` → `writeCmd([0x03])`. `writeCmd @0xc0571c` encrypts via `CgmAuth.encrypt`
+when `isNeedEncrypt`, and writes into **`convertCmd`** (`Obj!CgmCharacteristicType@156f991`,
+index `0xc`) = `d78d0706`. Matches the JugglucoNG driver.
+
+### 10.2 Flow steps and firmware version gates
+
+`CgmBindFlowManger._setDeviceCoefficientIfNeed` and `_setCalibrationParameterIfNeed`:
+a step runs only if the version profile supports it
+(`EmbededVersionManger.getIsSupportSetCoefficientByMac` → `profile.field_27`,
+`getIsSupportCalibrationParameterByMac` → `profile.field_3b`). States:
+`setDeviceCoefficientStart/Success/Error`, `writeCalibrationParameterStart/Success/Error`.
+(`HardwareKeyboard::lookUpLayout` in the listing is an artifact of identical code being
+folded together; it is in fact the profile lookup by MAC.)
+
+Flags of `SyEmbededVersionProfile.v_1_0 … v_1_8` (with register tracking):
+
+| flag | V1.0–1.3 | V1.4 | V1.5 | V1.6 | V1.7 | V1.8 | meaning |
+|---|---|---|---|---|---|---|---|
+| `field_1b` | – | ✓ | ✓ | ✓ | ✓ | ✓ | `maxActive` (matches "fw ≥ 1.4") |
+| `field_1f`, `field_23` | – | – | ✓ | ✓ | ✓ | ✓ | retain/destruction (matches "fw ≥ 1.5") |
+| `field_27` | – | – | – | ✓ | ✓ | ✓ | **writing coefficients into the sensor** |
+| `field_37` | – | – | – | – | – | ✓ | not resolved |
+| `field_3b` | – | – | – | – | – | ✓ | **writing calibration k/b into the sensor** |
+
+### 10.3 Coefficients: `writeCoefficientList @0xbcba18` → `ctlDevice`
+
+```
+payload = 0x09 ‖ N (1 byte) ‖ N × float32 LE ‖ CRC16/MODBUS(everything before it), LE (lo, hi)
+```
+
+- The list = the decrypted CSV `coefficient` (`CgmActiveCoefficientModel.
+  decipherCoefficientContent`: `decryptAes`, then `split(",")` → double → float32).
+  This is the same string JugglucoNG already decrypts into `materials.coefficients`.
+- **No encryption** (`CgmAuth.encrypt` is not called).
+- CRC16/MODBUS: init `0xFFFF`, poly `0xA001` (reflected), result `[crc & 0xFF, crc >> 8]`.
+- Written via `write()` with `handleError`; on a profile < V1.6 the function returns
+  `false` immediately, with the log `cgm is not support set coefficient`.
+
+### 10.4 Calibration: `writeCalibrationParameter @0xc069e8` → `ctlDevice`
+
+```
+payload = 0x0B ‖ E(k as float64 LE ‖ b as float64 LE)    // 1 + 16 bytes
+E = CgmAuth.encrypt (session AES, same as for maxActive) when isNeedEncrypt; otherwise plaintext
+```
+
+- `k`, `b` = `calibrationValueK`, `calibrationValueB` from `CgmBindDeviceModel.fromJson`
+  (`sy_embeded.dart` @0xbb8d88 / @0xbb8e08) — the cloud's device answer, type `double?`,
+  **not encrypted**. If either is `null` — error
+  `set_calibration_parameter_error: k is null` / `b is null`, no write happens.
+- They are placed into the manager via `CgmActiveCalibrationParameter.addCalibrationParameterToManger`
+  → `CgmActive.setCalibrationParameterByMac`.
+- Log: `write_calibration_parameter:kValue-… bValue-… paramsBytes:… writeBytes:…`.
+
+### 10.5 What it means
+
+- The JugglucoNG driver does none of these steps: it writes only RTC, `maxActive`,
+  retain and `ACTIVATE_CMD`. `calibrationValueK/B` is not parsed in `OttaiCloudClient`.
+- Our sensors, judging by the versions in the driver code, are `V1.7`. On V1.7 the official
+  app writes the coefficients (`0x09`) into the sensor, but not the calibration. The `k/b`
+  calibration appears only from **V1.8**, and it is probably to V1.8 that the mandatory
+  OTA moves sensors.
+- Hypothesis for the plan: "adequate right after OTA" = firmware V1.8 + the factory
+  calibration `k/b` from the cloud written before activation. "Back to normal on day
+  2–6" = a sensor without coefficients and a calibration converging on its own.
+- Not resolved: whether what the sensor serves over BLE (raw current or an already
+  corrected value) depends on these writes, what `field_37` means, what `isNeedEncrypt`
+  depends on. P2 (the HCI log) and a before/after stream comparison close this.

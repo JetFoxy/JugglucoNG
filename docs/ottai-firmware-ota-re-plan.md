@@ -57,11 +57,10 @@ Source: `~/Projects/Dia/Ottai_1.38.0_APKPure.xapk`, `config.armeabi_v7a.apk` →
 | OTA data | `984227f3-34fc-4045-a5d0-2c581f81a153` |
 
 Conclusion: the sensor SoC is likely SiLabs EFR32/BG2x, the image is `.gbl` (Gecko Bootloader).
-The protocol is open (SiLabs AN1086 / AN1045): `0x00` in control → reboot into AppLoader
-(often at a different address or name) → reconnect → `0x00` → stream the `.gbl` via
-write-without-response into data → `0x03` (end) → `0x04` (close / reboot).
-Whatever Ottai adds on top (authorization before entering OTA, an encrypted command into
-`d78d0706`, version checks) was unknown at that point. That is the main RE question.
+Classic SiLabs (AN1086): `0x00` in control → stream the `.gbl` into data → `0x03` → `0x04`.
+Ottai differs per the 1.44 statics: after a normal auth `0x00` → 244-byte chunks,
+write-with-response, no retries → `0x06`; then a 60 s rescan on the same MAC. Details in
+`docs/ottai-ota-static-re-1.44.md` §3.
 
 **UUIDs in 1.38 that are absent from the driver** (to classify; some may belong to the
 watch or other products): `ceb33896-4ac1-4fb8-a426-c6e3ff6f4a97`,
@@ -85,6 +84,21 @@ in bind/validate and depends on the device and `deviceVersion`. Therefore:
 - **H4 — not the version.** The difference is something else: activation parameters
   (`maxActive`, `destructionTime`), warmup, our filter/suppression (`OttaiOutputFilter`,
   warmup gate), spread between sensors.
+- **H5 — a skipped activation step (new, from the 1.44 statics).** Before `maxActive` the
+  official flow runs `set_device_coefficient → write_calibration_parameter`, i.e. it writes
+  coefficients and calibration parameters **into the sensor**. The JugglucoNG driver does
+  none of that: it writes only RTC, `maxActive`, retain and `ACTIVATE_CMD`, and uses
+  `coefficient` only in the app (`OttaiParser.toReading`). If the sensor's internal
+  algorithm starts without these parameters and converges on its own, this explains
+  "back to normal on day 2–6" **without any OTA**. Checkable statically; higher priority
+  than OTA. **Static analysis closed (report §10):** both steps write into `ctlDevice`
+  (`6aa799b6`) and are gated by firmware version. Coefficients
+  (`0x09 ‖ N ‖ float32 LE… ‖ CRC16-Modbus`, plaintext) — from **V1.6**, payload = our own
+  decrypted `coefficient`. Calibration (`0x0B ‖ AES(k f64 LE ‖ b f64 LE)`) — from **V1.8**
+  only, `k`/`b` = `calibrationValueK/B` from the cloud's device answer (our client does not
+  parse them). Refined hypothesis: "good values right after the mandatory OTA" = V1.8 +
+  writing the factory calibration `k/b`; on our V1.7 JugglucoNG additionally skips the
+  coefficients the official app does write.
 
 H2 can be checked with zero risk to the sensor. If it holds, OTA for improving the first
 days may not be needed at all: the right formula is enough.
@@ -132,8 +146,9 @@ Steps:
 **Main requirement for the outcome:** OTA must happen **before** activation and must not
 interfere with writing the long `maxActive` in JugglucoNG.
 
-Fact from the user: OTA happens **at the moment of activation** (inside one flow), not
-separately. The exact order was unknown. Options:
+Fact from the user: OTA happens **at the moment of activation** (inside one flow).
+**The order is closed by statics: variant A** (OTA before `maxActive` and `ACTIVATE_CMD`;
+after OTA the flow restarts in full). The table below is kept as the history of reasoning.
 
 | Option | Order | Meaning for us |
 |---|---|---|
@@ -141,10 +156,9 @@ separately. The exact order was unknown. Options:
 | B | bind → RTC → `maxActive` (15 d) → `ACTIVATE_CMD` → **OTA** | No window. If activation survives the reboot, the official app always gives the sensor 15 days; in JugglucoNG we must update before activation, and it is unknown whether the old firmware accepts OTA in an inactive state. |
 | C | bind → RTC → `maxActive` → **OTA** → re-activation | Probably `maxActive` is written again after OTA; the window is unclear. |
 
-Indirect sign for A: OTA errors are named `BindStatusOTA*`, i.e. they belong to the bind
-step statuses, and bind in the known flow goes before BLE activation. Not proof: the enum
-may cover the whole master connection. The order is closed by P1 (code `CgmOTAFlowState` /
-`_startDeviceOtaUpgrade`) and P2 (the HCI log).
+Confirmed in `cgm_bind_manger.dart` (1.44): the OTA branch is entered only for a
+**non-activated** sensor. Consequence: a sensor already activated in JugglucoNG cannot be
+updated by the official app — OTA in JugglucoNG must happen before activation.
 
 P0 deliverable: whether OTA is needed at all, or the task reduces to formula choice.
 
@@ -159,13 +173,31 @@ P0 deliverable: whether OTA is needed at all, or the task reduces to formula cho
    constants (`/ota/upgradeVersion/judge`, `03A617EB`, `V1.8.`, `.GBL`).
    Questions 1–6 below are closed statically; 7 (lifetime) — dynamics only.
 
+   **Discrepancies against the static report:**
+   - ~~`ctlDevice` = ACTIVATE_CMD~~ — **closed**: the label was wrong. `_active` =
+     `writeRTC` → `writeCmd([0x03])` into `convertCmd` = `d78d0706`, same as the driver.
+     `ctlDevice` is a control channel (retain, coefficients, calibration). The report is fixed.
+   - The branch `allowUpgrade=true && requiredUpgrade=false → upgradeCountLimt → end of
+     pass` looks odd (an optional update blocks activation). Re-check the branching
+     condition; the fields may be swapped.
+
+   **Next static steps (no sensor needed):**
+   - ~~H5: format of coefficients and calibration~~ — **done**, report §10.
+   - ~~Profiles V1.0…V1.8~~ — **done**, report §10.2. `field_37` (V1.8 only) not understood.
+   - Check the saved cloud answers (`validateDeviceByMacV3`, `bindV3`, `deviceBind/list`)
+     for whether `calibrationValueK/B` arrive for our sensors and with which values.
+     No sensor needed.
+   - Get the `.gbl` without a sensor: `GET /ota/upgradeVersion/judge?mac=…&deviceVersion=…
+     &deviceType=cgm` with the MAC and version of an already-used sensor from the account —
+     a read-only request. If it returns `downloadUrl`, download the file and do P3 right
+     away. The answer for an old or expired sensor may differ; do **not** call
+     `POST /device/ota/upgrade`.
+
 1. **Cheap sources first.** Check whether OTA code exists in readable Java builds:
    `Ottai_mod_1_44.apk`, watch-APK 1.1.0 (`com.ottai.tag.watch`), the older CN `com.ottai.tag`.
    If OTA is Java/Kotlin there, the whole protocol reads out in jadx.
    → No OTA in Java/Kotlin (dex is clean), everything is in Dart. But `Ottai_mod_1_44.apk` gave arm64.
-2. **Dart AOT 1.38.** The XAPK from APKPure has `libapp.so` ARMv7 only, while blutter works
-   well with arm64. The user will provide an arm64-v8a build. Run blutter → get function
-   names, object pools, offsets. Fallback path — reFlutter/Frida hooks by offsets.
+2. **Dart AOT.** → Done on 1.44 arm64 (blutter); 1.38/1.50 are ARMv7-only, 1.50 obfuscated.
 3. Targets: `CgmOTA`, `CgmOTATool`, `CgmOTAFlowState`, `_startDeviceOtaUpgrade`,
    `_startOtaMiniFlow`, `downloadOTAFile`, `readOTAFile`, `writeOTAControl`/`writeOTAData`,
    `upgradeOTAVersion`, `_uploadOtaUpgradeStatue`, `OTAUpgradeModel.fromJson`,
@@ -207,7 +239,11 @@ On a **new** sensor that the user is going to activate with OTA in the official 
 5. In the HCI log, mark the exact order: OTA control/data → reboot → RTC →
    `b8fd9848` (what value) → `6AA799B6` → `ACTIVATE_CMD`. This defines where the window
    for "OTA without the official activation" is.
-6. Keep the artifacts outside the repo (like `~/Projects/Dia/anytime-native/`), e.g.
+6. The final opcode: `0x06` (as in 1.44) or `0x03`/`0x04` (classic SiLabs); when the
+   connection drops, whether MAC or adv change after the reboot, the real pause between chunks.
+7. What `set_device_coefficient` / `write_calibration_parameter` write (H5) and where
+   `ACTIVATE_CMD` goes (`d78d0706` or `6aa799b6`).
+8. Keep the artifacts outside the repo (like `~/Projects/Dia/anytime-native/`), e.g.
    `~/Projects/Dia/ottai-ota/`. Firmware image and raw captures **are not committed**.
 
 ### P3. Analysis of the `.gbl` image (risk 0)
