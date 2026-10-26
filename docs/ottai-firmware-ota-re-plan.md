@@ -1,278 +1,276 @@
-# Ottai: RE обновления прошивки сенсора (OTA) — план
+# Ottai: RE of sensor firmware updates (OTA) — plan
 
-Статус: план, 2026-10-26. P1 (статический RE) в основном закрыт в тот же день —
-результаты в `docs/ottai-ota-static-re-1.44.md`. Прошивку самого сенсора до этого не
-изучали; драйвер (`Common/src/main/java/tk/glucodata/drivers/ottai/`) OTA не делает и
-OTA-сервис не трогает.
+Status: plan, 2026-10-26. P1 (static RE) is mostly closed the same day —
+results in `docs/ottai-ota-static-re-1.44.md`. The sensor's own firmware was not studied
+before that; the driver (`Common/src/main/java/tk/glucodata/drivers/ottai/`) does not do
+OTA and does not touch the OTA service.
 
-Коротко по P1: OTA стоит **до** `ACTIVATE_CMD` (вариант A), GATT-карта и весь
-SiLabs-транспорт восстановлены, облачные эндпоинты и модель ответа известны,
-проверки подписи в приложении нет. Осталось только динамическое подтверждение
-(§P2): `0x06` vs `0x03` в конце, темп, поведение при ребуте.
+P1 in short: OTA happens **before** `ACTIVATE_CMD` (variant A), the GATT map and the whole
+SiLabs transport are recovered, the cloud endpoints and the response model are known, and
+there is no signature check in the app. Only dynamic confirmation remains (§P2):
+`0x06` vs `0x03` at the end, write pacing, behavior across the reboot.
 
-## Мотивация (полевые данные)
+## Motivation (field reports)
 
-- Два Ottai, активированные в JugglucoNG без OTA: один пришёл в норму примерно на 6-е сутки,
-  второй — примерно через 2 суток.
-- В официальном приложении активация с обновлением прошивки даёт адекватные значения почти
-  сразу (при прочих равных).
-- Рабочая гипотеза пользователя: на старой прошивке долго идёт автокалибровка внутри сенсора,
-  а новая прошивка её исправляет.
+- Two Ottai sensors activated in JugglucoNG without OTA: one came back to normal around
+  day 6, the other around day 2.
+- In the official app, activation with the firmware update gives adequate values almost
+  immediately (all else being equal).
+- User's working hypothesis: on the old firmware the autocalibration inside the sensor
+  takes a long time, and the newer firmware fixes it.
 
-## Что уже известно (триаж APK `com.ottai.seas` 1.38.0, 2026-10-26)
+## What is already known (triage of APK `com.ottai.seas` 1.38.0, 2026-10-26)
 
-Источник: `~/Projects/Dia/Ottai_1.38.0_APKPure.xapk`, `config.armeabi_v7a.apk` →
-`lib/armeabi-v7a/libapp.so` (Flutter AOT, ARM32), выборка через `strings`.
+Source: `~/Projects/Dia/Ottai_1.38.0_APKPure.xapk`, `config.armeabi_v7a.apk` →
+`lib/armeabi-v7a/libapp.so` (Flutter AOT, ARM32), sampling via `strings`.
 
-**OTA есть и встроено в активацию/подключение.**
-- Ассеты: `monitor_connect_ota_update_{tips,warning,limit,error,done}.webp`.
-- UI/строки: «For a safer and better experience, we need you to perform a firmware upgrade,
-  which takes about 1 minute», `UpgradeIgnore`, `UpgradeNextTime`, `UpgradeUpdate`.
-- Ошибки шага привязки: `BindStatusOTACheckInfoError`, `BindStatusOTADownloadError`,
-  `BindStatusOTAInstallPackageError`, `BindStatusOTAUpdateLimitError`. Значит, OTA —
-  часть bind/activate-флоу, а не отдельный экран настроек.
-- Dart-символы: `CgmOTA`, `CgmOTATool`, `CgmOTAFlowState`, `_startDeviceOtaUpgrade`,
+**OTA is present and built into the activation/connection flow.**
+- Assets: `monitor_connect_ota_update_{tips,warning,limit,error,done}.webp`.
+- UI/strings: "For a safer and better experience, we need you to perform a firmware upgrade,
+  which takes about 1 minute", `UpgradeIgnore`, `UpgradeNextTime`, `UpgradeUpdate`.
+- Bind-step errors: `BindStatusOTACheckInfoError`, `BindStatusOTADownloadError`,
+  `BindStatusOTAInstallPackageError`, `BindStatusOTAUpdateLimitError`. So OTA is part of
+  the bind/activate flow, not a separate settings screen.
+- Dart symbols: `CgmOTA`, `CgmOTATool`, `CgmOTAFlowState`, `_startDeviceOtaUpgrade`,
   `_startOtaMiniFlow`, `downloadOTAFile`, `readOTAFile`, `writeOTAControl`, `writeOTAData`,
   `clearOtaSection`, `upgradeOTAVersion`, `upgradeOTAStatus`, `_uploadOtaUpgradeStatue`,
   `pushOTAProgressState`, `checkOtaError`.
-- Модель: `OTAUpgradeModel.fromJson` с полями `forceUpgrade`, `upgradeFlag`, `isOtaing`,
+- Model: `OTAUpgradeModel.fromJson` with fields `forceUpgrade`, `upgradeFlag`, `isOtaing`,
   `otaProgress`.
 
-**Облако.**
-- `/ota/upgradeVersion/judge` — по названию проверка «нужно ли обновление» (вероятно, только
-  чтение). Вход/выход пока неизвестны.
-- `/device/ota/upgrade` — вероятно, отчёт о статусе или выдача пакета.
+**Cloud.**
+- `/ota/upgradeVersion/judge` — checks by name whether an update is needed (likely
+  read-only). Input/output unknown at that point.
+- `/device/ota/upgrade` — probably a status report or package delivery.
 - `CgmApi|getUpgradeOTAVersion`, `CgmApi|postUpgradeOTAVersion`.
-- Образа прошивки в APK нет: он скачивается (`downloadOTAFile`).
-- Бизнес-код `AppDevice_Upgrade_Version` (у нас `OttaiCloudClient.BIZ_UPGRADE_VERSION`,
-  сейчас трактуется как «уходи на V3») стоит перепроверить: возможно, он значит «устройству
-  или приложению нужен апгрейд».
+- No firmware image inside the APK: it is downloaded (`downloadOTAFile`).
+- The business code `AppDevice_Upgrade_Version` (ours: `OttaiCloudClient.BIZ_UPGRADE_VERSION`,
+  currently treated as "switch to V3") needs re-checking: it may mean "the device or the
+  app needs an upgrade".
 
-**BLE-транспорт: Silicon Labs AppLoader OTA** (стандартные UUID SiLabs, есть в `libapp.so`):
+**BLE transport: Silicon Labs AppLoader OTA** (standard SiLabs UUIDs, present in `libapp.so`):
 
-| Роль | UUID |
+| Role | UUID |
 |---|---|
 | OTA service | `1d14d6ee-fd63-4fa1-bfa4-8f47b42119f0` |
 | OTA control | `f7bf3564-fb6d-4e53-88a4-5e37e0326063` |
 | OTA data | `984227f3-34fc-4045-a5d0-2c581f81a153` |
 
-Отсюда: SoC сенсора — скорее всего SiLabs EFR32/BG2x, образ — `.gbl` (Gecko Bootloader).
-Протокол открыт (SiLabs AN1086 / AN1045): `0x00` в control → перезагрузка в AppLoader
-(часто с другим адресом или именем) → переподключение → `0x00` → поток `.gbl` через
-write-without-response в data → `0x03` (конец) → `0x04` (закрыть / перезагрузиться).
-Что добавляет Ottai поверх (авторизация перед входом в OTA, шифрованная команда в
-`d78d0706`, проверка версии) — неизвестно. Это главный вопрос RE.
+Conclusion: the sensor SoC is likely SiLabs EFR32/BG2x, the image is `.gbl` (Gecko Bootloader).
+The protocol is open (SiLabs AN1086 / AN1045): `0x00` in control → reboot into AppLoader
+(often at a different address or name) → reconnect → `0x00` → stream the `.gbl` via
+write-without-response into data → `0x03` (end) → `0x04` (close / reboot).
+Whatever Ottai adds on top (authorization before entering OTA, an encrypted command into
+`d78d0706`, version checks) was unknown at that point. That is the main RE question.
 
-**UUID в 1.38, которых нет в драйвере** (классифицировать, часть может относиться к
-часам или другим продуктам): `ceb33896-4ac1-4fb8-a426-c6e3ff6f4a97`,
+**UUIDs in 1.38 that are absent from the driver** (to classify; some may belong to the
+watch or other products): `ceb33896-4ac1-4fb8-a426-c6e3ff6f4a97`,
 `12347922-4e79-42e3-b107-a10e816f5b99`, `cb627922-4e79-42e3-b107-a10e816f5b99`,
-`e06e1d43-1319-4ebf-94b0-5b0e5318a2f1`, `e06e1d43-1339-*` (3 шт.),
-`c8693b6f-f850-44cb-b9b4-ac87ed962bac` (известный no-data/destructive — не трогать),
+`e06e1d43-1319-4ebf-94b0-5b0e5318a2f1`, `e06e1d43-1339-*` (3 of them),
+`c8693b6f-f850-44cb-b9b4-ac87ed962bac` (a known no-data/destructive one — do not touch),
 `00002ef7-0000-1000-8000-00888f9b34fb`.
 
-## Конкурирующие гипотезы (проверять до любых OTA-экспериментов)
+## Competing hypotheses (check before any OTA experiments)
 
-Глюкозу считает **приложение**, а не сенсор: `OttaiFormula` вычисляет RPN-выражение
-`method` с `coefficient` из облака. Переменные: `V0` ток, `V1` температура, `V2` runtime,
-`V4` runtime/3600, `V5` напряжение. Пакет `method` и `coefficient` приходит из
-bind/validate и зависит от устройства и `deviceVersion`. Поэтому:
+The app computes glucose, not the sensor: `OttaiFormula` evaluates the RPN expression
+`method` with `coefficient` from the cloud. Variables: `V0` current, `V1` temperature,
+`V2` runtime, `V4` runtime/3600, `V5` voltage. The `method`+`coefficient` package arrives
+in bind/validate and depends on the device and `deviceVersion`. Therefore:
 
-- **H1 — прошивка.** Новая прошивка меняет сырьё (ток, фильтрация, внутренний алгоритм
-  стабилизации), и данные сразу хорошие.
-- **H2 — формула.** После OTA меняется `deviceVersion`, и облако отдаёт другие
-  `method`/`coefficient` (другая кривая чувствительности по `V4`). Сенсор тот же, формула
-  новая.
-- **H3 — оба фактора** (новой прошивке нужна новая формула).
-- **H4 — не версия.** Разница в другом: параметры активации (`maxActive`,
-  `destructionTime`), прогрев, наш фильтр/подавление (`OttaiOutputFilter`, warmup gate),
-  разброс между сенсорами.
+- **H1 — firmware.** The new firmware changes the raw signal (current, filtering, internal
+  stabilization algorithm), and the data is good right away.
+- **H2 — formula.** After OTA the `deviceVersion` changes, and the cloud returns different
+  `method`/`coefficient` (a different sensitivity curve over `V4`). Same sensor, new formula.
+- **H3 — both factors** (the new firmware needs a new formula).
+- **H4 — not the version.** The difference is something else: activation parameters
+  (`maxActive`, `destructionTime`), warmup, our filter/suppression (`OttaiOutputFilter`,
+  warmup gate), spread between sensors.
 
-H2 проверяется без какого-либо риска для сенсора. Если подтвердится, OTA для улучшения
-первых суток может не понадобиться: хватит правильной формулы.
+H2 can be checked with zero risk to the sensor. If it holds, OTA for improving the first
+days may not be needed at all: the right formula is enough.
 
-## Фазы
+## Phases
 
-Факт от пользователя (2026-10-26): **в официальном приложении OTA при активации
-обязательна.** Значит, любой сенсор, заведённый в офиц. приложении, уже на новой прошивке,
-а любой сенсор, активированный в JugglucoNG, остаётся на заводской. Каждая активация в
-офиц. приложении — готовая возможность для захвата P2.
+User-reported fact (2026-10-26): **in the official app OTA at activation is mandatory.**
+So every sensor enrolled in the official app is already on the new firmware, and every
+sensor activated in JugglucoNG stays on the factory one. Each activation in the official
+app is a ready-made opportunity for a P2 capture.
 
-### P0. Сбор фактов без RE (риск 0)
+### P0. Facts without RE (risk 0)
 
-Откуда берётся версия:
-- В JugglucoNG `deviceVersion` приходит **из облака** (`validateDeviceByMacV2/V3`), а не
-  читается из сенсора. Хранится в материалах (`ottai_device_version_*`, экспорт JSON),
-  показывается в карточке сенсора строкой «Прошивка» (`SensorCard.kt`,
-  `vendorFirmwareVersion`) и пишется в logcat: `Ottai: V3 validation ok mac=… version=…`.
-  Для сенсоров, активированных в JugglucoNG, это версия **до** OTA.
-- Сам сенсор отдаёт версию в стандартной характеристике Device Information
-  `0000180a/00002a28` (Software Revision). Драйвер её сейчас **не читает**.
-  Источник истины после OTA — она: облачная запись может отставать.
+Where the version comes from:
+- In JugglucoNG `deviceVersion` arrives **from the cloud** (`validateDeviceByMacV2/V3`), not
+  from the sensor. It is stored in materials (`ottai_device_version_*`, JSON export), shown
+  in the sensor card as "Firmware" (`SensorCard.kt`, `vendorFirmwareVersion`) and written to
+  logcat: `Ottai: V3 validation ok mac=… version=…`. For sensors activated in JugglucoNG,
+  this is the version **before** OTA.
+- The sensor itself serves the version in the standard Device Information characteristic
+  `0000180a/00002a28` (Software Revision). The driver currently does **not** read it.
+  The source of truth after OTA is this characteristic: the cloud record may lag.
 
-Шаги:
-1. Проблемные сенсоры: снять «Прошивка» из карточки или `deviceVersion` из экспорта JSON.
-2. Сенсор после OTA в офиц. приложении: закрыть офиц. приложение (у BLE одно соединение),
-   подключиться nRF Connect → Device Information → Software Revision String (`2a28`).
-   Обычно это читается без авторизации. Если не выходит — добавить в драйвер read-only
-   чтение `2a28` при подключении с логом и сравнением с облачной `deviceVersion`
-   (безопасно, ничего не пишет).
-3. Отдельно проверить облачную `deviceVersion` того же сенсора (`deviceBind/list`):
-   обновляет ли её `_uploadOtaUpgradeStatue` после OTA.
-4. Из `deviceBind/list` и bind-ответов аккаунта вытащить `method`+`coefficient` для
-   сенсоров на старой и новой прошивке. Расшифровать (`OttaiCrypto`) и сравнить
-   выражения: отличаются ли члены с `V2`/`V4` (runtime)?
-5. Если есть сырые записи проблемных сенсоров: пересчитать первые 6 суток формулой
-   «новой» версии (офлайн, юнит-харнесс как в side-smoothing study) и сравнить с
-   пальцевыми замерами. Совпадение → H2.
+Steps:
+1. Problem sensors: take the "Firmware" field from the card or `deviceVersion` from the JSON export.
+2. A sensor updated via OTA in the official app: close the official app (one BLE connection),
+   connect nRF Connect → Device Information → Software Revision String (`2a28`).
+   Usually readable without authorization. If not — add read-only `2a28` reading to the
+   driver at connection with a log and a comparison against the cloud `deviceVersion`
+   (safe, writes nothing).
+3. Separately check the cloud `deviceVersion` of the same sensor (`deviceBind/list`):
+   does `_uploadOtaUpgradeStatue` refresh it after OTA.
+4. From `deviceBind/list` and the account's bind answers, extract `method`+`coefficient`
+   for sensors on the old and the new firmware. Decrypt (`OttaiCrypto`) and compare the
+   expressions: do the terms with `V2`/`V4` (runtime) differ?
+5. If raw records of the problem sensors exist: recompute the first 6 days with the
+   "new" firmware formula (offline, a unit harness like the side-smoothing study) and
+   compare with finger-prick measurements. A match → H2.
 
-6. Обход «активировать в офиц. приложении → перевести в JugglucoNG» **не годится как
-   решение**: офиц. активация зашивает `maxActive` = 15 дней (`b8fd9848`), а JugglucoNG
-   умеет активировать на больший срок. Годится только как одноразовый измерительный
-   сенсор для P4 (новая прошивка, 15 дней).
+6. The workaround "activate in the official app → move to JugglucoNG" is **not acceptable
+   as a solution**: an official activation pins `maxActive` = 15 days (`b8fd9848`), while
+   JugglucoNG can activate for a longer period. It is only usable as a one-off measuring
+   sensor for P4 (new firmware, 15 days).
 
-**Главное требование к результату:** OTA должна выполняться **до** активации и не мешать
-записи длинного `maxActive` в JugglucoNG.
+**Main requirement for the outcome:** OTA must happen **before** activation and must not
+interfere with writing the long `maxActive` in JugglucoNG.
 
-Факт от пользователя: OTA происходит **в момент активации** (внутри одного флоу), а не
-отдельно. Точный порядок неизвестен. Варианты:
+Fact from the user: OTA happens **at the moment of activation** (inside one flow), not
+separately. The exact order was unknown. Options:
 
-| Вариант | Порядок | Что значит для нас |
+| Option | Order | Meaning for us |
 |---|---|---|
-| A | bind → **OTA** → перезагрузка → RTC → `maxActive` → `ACTIVATE_CMD` | Окно между OTA и записью срока есть. OTA в JugglucoNG встаёт перед существующей активацией. |
-| B | bind → RTC → `maxActive` (15 дн) → `ACTIVATE_CMD` → **OTA** | Окна нет. Если активация переживает перезагрузку, у офиц. приложения сенсор всегда получает 15 дней; в JugglucoNG надо обновлять до активации, и неизвестно, примет ли старая прошивка OTA в неактивном состоянии. |
-| C | bind → RTC → `maxActive` → **OTA** → повтор активации | Вероятно, `maxActive` пишется заново после OTA; окно неочевидно. |
+| A | bind → **OTA** → reboot → RTC → `maxActive` → `ACTIVATE_CMD` | There is a window between OTA and writing the lifetime. OTA in JugglucoNG goes before the existing activation. |
+| B | bind → RTC → `maxActive` (15 d) → `ACTIVATE_CMD` → **OTA** | No window. If activation survives the reboot, the official app always gives the sensor 15 days; in JugglucoNG we must update before activation, and it is unknown whether the old firmware accepts OTA in an inactive state. |
+| C | bind → RTC → `maxActive` → **OTA** → re-activation | Probably `maxActive` is written again after OTA; the window is unclear. |
 
-Косвенный признак за A: OTA-ошибки названы `BindStatusOTA*`, то есть они в статусах
-шага bind, а bind в известном флоу идёт до BLE-активации. Это не доказательство: enum
-может покрывать весь мастер подключения. Порядок закрывает P1 (код `CgmOTAFlowState` /
-`_startDeviceOtaUpgrade`) и P2 (HCI-лог).
+Indirect sign for A: OTA errors are named `BindStatusOTA*`, i.e. they belong to the bind
+step statuses, and bind in the known flow goes before BLE activation. Not proof: the enum
+may cover the whole master connection. The order is closed by P1 (code `CgmOTAFlowState` /
+`_startDeviceOtaUpgrade`) and P2 (the HCI log).
 
-Выход P0: решение, нужен ли OTA вообще, или задача сводится к выбору формулы.
+P0 deliverable: whether OTA is needed at all, or the task reduces to formula choice.
 
-### P1. Статический RE официального приложения (риск 0) — ВЫПОЛНЕНО (см. `ottai-ota-static-re-1.44.md`)
+### P1. Static RE of the official app (risk 0) — DONE (see `ottai-ota-static-re-1.44.md`)
 
-0. **Итог 2026-10-26.** `Ottai_1.50.0_APKPure.xapk` — снова только ARMv7 **и** код
-   обфусцирован на уровне Dart (имена `_fph`, `init:_TJe@…`; `CgmOTA`, `startCgmOTA`,
-   `OTAUpgradeModel` отсутствуют). Поэтому разбирали **`Ottai_mod_1_44.apk`**
-   (`com.ottai.tag`, 1.44, `lib/arm64-v8a/libapp.so`, без обфускации, Dart 3.10.9) —
-   Blutter отработал, в нём весь `sy_embeded/src/ota/*`, `flow/cgm_bind_manger.dart`,
-   `cgm/cgm_transmit_manger.dart`. Идентичность кода с `com.ottai.seas` подтверждена
-   константами (`/ota/upgradeVersion/judge`, `03A617EB`, `V1.8.`, `.GBL`).
-   Вопросы ниже 1–6 закрыты статически; 7 (срок службы) — только динамикой.
+0. **Outcome of 2026-10-26.** `Ottai_1.50.0_APKPure.xapk` — ARMv7-only again **and** the
+   code is obfuscated at the Dart level (names `init:_TJe@…`, `_fph`; `CgmOTA`, `startCgmOTA`,
+   `OTAUpgradeModel` absent). So we worked with **`Ottai_mod_1_44.apk`**
+   (`com.ottai.tag`, 1.44, `lib/arm64-v8a/libapp.so`, unobfuscated, Dart 3.10.9) —
+   Blutter ran through, with all of `sy_embeded/src/ota/*`, `flow/cgm_bind_manger.dart`,
+   `cgm/cgm_transmit_manger.dart`. Identity with `com.ottai.seas` was confirmed by
+   constants (`/ota/upgradeVersion/judge`, `03A617EB`, `V1.8.`, `.GBL`).
+   Questions 1–6 below are closed statically; 7 (lifetime) — dynamics only.
 
-1. **Сначала дешёвые источники.** Проверить, есть ли OTA-код в читаемых Java-сборках:
-   `Ottai_mod_1_44.apk`, watch-APK 1.1.0 (`com.ottai.tag.watch`), старый CN `com.ottai.tag`.
-   Если OTA там на Java/Kotlin, весь протокол читается в jadx.
-   → В Java/Kotlin OTA нет (dex чист), всё в Dart. Зато `Ottai_mod_1_44.apk` дал arm64.
-2. **Dart AOT 1.38.** В XAPK с APKPure `libapp.so` только ARMv7, а blutter нормально
-   работает с arm64. arm64-v8a сборку пользователь предоставит. Прогнать blutter →
-   получить имена функций, пулы объектов, offsets. Запасной путь — reFlutter/Frida-хуки
-   по offsets.
-3. Цели разбора: `CgmOTA`, `CgmOTATool`, `CgmOTAFlowState`, `_startDeviceOtaUpgrade`,
+1. **Cheap sources first.** Check whether OTA code exists in readable Java builds:
+   `Ottai_mod_1_44.apk`, watch-APK 1.1.0 (`com.ottai.tag.watch`), the older CN `com.ottai.tag`.
+   If OTA is Java/Kotlin there, the whole protocol reads out in jadx.
+   → No OTA in Java/Kotlin (dex is clean), everything is in Dart. But `Ottai_mod_1_44.apk` gave arm64.
+2. **Dart AOT 1.38.** The XAPK from APKPure has `libapp.so` ARMv7 only, while blutter works
+   well with arm64. The user will provide an arm64-v8a build. Run blutter → get function
+   names, object pools, offsets. Fallback path — reFlutter/Frida hooks by offsets.
+3. Targets: `CgmOTA`, `CgmOTATool`, `CgmOTAFlowState`, `_startDeviceOtaUpgrade`,
    `_startOtaMiniFlow`, `downloadOTAFile`, `readOTAFile`, `writeOTAControl`/`writeOTAData`,
    `upgradeOTAVersion`, `_uploadOtaUpgradeStatue`, `OTAUpgradeModel.fromJson`,
    `CgmApi.getUpgradeOTAVersion`/`postUpgradeOTAVersion`.
-4. Что нужно ответить:
-   - в каком месте bind/activate стоит OTA: до `ACTIVATE_CMD` (0x03) или после?
-     Нужна ли переактивация после перезагрузки?
-   - что приложение пишет в сенсор перед `0x00` в OTA control: вендорская команда в
-     `d78d0706`, авторизация, ничего?
-   - как ищется устройство после перезагрузки в AppLoader: тот же MAC или MAC+1, имя,
-     сервис в рекламе;
-   - размер чанка, MTU, write-with/without-response, паузы, ретраи, поведение на обрыве;
-   - проверка пакета: md5/crc/подпись в ответе облака, сверка версии до и после;
-   - `forceUpgrade` / `upgradeFlag` / `UpdateLimit`: можно ли отказаться, есть ли лимит
-     попыток;
-   - что идёт после OTA: повтор Auth V2, повторный `validateDeviceByMac*`, новый bind,
-     новые `method`/`coefficient`.
-   - **срок службы на новой прошивке:** нет ли в ней потолка `maxActive` или проверки,
-     которая отвергает срок больше 15 дней. Искать в 1.38: откуда берётся
-     `activeExpireTime` (облако или константа), обрабатывает ли приложение NACK на
-     `b8fd9848`. Если потолок есть в прошивке, OTA и длинный срок несовместимы. Это
-     **стоп-критерий** всего направления, выяснить его до P5.
-   - есть ли «окно» между успешной OTA и `ACTIVATE_CMD`: можно ли остановить офиц. флоу
-     после OTA (до записи `maxActive`) и активировать уже в JugglucoNG. Делать это
-     только когда порядок шагов точно известен из P1/P2 — иначе это риск получить сенсор,
-     активированный на 15 дней, или наполовину активированный.
+4. Questions to answer:
+   - where in the bind/activate flow OTA sits: before `ACTIVATE_CMD` (0x03) or after?
+     Is reactivation needed after the reboot?;
+   - what the app writes to the sensor before `0x00` in OTA control: a vendor command into
+     `d78d0706`, authorization, nothing?;
+   - how the device is found after the reboot into AppLoader: same MAC or MAC+1, name,
+     service in the advertisement;
+   - chunk size, MTU, write-with/without-response, pauses, retries, behavior on disconnect;
+   - package verification: md5/crc/signature in the cloud response, version check before/after;
+   - `forceUpgrade` / `upgradeFlag` / `UpdateLimit`: can it be declined, is there a limit of attempts;
+   - what follows OTA: a repeat Auth V2, a repeat `validateDeviceByMac*`, a new bind,
+     new `method`/`coefficient`;
+   - **lifetime on the new firmware:** whether it cap `maxActive` or does a check that
+     rejects anything above 15 days. Look in 1.38: what `activeExpireTime` comes
+     from (cloud or a constant), whether the app handles a NACK to `b8fd9848`. If the cap
+     is in the firmware, OTA and a long lifetime are incompatible. This is the
+     **stop criterion** of the whole direction, settle it before P5;
+   - is there a "window" between a successful OTA and `ACTIVATE_CMD`: can the official flow
+     be stopped after OTA (before writing `maxActive`) and activated in JugglucoNG. Do this
+     only when the step order is exactly known from P1/P2 — otherwise it risks producing a
+     sensor activated for 15 days, or a half-activated one.
 
-### P2. Динамический захват (риск низкий: делает официальное приложение)
+### P2. Dynamic capture (risk low: the official app does the work)
 
-На **новом** сенсоре, который пользователь и так активирует в официальном приложении с OTA:
+On a **new** sensor that the user is going to activate with OTA in the official app anyway:
 
-1. Android HCI snoop log (Developer options) на весь путь: скан → bind → OTA →
-   активация → первые 30 минут данных.
-2. HTTPS: Frida + обход pinning (`libnative-keys-pinning-container.so`, `toolChecker` —
-   есть anti-tamper) или reFlutter. Записать запрос и ответ `/ota/upgradeVersion/judge`,
-   URL и заголовки скачивания пакета, `/device/ota/upgrade`.
-3. Сохранить сам `.gbl` (из ответа или из кэша приложения через `run-as`/root).
-4. Зафиксировать `2a28` до и после, а также `method`/`coefficient` до и после
+1. Android HCI snoop log (Developer options) across the whole path: scan → bind → OTA →
+   activation → the first 30 minutes of data.
+2. HTTPS: Frida + pinning bypass (`libnative-keys-pinning-container.so`, `toolChecker` —
+   anti-tamper present) or reFlutter. Record the request and response of
+   `/ota/upgradeVersion/judge`, the download package URL and headers, `/device/ota/upgrade`.
+3. Keep the `.gbl` itself (from the response or the app cache via `run-as`/root).
+4. Record `2a28` before and after, and `method`/`coefficient` before and after
    (`deviceBind/list`).
-5. В HCI-логе отметить точный порядок: OTA control/data → перезагрузка → RTC →
-   `b8fd9848` (какое значение) → `6AA799B6` → `ACTIVATE_CMD`. Это определяет, где окно
-   для «OTA без офиц. активации».
-5. Артефакты держать вне репо (как `~/Projects/Dia/anytime-native/`), например
-   `~/Projects/Dia/ottai-ota/`. Образ прошивки и сырые захваты **не коммитить**.
+5. In the HCI log, mark the exact order: OTA control/data → reboot → RTC →
+   `b8fd9848` (what value) → `6AA799B6` → `ACTIVATE_CMD`. This defines where the window
+   for "OTA without the official activation" is.
+5. Keep the artifacts outside the repo (like `~/Projects/Dia/anytime-native/`), e.g.
+   `~/Projects/Dia/ottai-ota/`. Firmware image and raw captures **are not committed**.
 
-### P3. Анализ образа `.gbl` (риск 0)
+### P3. Analysis of the `.gbl` image (risk 0)
 
-1. Распарсить GBL-теги (header, application info с версией, prog, encryption, signature).
-2. Если образ зашифрован и подписан (AES-CCM + ECDSA в Gecko Bootloader): модифицировать
-   нельзя, но для доставки это не нужно, достаточно переслать байт-в-байт. Если открыт:
-   версия и app properties; при наличии двух версий — бинарный diff в Ghidra
-   (Cortex-M33, база из app properties) по участкам с обработкой тока или стабилизацией.
-3. Привязка пакета: один образ на всех или под конкретный MAC/партию (влияет на то,
-   можно ли брать файл из облака по версии).
+1. Parse GBL tags (header, application info with version, prog, encryption, signature).
+2. If the image is encrypted and signed (AES-CCM + ECDSA in Gecko Bootloader): it cannot be
+   modified, but delivery does not need that — retransmitting byte-for-byte is enough. If
+   plaintext: version and app properties; with two versions available — a binary diff in
+   Ghidra (Cortex-M33, base from app properties) over areas handling current or stabilization.
+3. Package binding: one image for all or per-MAC/per-batch (affects whether the file can be
+   pulled from the cloud by version).
 
-### P4. Эксперимент «прошивка vs формула» (риск: один сенсор)
+### P4. Experiment "firmware vs formula" (risk: one sensor)
 
-Матрица на сенсорах одной партии, при одинаковой постановке, с пальцевыми замерами
-первые 72 ч:
+Matrix on sensors of one batch, identical placement, with finger measurements over the
+first 72 hours:
 
-| | старая формула | новая формула |
+| | old formula | new formula |
 |---|---|---|
-| старая прошивка | текущее JugglucoNG | P0 офлайн-пересчёт |
-| новая прошивка | офлайн-пересчёт со старой формулой | офиц. приложение (эталон); JugglucoNG на сенсоре после офиц. активации (формулу отдаёт облако — сверить с офиц.) |
+| old firmware | current JugglucoNG | P0 offline recomputation |
+| new firmware | offline recomputation with the old formula | official app (reference); JugglucoNG on a sensor after the official activation (the cloud serves the formula — cross-check against official) |
 
-Ячейку «старая прошивка + новая формула» в офиц. приложении получить нельзя (OTA
-обязательна), только офлайн-пересчётом.
+The "old firmware + new formula" cell cannot be produced in the official app (OTA is
+mandatory), only by offline recomputation.
 
-Решение по этой матрице определяет реализацию:
-- достаточно формулы → P5 не нужен, правим выбор `method`/`coefficient`;
-- нужна прошивка → P5.
+The matrix decides the implementation:
+- formula is enough → P5 not needed, fix the `method`/`coefficient` selection;
+- firmware is needed → P5.
 
-### P5. Реализация в JugglucoNG (только после P2 + P4)
+### P5. Implementation in JugglucoNG (only after P2 + P4)
 
-- `OttaiOtaManager`: judge → скачивание → проверка хеша → SiLabs OTA → переподключение →
-  проверка `2a28` → повтор auth/validate → новые материалы.
-- Только явное действие пользователя, с предупреждением о риске; никогда автоматически
-  и никогда в фоне. Предусловия: батарея телефона, RSSI, экран включён, нет других BLE-сессий.
-- Восстановление: устройство «застряло» в AppLoader → найти и долить образ повторно.
-- Порядок относительно `ACTIVATE_CMD` — строго как в официальном приложении (из P1/P2):
-  OTA → переподключение → активация JugglucoNG с длинным `maxActive`. После активации
-  проверить ACK `maxActive` и записать фактический срок (`PREF` принятого `maxActive`).
-- Первый боевой прогон — на сенсоре, который не жалко, с проверкой, что новая прошивка
-  приняла срок больше 15 дней и держит его после 15-х суток.
-- Тесты на фейковом GATT: последовательность control-опкодов, нарезка, обрыв/ретрай,
-  смена адреса. Без live-OTA в CI.
-- Сначала field-test сборка с явной пометкой.
+- `OttaiOtaManager`: judge → download → hash check → SiLabs OTA → reconnect → `2a28` check →
+  re-auth/validate → new materials.
+- Explicit user action only, with a risk warning; never automatic, never in background.
+  Preconditions: phone battery, RSSI, screen on, no other BLE sessions.
+- Recovery: device "stuck" in AppLoader → find it and re-send the image.
+- Order relative to `ACTIVATE_CMD` — exactly as in the official app (from P1/P2):
+  OTA → reconnect → JugglucoNG activation with the long `maxActive`. After activation,
+  check the `maxActive` ACK and record the actual lifetime (`PREF` of the accepted `maxActive`).
+- First live run — on a disposable sensor, verifying that the new firmware accepted a
+  lifetime above 15 days and keeps it past day 15.
+- Tests against a fake GATT: the control opcode sequence, chunking, disconnect/retry,
+  address change. No live OTA in CI.
+- First a field-test build with an explicit label.
 
-## Правила остановки и безопасности
+## Stop rules and safety
 
-- Сенсор одноразовый, неудачный OTA = потерянный сенсор. Никаких самодельных OTA-записей
-  до полного захвата P2, и только на запасном сенсоре.
-- Не писать в `c8693b6f…` и неизвестные характеристики `84c5b711…`
-  (no-data/destructive путь).
-- Не менять текущие warmup/фильтр/формулу «на глаз» без данных P0/P4.
-- Прошивку, захваты и ключи держать вне репозитория.
+- The sensor is disposable; a failed OTA means a lost sensor. No homemade OTA writes before
+  a complete P2 capture, and only on a spare sensor.
+- Do not write to `c8693b6f…` and unknown characteristics of `84c5b711…`
+  (the no-data/destructive path).
+- Do not change the current warmup/filter/formula "by eye" without P0/P4 data.
+- Keep firmware, captures, and keys outside the repository.
 
-## Что нужно от пользователя
+## What is needed from the user
 
-1. Строка «Прошивка» из карточки двух проблемных сенсоров (см. P0).
-2. `2a28` через nRF Connect у сенсора, обновлённого в офиц. приложении.
-3. HCI snoop + HTTPS на следующей активации в офиц. приложении.
-4. arm64 APK 1.38+ — **не нужен для статики**: 1.50 обфусцирован, разбор сделан по
-   1.44 arm64. Нужен только если понадобится сверить 1.50 с точностью до опкода;
-   тогда лучше сразу HCI-лог (п. 3).
-5. Сам `.gbl` (из кеша приложения или из облака) — для P3 и как эталон для тестов.
+1. The "Firmware" line from the cards of the two problem sensors (see P0).
+2. `2a28` via nRF Connect from a sensor updated in the official app.
+3. HCI snoop + HTTPS on the next activation in the official app.
+4. arm64 APK 1.38+ — **not needed for static work**: 1.50 is obfuscated, the analysis was
+   done on 1.44 arm64. Only needed if we must compare 1.50 opcode-by-opcode;
+   in that case an HCI log (item 3) is better straight away.
+5. The `.gbl` itself (from the app cache or from the cloud) — for P3 and as the reference
+   for tests.
 
-Закрыто: OTA при активации в офиц. приложении обязательна.
+Closed: OTA at activation in the official app is mandatory.

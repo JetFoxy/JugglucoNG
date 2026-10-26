@@ -1,42 +1,42 @@
-# Ottai OTA: статический RE (Blutter, com.ottai.tag 1.44 arm64) — результаты
+# Ottai OTA: static RE (Blutter, com.ottai.tag 1.44 arm64) — results
 
-Статус: P1 (статический RE) — основная часть закрыта, 2026-10-26.
-План: `docs/ottai-firmware-ota-re-plan.md`. Артефакты (вне репо):
+Status: P1 (static RE) — the main part is closed, 2026-10-26.
+Plan: `docs/ottai-firmware-ota-re-plan.md`. Artifacts (outside the repo):
 `~/Projects/Dia/ottai-ota/`.
 
-## 0. Как получен результат
+## 0. How the result was obtained
 
-- `Ottai_1.50.0_APKPure.xapk` содержит только `armeabi-v7a` (как и 1.38): Blutter
-  ARM32 не умеет. Дополнительно **1.50 обфусцирован на уровне Dart**:
-  имена вида `init:_TJe@601043202`, `_fph`, `_qna`; символов `CgmOTA`, `startCgmOTA`,
-  `OTAUpgradeModel`, `_startDeviceOtaUpgrade` в `libapp.so` нет (в 1.38 были).
-  При этом константы `/ota/upgradeVersion/judge`, `03A617EB`, `V1.8.`, `.GBL`,
-  `writeOTAControl:`, `download_ota_package_*`, `update_ota_status_*` в 1.50 на месте.
-  Вывод: код тот же, имена переименованы → 1.50 для чтения кода не годится.
-- Рабочий статический таргет: **`~/Downloads/Ottai_mod_1_44.apk`** = `com.ottai.tag`
-  (CN-сборка) 1.44, `lib/arm64-v8a/libapp.so` 25 МБ, Dart 3.10.9, **без обфускации**,
-  флаги снапшота `product, compressed-pointers, no-shared_data, arm64`.
-  Тот же модуль `sy_embeded`, те же константы, что в 1.44/1.50 `com.ottai.seas`.
-- Blutter (worawit/blutter, коммит 4a60ac6) + Dart SDK 3.10.9 собран локально.
-  Понадобился фикс ICU (Homebrew `brew --prefix icu4c` → `icu4c@79` без libicuuc;
-  в `scripts/CMakeLists.txt` добавлен откат на `icu4c@78`) и правка
-  `ICU_INCLUDE_DIR` в CMakeCache.
-- Выход: `~/Projects/Dia/ottai-ota/work/blutter-1.44/asm/` — листинги по исходным
-  файлам (`package:sy_embeded/...`), `pp.txt` — дамп пула объектов.
-  Адреса ниже (`0x…`) — адреса в `libapp.so` 1.44 arm64, для трассировки.
+- `Ottai_1.50.0_APKPure.xapk` contains only `armeabi-v7a` (same as 1.38): Blutter
+  does not handle ARM32. On top of that **1.50 is obfuscated at the Dart level**:
+  names like `init:_TJe@601043202`, `_fph`, `_qna`; the symbols `CgmOTA`, `startCgmOTA`,
+  `OTAUpgradeModel`, `_startDeviceOtaUpgrade` are absent from `libapp.so` (they were in 1.38).
+  Meanwhile the constants `/ota/upgradeVersion/judge`, `03A617EB`, `V1.8.`, `.GBL`,
+  `writeOTAControl:`, `download_ota_package_*`, `update_ota_status_*` are all still in 1.50.
+  Conclusion: same code, renamed symbols → 1.50 is unusable for code reading.
+- The working static target: **`~/Downloads/Ottai_mod_1_44.apk`** = `com.ottai.tag`
+  (CN build) 1.44, `lib/arm64-v8a/libapp.so` 25 MB, Dart 3.10.9, **unobfuscated**,
+  snapshot flags product, compressed-pointers, no-shared_data, arm64.
+  Same `sy_embeded` module, same constants as in 1.44/1.50 `com.ottai.seas`.
+- Blutter (worawit/blutter, commit 4a60ac6) + Dart SDK 3.10.9 built locally.
+  An ICU fix was needed (Homebrew `brew --prefix icu4c` → `icu4c@79` is missing libicuuc;
+  a fallback to `icu4c@78` was added to `scripts/CMakeLists.txt`) and an
+  `ICU_INCLUDE_DIR` fix in the CMakeCache.
+- Output: `~/Projects/Dia/ottai-ota/work/blutter-1.44/asm/` — listings per source file
+  (`package:sy_embeded/...`), `pp.txt` — the object pool dump. The addresses below
+  (`0x…`) are addresses in `libapp.so` 1.44 arm64, for tracing.
 
-Ограничение: APK модифицированный, не из стора. Идентичность протокола с
-`com.ottai.seas` подтверждена константами и именами состояний, но финальную
-сверку даёт только P2 (HCI-лог).
+Limitation: the APK is modified, not from a store. Protocol identity with
+`com.ottai.seas` is confirmed by constants and state names, but the final cross-check
+comes only from P2 (an HCI log).
 
-## 1. GATT-карта Ottai (найдена целиком)
+## 1. The Ottai GATT map (recovered in full)
 
-`CgmCharacteristicType` (`pp.txt`, объекты `Obj!CgmCharacteristicType`) — 21 значение,
-порядок индексов совпадает с порядком UUID в пуле (`pp+0x278b0…0x27950`).
-Проверено по якорям: `softVersion` = `2a28`, `currentTime` = `2a2b`,
+`CgmCharacteristicType` (`pp.txt`, objects `Obj!CgmCharacteristicType`) — 21 values;
+the index order matches the UUID order in the pool (`pp+0x278b0…0x27950`).
+Verified against anchors: `softVersion` = `2a28`, `currentTime` = `2a2b`,
 `ctlDevice` = `6aa799b6` (ACTIVATE_CMD), `activeDuartion` = `b8fd9848`.
 
-| # | enum | UUID | Замечание |
+| # | enum | UUID | Note |
 |---|---|---|---|
 | 0 | deviceInfo | `0000180a-0000-1000-8000-00805f9b34fb` | Device Information |
 | 1 | softVersion | `00002a28-0000-1000-8000-00805f9b34fb` | Software Revision (ASCII) |
@@ -50,180 +50,179 @@
 | 9 | monitorGlucose | `00002aa7-0000-1000-8000-00805f9b34fb` | |
 | 10 | glucoseRecord | `69e4f45f-a180-422c-83c0-324146402112` | |
 | 11 | requestByCount | `ccecb015-6750-41fd-ba78-3fb77d350574` | |
-| 12 | convertCmd | `d78d0706-c775-448d-8a78-01215e7c2e11` | «вендорская команда» из плана |
+| 12 | convertCmd | `d78d0706-c775-448d-8a78-01215e7c2e11` | the "vendor command" from the plan |
 | 13 | selfTest | `cb627922-4e79-42e3-b107-a10e816f5b99` | |
 | 14 | mackey | `12347922-4e79-42e3-b107-a10e816f5b99` | |
 | 15 | serviceOTA | `1d14d6ee-fd63-4fa1-bfa4-8f47b42119f0` | SiLabs OTA |
 | 16 | otaControl | `f7bf3564-fb6d-4e53-88a4-5e37e0326063` | |
 | 17 | otaData | `984227f3-34fc-4045-a5d0-2c581f81a153` | |
 | 18 | ctlDevice | `6aa799b6-b374-4148-8f36-6d440c0ec203` | ACTIVATE_CMD |
-| 19 | ctlGluDataIdx | `c8693b6f-f850-44cb-b9b4-ac87ed962bac` | не писать (destructive) |
-| 20 | activeDuartion | `b8fd9848-0ccd-423f-bd34-2419aa7ea004` | maxActive, 4 байта |
+| 19 | ctlGluDataIdx | `c8693b6f-f850-44cb-b9b4-ac87ed962bac` | do not write (destructive) |
+| 20 | activeDuartion | `b8fd9848-0ccd-423f-bd34-2419aa7ea004` | maxActive, 4 bytes |
 
-Сервисные имена для логов: `device_info`, `service_auth`, `service_CGM`, `service_OTA`
-(`pp+0x27860`), характеристики: `soft_version`, `error_info`, `current_time`, `auth_host`,
+Service names for logs: `device_info`, `service_auth`, `service_CGM`, `service_OTA`
+(`pp+0x27860`); characteristics: `soft_version`, `error_info`, `current_time`, `auth_host`,
 `auth_dev`, `auth_flag`, `new_glucose`, `glucose_record`, `request_by_count`, `cmd`,
 `self_test`, `mac_key`, `ota_control`, `ota_package`, `ctl_device`, `ctl_glu_data_idx`,
-`active_duartion` (опечатка в коде).
+`active_duartion` (typo in the code).
 
-## 2. Флоу активации и место OTA (ответ: вариант A)
+## 2. The activation flow and the place of OTA (answer: variant A)
 
-`CgmBindFlowManger` (`asm/sy_embeded/src/flow/cgm_bind_manger.dart`) — состояния
-(полный enum `CgmBindFlowState`, 89 значений, `_pushState @0xc0b6cc`) идут в порядке:
+`CgmBindFlowManger` (`asm/sy_embeded/src/flow/cgm_bind_manger.dart`) — states
+(the full enum `CgmBindFlowState`, 89 values, `_pushState @0xc0b6cc`) come in this order:
 
 ```
 nfc_* → ble_permit → ble_scan/connect/discover_service
   → read_device_version_profile → auth
   → check_active
-      ├─ уже активирован → check expired → дальше
-      └─ не активирован:
+      ├─ already activated → check expired → continue
+      └─ not activated:
            upgrade_check (GET /ota/upgradeVersion/judge)
              ├─ requiredUpgrade=true → download_ota_package → ota_start/success/error
-             │                        → update_ota_status → **rescan 60 с** → флоу с начала
-             └─ иначе → upgrade_check_success / upgrade_count_limt → дальше
+             │                        → update_ota_status → **rescan 60 s** → flow restarts
+             └─ otherwise → upgrade_check_success / upgrade_count_limt → continue
   → set_device_coefficient → write_calibration_parameter
   → set_active_duration (b8fd9848) → set_retain_duration
   → active_start (ctlDevice, ACTIVATE_CMD)
   → bind_device (POST /deviceBind/composite/bind)
 ```
 
-Факты:
+Facts:
 
-- OTA выполняется **до** записи `maxActive` и **до** `ACTIVATE_CMD` → в плане это
-  вариант **A**, окно между OTA и активацией есть.
-- OTA вообще не рассматривается для уже активированного сенсора: ветка
-  `checkNeedDeviceUpgrade` вызывается только когда `check_active != true`
+- OTA happens **before** writing `maxActive` and **before** `ACTIVATE_CMD` → this is
+  variant **A** in the plan; a window between OTA and activation exists.
+- OTA is not considered for an already-activated sensor at all: the
+  `checkNeedDeviceUpgrade` branch is entered only when `check_active != true`
   (`cgm_bind_manger.dart` 0xc042a4 → 0xc042c8).
-- После успешной OTA приложение делает `startScan(mac, 60 s, isFromBind: true)`
-  (`_startOtaMiniFlow @0xc07638`, Duration = `0x3938700` мкс) и **перезапускает
-  весь флоу с нуля** (scan → connect → discover → read version → auth → check_active).
-  Никакой отдельной «пост-OTA» логики нет.
-- Если OTA не удалась — `_startBleScan` не вызывается, флоу просто завершается
-  (сенсор остаётся неактивированным; приложение показывает ошибку шага bind).
-- Решение об OTA принимает **облако**; `requiredUpgrade=true` → OTA обязательна
-  (то, что пользователь видит в офиц. приложении). `allowUpgrade=true &&
-  requiredUpgrade=false` → OTA **не** делается, ставится состояние
-  `upgradeCountLimt`, и текущий проход флоу на этом **завершается** (UI показывает
-  экран «обновление доступно/лимит»); продолжение — только новым проходом.
-  `downloadUrl == null` → `upgradeCheckError`, тоже конец прохода.
+- After a successful OTA the app calls `startScan(mac, 60 s, isFromBind: true)`
+  (`_startOtaMiniFlow @0xc07638`, Duration = `0x3938700` µs) and **restarts the whole
+  flow from scratch** (scan → connect → discover → read version → auth → check_active).
+  There is no separate "post-OTA" logic.
+- If OTA fails — `_startBleScan` is not called, the flow simply ends (the sensor remains
+  unactivated; the app shows the bind step error).
+- The decision to OTA is made by the **cloud**; `requiredUpgrade=true` → OTA is mandatory
+  (what the user sees in the official app). `allowUpgrade=true && requiredUpgrade=false` →
+  OTA is **not** performed, the state `upgradeCountLimt` is set, and the current pass of
+  the flow **ends** here (the UI shows an "update available/limit" screen); continuing is
+  only via a fresh pass. `downloadUrl == null` → `upgradeCheckError`, also the end of the pass.
 
-## 3. Транспорт OTA (SiLabs AppLoader)
+## 3. The OTA transport (SiLabs AppLoader)
 
 `CgmOTA.startCgmOTA(path)` — `asm/sy_embeded/src/ota/cgm_ota.dart` @0xc07bec:
 
-1. `CgmOTATool.readOTAFile(path)` — файл из `getApplicationDocumentsDirectory()`,
-   проверка существования + `path.toUpperCase().endsWith(".GBL")` + `verifyFile(bytes)`
-   (см. §4). При ошибке — `false`.
-2. `requestMTU(mac)` → плагин просит MTU **247** (`0xf7`, `sy_bluetooth_plugin.dart`
-   @0xc08448); берётся фактически согласованный.
-3. `chunk = (mtu ~/ 4) * 4` → при 247 это **244** (= MTU-3).
+1. `CgmOTATool.readOTAFile(path)` — the file from `getApplicationDocumentsDirectory()`,
+   existence check + `path.toUpperCase().endsWith(".GBL")` + `verifyFile(bytes)`
+   (see §4). On error — `false`.
+2. `requestMTU(mac)` → the plugin requests MTU **247** (`0xf7`, `sy_bluetooth_plugin.dart`
+   @0xc08448); the actually negotiated value is used.
+3. `chunk = (mtu ~/ 4) * 4` → at 247 that is **244** (= MTU-3).
 4. `pushOTAProgressState(0.0)`.
-5. `writeOtaControl([0x00])` — в `f7bf3564…`, **write-with-response**
-   (`SyBluetoothPlugin.writeCharacteristic`). Если не `true` — выход с `false`.
-6. Цикл `i = 0; i < len; i += chunk`: `writeOtaData(file.sublist(i, min(i+chunk, len)))`
-   в `984227f3…`, тоже write-with-response, последовательно (await каждого).
-   После каждого успешного чанка `pushOTAProgressState(i / len)` (в UI — `otaProgress`).
-   Первая же ошибка → `false`, **без ретраев**.
+5. `writeOtaControl([0x00])` — into `f7bf3564…`, **write-with-response**
+   (`SyBluetoothPlugin.writeCharacteristic`). If not `true` — exit with `false`.
+6. Loop `i = 0; i < len; i += chunk`: `writeOtaData(file.sublist(i, min(i+chunk, len)))`
+   into `984227f3…`, also write-with-response, sequentially (each awaited).
+   After each successful chunk `pushOTAProgressState(i / len)` (in the UI — `otaProgress`).
+   The first failure → `false`, **no retries**.
 7. `pushOTAProgressState(1.0)`.
 8. `writeOtaControl([0x06])` → `true`.
 
-Что важно:
+What matters:
 
-- Никакой вендорской команды/авторизации непосредственно перед `0x00` нет:
-  auth (`authHost/authDev/authFlag`, запись ключа в `mackey`) выполняется раньше,
-  как обычный шаг флоу. `d78d0706` (convertCmd) в OTA-пути не участвует.
-- Между чанками приложение выдерживает паузу из настроек (`write()` делает
-  `Future.delayed(...)` после каждой записи; ключи `key_ble_*` приходят из
-  `sdk_init` профиля, значения по умолчанию в коде не зашиты) — точный темп
-  надо брать из P2.
-- Финал — `0x06`, а не `0x03` как в классическом описании SiLabs
-  («0x03 = upload finished»). Либо у Ottai AppLoader другой набор опкодов, либо
-  `0x06` = «finish + reboot». Различие принципиально, закрывается HCI-логом.
-- Перезагрузка сенсора ожидается **после** `0x06`: сразу после успеха флоу уходит
-  в скан на 60 с и переподключается по тому же MAC (`isFromBind: true`).
-  Меняется ли MAC/имя после ребута — статически не видно.
+- There is no vendor command / authorization immediately before `0x00`:
+  auth (`authHost/authDev/authFlag`, key write into `mackey`) happens earlier as a regular
+  flow step. `d78d0706` (convertCmd) does not participate in the OTA path.
+- Between chunks the app keeps a pause from settings (`write()` does a
+  `Future.delayed(...)` after every write; the keys `key_ble_*` come from the
+  `sdk_init` profile, the default values are not hardcoded) — the exact pacing
+  must come from P2.
+- The finish is `0x06`, not `0x03` as in the classic SiLabs description
+  ("0x03 = upload finished"). Either the Ottai AppLoader uses a different opcode set, or
+  `0x06` = "finish + reboot". The distinction is critical and is closed by the HCI log.
+- The sensor restart is expected **after** `0x06`: right after success the flow goes to
+  a 60-second scan and reconnects to the same MAC (`isFromBind: true`).
+  Whether the MAC/name changes across the reboot is not visible statically.
 
-## 4. Проверка пакета `.gbl` (в приложении)
+## 4. Verification of the `.gbl` package (in the app)
 
-`CgmOTATool.verifyFile(bytes, startIndex = 0)` @0xc086c0 — рекурсивный обход GBL-тегов:
+`CgmOTATool.verifyFile(bytes, startIndex = 0)` @0xc086c0 — a recursive walk over GBL tags:
 
-- `tagId` = 4 байта с начала тега, читаются **в обратном порядке**, в hex-строку;
-- допустимые `tagId` (hex, как в коде): `03A617EB` (header), `5EA617EB` (bootloader),
+- `tagId` = 4 bytes from the tag start, read **in reverse order**, into a hex string;
+- allowed `tagId` values (hex, as in the code): `03A617EB` (header), `5EA617EB` (bootloader),
   `F40A0AF4` (erase&prog), `F50909F5` (end), `F70A0AF7` (signature), `F60808F6`,
   `FC0404FC`, `FE0101FE`, `FD0303FD`, `FD0505FD`, `FD0707FD`
-  (последние — группа encryption/metadata/secure-boot; точные имена по UG103.7
-  не сверял);
-- `tagLength` = 4 байта little-endian; переход к следующему тегу `start+4+len`;
-  конец = ровно длина файла;
-- если обход бросил исключение, но остаток файла целиком `0xFF` — считается валидным
-  (допускается «стёртый» хвост).
+  (the last group is encryption/metadata/secure-boot; the exact names against UG103.7
+  were not cross-checked);
+- `tagLength` = 4 bytes little-endian; next tag at `start+4+len`;
+  the end must equal the file length exactly;
+- if the walk threw but the remaining file is entirely `0xFF` — considered valid
+  (an "erased" tail is allowed).
 
-**Хеша, CRC или проверки подписи в приложении нет.** Целостность/подпись проверяет
-Gecko Bootloader на сенсоре по тегам signature/encryption.
+**No hash, CRC or signature check in the app.** Integrity/signature is checked by
+the Gecko Bootloader on the sensor via the signature/encryption tags.
 
-## 5. Облако
+## 5. Cloud
 
-| Что | Детали |
+| What | Details |
 |---|---|
-| Проверка версии | `GET /ota/upgradeVersion/judge?mac=<mac>&deviceVersion=<cachedVersion>&deviceType=cgm` (`cgm_api.dart` @0xc094c8) |
-| Ответ | `OTAUpgradeModel.fromJson`: `downloadUrl`, `requiredUpgrade` (bool), `allowUpgrade` (bool), `errorCode` (`ota_upgrade_model.dart`) |
-| `deviceVersion` в запросе | **из локального кеша** `EmbededVersionManger.getSoftwareVersionByMac(mac)`, а не чтение с сенсора |
-| Скачивание | `downloadOTAFile(url)`: имя = последний сегмент URL, сохраняется в `getApplicationDocumentsDirectory()/<имя>`, если файла нет — `DioNet.downloadFile(url, path)`; повторно не качается |
-| Отчёт | `POST /device/ota/upgrade` c `{mac, sourceVersion, targetVersion, upgradeStatus, remark}`; `upgradeStatus = 1` при успехе, `0` при ошибке; `targetVersion` = имя файла без `.gbl` (`_getFileName`), `sourceVersion` = версия из кеша (т.е. **старая**) |
-| Ещё | `/device/getUranusVersion`, `/device/validateDeviceByMacV2` |
+| Version check | `GET /ota/upgradeVersion/judge?mac=<mac>&deviceVersion=<cachedVersion>&deviceType=cgm` (`cgm_api.dart` @0xc094c8) |
+| Response | `OTAUpgradeModel.fromJson`: `downloadUrl`, `requiredUpgrade` (bool), `allowUpgrade` (bool), `errorCode` (`ota_upgrade_model.dart`) |
+| `deviceVersion` in the request | **from the local cache** `EmbededVersionManger.getSoftwareVersionByMac(mac)`, not read from the sensor |
+| Download | `downloadOTAFile(url)`: name = last URL segment, saved into `getApplicationDocumentsDirectory()/<name>`; if the file exists — no re-download (`DioNet.downloadFile(url, path)`) |
+| Report | `POST /device/ota/upgrade` with `{mac, sourceVersion, targetVersion, upgradeStatus, remark}`; `upgradeStatus = 1` on success, `0` on error; `targetVersion` = the filename minus `.gbl` (`_getFileName`), `sourceVersion` = the cached version (i.e. the **old** one) |
+| More | `/device/getUranusVersion`, `/device/validateDeviceByMacV2` |
 
-Следствие для P0: облачная `deviceVersion` после OTA обновится только когда
-приложение снова прочитает `2a28` (`readSoftVersion`) в новом проходе флоу и
-запишет в кеш/на сервер (`EmbededVersionManger.setTargetDeviceVersion`). Сам отчёт
-об OTA версию не обновляет.
+Consequence for P0: the cloud `deviceVersion` updates only when the app reads `2a28`
+again (`readSoftVersion`) in the new flow pass and writes it to the cache/server
+(`EmbededVersionManger.setTargetDeviceVersion`). The OTA report itself does not refresh it.
 
-## 6. Версионные профили (важно для H2)
+## 6. Version profiles (important for H2)
 
 `SyEmbededVersionProfile.getVersionProfileFromSupport(version)` @0xbf4a98:
-по префиксу `softVersion` выбирается профиль `V1.3. … V1.8.`
-(фабрики `SyEmbededVersionProfile.v_1_3 … v_1_8`). Профиль = набор поддерживаемых
-характеристик (`isSupportCharacter`), т.е. по факту — карта возможностей прошивки.
+by the `softVersion` prefix a profile `V1.3. … V1.8.` is selected
+(factories `SyEmbededVersionProfile.v_1_3 … v_1_8`). A profile = the set of supported
+characteristics (`isSupportCharacter`), i.e. effectively the firmware capability map.
 
-- `serviceOTA`/`otaControl`/`otaData` есть во **всех** профилях V1.3…V1.8.
-- `activeDuartion` (`b8fd9848`) появляется только с **V1.4** — на более старой
-  прошивке `maxActive` не пишется вовсе.
-- `readSoftVersion` читает `2a28` и делает `createFromCharCodes` (ASCII), т.е.
-  версия — строка вида `V1.x.y`.
-- `setTargetDeviceVersion` сравнивает прочитанную версию с профилем: несовпадение →
-  `readDeviceVersionProfileError` и флоу дальше не идёт. Значит список допустимых
-  версий зашит в приложение — можно вытащить полный список поддерживаемых прошивок
-  из 1.44 (следующий шаг, дешёвый).
+- `serviceOTA`/`otaControl`/`otaData` are present in **all** profiles V1.3…V1.8.
+- `activeDuartion` (`b8fd9848`) appears only from **V1.4** — on an older firmware
+  `maxActive` is not written at all.
+- `readSoftVersion` reads `2a28` and does `createFromCharCodes` (ASCII), i.e. the version
+  is a string like `V1.x.y`.
+- `setTargetDeviceVersion` compares the read version against the profile: a mismatch →
+  `readDeviceVersionProfileError` and the flow does not continue. So the list of allowed
+  versions is hardcoded in the app — the full list of supported firmwares can be extracted
+  from 1.44 (next step, cheap).
 
-## 7. Ответы на вопросы P1
+## 7. Answers to the P1 questions
 
-| Вопрос плана | Ответ |
+| Plan question | Answer |
 |---|---|
-| Где OTA относительно `ACTIVATE_CMD` | До: `check_active → upgrade → coefficient → calibration → active_duration → ACTIVATE_CMD → bind`. Вариант A |
-| Нужна ли переактивация после перезагрузки | После OTA флоу начинается заново целиком и доходит до `ACTIVATE_CMD`; сенсор к этому моменту ещё не активирован |
-| Что пишется перед `0x00` | Ничего сверх обычного auth. `0x00` идёт сразу в `f7bf3564…` |
-| Как ищется после ребута | Скан 60 с, `isFromBind: true`, переподключение по тому же MAC; полный ре-дискавери сервисов |
-| Чанк / MTU / тип записи | MTU запрос 247, чанк `floor(mtu/4)*4` (244), write-with-response, последовательно, пауза из настроек, ретраев нет |
-| Проверка пакета | Только обход GBL-тегов + расширение `.GBL`; хеша/подписи в приложении нет |
-| `forceUpgrade` / лимиты | `requiredUpgrade` (обязательно), `allowUpgrade` (разрешено, но не обязательно → пропуск), `errorCode` |
-| Что после OTA | Рескан 60 с → read `2a28` → auth → check_active → coefficient/calibration → maxActive → ACTIVATE_CMD → bind; затем `POST /device/ota/upgrade` (отчёт был ещё до рескана) |
-| Потолок `maxActive` на новой прошивке | В приложении потолка нет: пишется 4-байтовое значение, **шифруется** `CgmAuth.encrypt` при необходимости и уходит в `b8fd9848`. Ограничение, если есть, — на стороне облака/прошивки; статически не закрывается, нужен P2/P4 |
+| Where OTA sits relative to `ACTIVATE_CMD` | Before: `check_active → upgrade → coefficient → calibration → active_duration → ACTIVATE_CMD → bind`. Variant A |
+| Reactivation needed after the reboot | After OTA the flow restarts in full and reaches `ACTIVATE_CMD`; the sensor is still unactivated at that point |
+| What is written before `0x00` | Nothing beyond the regular auth. `0x00` goes straight into `f7bf3564…` |
+| How it is found after the reboot | Scan for 60 s, `isFromBind: true`, reconnect to the same MAC; full service re-discovery |
+| Chunk / MTU / write type | MTU request 247, chunk `floor(mtu/4)*4` (244), write-with-response, sequential, pause from settings, no retries |
+| Package verification | Only the GBL tag walk + the `.GBL` extension; no hash/signature in the app |
+| `forceUpgrade` / limits | `requiredUpgrade` (mandatory), `allowUpgrade` (allowed but not required → skip), `errorCode` |
+| What follows OTA | Rescan 60 s → read `2a28` → auth → check_active → coefficient/calibration → maxActive → ACTIVATE_CMD → bind; then `POST /device/ota/upgrade` (the report was already before the rescan) |
+| `maxActive` cap on the new firmware | No cap in the app: a 4-byte value is written, **encrypted** via `CgmAuth.encrypt` when needed and sent into `b8fd9848`. Any limit lives on the cloud/firmware side; not closable statically, needs P2/P4 |
 
-## 8. Что осталось (только динамика, P2)
+## 8. What remains (dynamics only, P2)
 
-1. Семантика `0x06` vs `0x03` в конце и момент фактического разрыва соединения/ребута.
-2. Реальный темп записи (пауза `key_ble_*`), поведение при обрыве на середине.
-3. Меняется ли MAC/имя/adv-данные после ребута в AppLoader.
-4. Потолок срока службы на новой прошивке (стоп-критерий) — только эксперимент.
-5. Привязка `.gbl` к партии/MAC и наличие подписи (по самому файлу, P3).
-6. Сверка протокола 1.44 (CN, mod) с 1.50 (`com.ottai.seas`) по HCI-логу.
+1. Semantics of `0x06` vs `0x03` at the end, and the actual moment of disconnect/reboot.
+2. The real write pacing (the `key_ble_*` pause), behavior on a mid-transfer disconnect.
+3. Whether MAC/name/adv data change after the reboot into AppLoader.
+4. The lifetime cap on the new firmware (stop criterion) — experiment only.
+5. Binding of a `.gbl` to a batch/MAC, and whether it is signed (from the file itself, P3).
+6. Cross-check of the 1.44 (CN, mod) protocol against 1.50 (`com.ottai.seas`) via an HCI log.
 
-## 9. Что это значит для P5
+## 9. What it means for P5
 
-- Реализуемо точным повторением последовательности §3 (control `0x00` → чанки 244 Б
-  write-with-response → control `0x06` → ожидание ребута → рескан/реконнект по MAC).
-- Порядок в JugglucoNG: OTA вставляется туда же, где у офиц. приложения — **перед**
-  записью `maxActive` и `ACTIVATE_CMD`; после OTA — переподключение и обычная
-  активация с длинным `maxActive`.
-- Проверять версию после OTA логично через `2a28` (read-only), как и планировалось в P0.
-- Риск: подтверждение `0x00`/`0x06` и поведения при ребуте нужно получить до первой
-  записи в сенсор; иначе высок шанс оставить устройство в AppLoader.
+- Implementable by an exact replay of the §3 sequence (control `0x00` → 244-byte chunks
+  write-with-response → control `0x06` → wait for the reboot → rescan/reconnect by MAC).
+- Positioning in JugglucoNG: OTA goes exactly where it does in the official app — **before**
+  writing `maxActive` and `ACTIVATE_CMD`; after OTA — reconnect and a regular activation
+  with the long `maxActive`.
+- Checking the version after OTA logically goes through `2a28` (read-only), as already
+  planned in P0.
+- Risk: confirmation of `0x00`/`0x06` and of the reboot behavior must be obtained before
+  the first write to a sensor; otherwise the chance of leaving the device in AppLoader is high.
