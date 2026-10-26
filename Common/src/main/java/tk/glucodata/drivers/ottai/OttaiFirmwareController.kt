@@ -139,13 +139,13 @@ internal class OttaiFirmwareController(
                 ?: throw IllegalArgumentException("firmware_profile")
             val saved = io.savedImage()
             require(saved == null || saved.mode == mode) { "recovery_mode" }
-            val resumed = !afterInstall && saved?.target == version
-            applicationRecovery = saved?.takeIf { !afterInstall && !resumed && it.source == version }
+            val resumed = !afterInstall && saved != null && OttaiOtaProtocol.sameVersion(saved.target, version)
+            applicationRecovery = saved?.takeIf { !afterInstall && !resumed && OttaiOtaProtocol.sameVersion(it.source, version) }
             if (resumed) {
                 installed = saved
-                state = state.copy(before = saved?.before, target = version, recovery = true)
+                state = state.copy(before = saved.before, target = version, recovery = true)
             }
-            if (afterInstall) require(version == installed?.target) { "version_readback_mismatch" }
+            if (afterInstall) require(installed?.let { OttaiOtaProtocol.sameVersion(version, it.target) } == true) { "version_readback_mismatch" }
             state = state.copy(firmware = version)
             authenticate {
                 // Ottai can change its handles after auth. Match the normal activation path's
@@ -323,11 +323,12 @@ internal class OttaiFirmwareController(
     }
 
     private fun prepareParameters() {
+        val minor = OttaiOtaProtocol.minor(state.firmware)
+        require(minor >= 0) { "factory_parameter_profile" }
         update(OttaiFirmwareStage.PREPARING) { it.copy(errorCode = "") }
         io.refreshMaterials(state.firmware, completion { fresh ->
             require(fresh.deviceVersion == state.firmware && fresh.authKeys != null) { "materials_version" }
             materials = fresh
-            val minor = OttaiOtaProtocol.minor(state.firmware)
             // Construct and validate BOTH packets before issuing either write.
             val coefficients = if (minor >= 6) OttaiOtaProtocol.coefficientPacket(fresh.coefficient) else null
             val calibration = if (minor >= 8) OttaiOtaProtocol.calibrationPacket(fresh.calibrationValueK,

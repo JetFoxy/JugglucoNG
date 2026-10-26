@@ -1,6 +1,7 @@
 package tk.glucodata.drivers.ottai
 
 import java.net.URI
+import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -56,19 +57,44 @@ internal object OttaiOtaProtocol {
     // Recovered CN 1.44 sequence in PR #727, deliberately not the standard SiLabs 0x03 finish.
     const val FINISH: Byte = 0x06
     const val WRITE_DELAY_MS = 60L
-    private val versionPattern = Regex("V1\\.([3-8])\\.\\d+(?:\\.\\d+)*")
-    fun version(value: String): String? = value.trim().takeIf { versionPattern.matches(it) }
-    fun minor(version: String): Int = versionPattern.matchEntire(version)?.groupValues?.get(1)?.toInt() ?: -1
+    // Revision syntax is not a firmware compatibility whitelist. Preserve the reported spelling
+    // for the CN API; parse numbers separately for ordering and post-reboot comparison.
+    private val versionPattern = Regex("[Vv]?([0-9]+(?:\\.[0-9]+)*)([-_+][A-Za-z0-9][A-Za-z0-9._+-]*)?")
+    fun version(value: String): String? = value.trim { it.isWhitespace() || it == '\u0000' }
+        .takeIf { it.length in 1..64 && versionPattern.matches(it) }
+
+    private fun components(value: String): List<BigInteger> =
+        versionPattern.matchEntire(requireNotNull(version(value)) { "target_version" })!!
+            .groupValues[1].split('.').map { it.toBigInteger() }
+
+    // Factory commands are understood for the V1 family. A different major revision can still
+    // run the OTA experiment, but must not silently inherit V1 factory-parameter writes.
+    fun minor(version: String): Int {
+        val parts = components(version)
+        return if (parts.first() == BigInteger.ONE)
+            parts.getOrNull(1)?.toString()?.toIntOrNull() ?: -1 else -1
+    }
+
+    fun sameVersion(left: String, right: String): Boolean {
+        if (version(left) == null || version(right) == null) return false
+        val leftSuffix = versionPattern.matchEntire(version(left)!!)!!.groupValues[2]
+        val rightSuffix = versionPattern.matchEntire(version(right)!!)!!.groupValues[2]
+        return compareVersions(left, right) == 0 && leftSuffix == rightSuffix
+    }
+
+    private fun compareVersions(source: String, target: String): Int {
+        val from = components(source)
+        val to = components(target)
+        for (index in 0 until maxOf(from.size, to.size)) {
+            val comparison = (to.getOrNull(index) ?: BigInteger.ZERO)
+                .compareTo(from.getOrNull(index) ?: BigInteger.ZERO)
+            if (comparison != 0) return comparison
+        }
+        return 0
+    }
 
     fun isUpgrade(source: String, target: String): Boolean {
-        require(version(source) != null && version(target) != null) { "target_version" }
-        val from = source.drop(1).split('.').map { it.toIntOrNull() ?: throw IllegalArgumentException("target_version") }
-        val to = target.drop(1).split('.').map { it.toIntOrNull() ?: throw IllegalArgumentException("target_version") }
-        for (index in 0 until maxOf(from.size, to.size)) {
-            val comparison = (to.getOrNull(index) ?: 0).compareTo(from.getOrNull(index) ?: 0)
-            if (comparison != 0) return comparison > 0
-        }
-        return false
+        return compareVersions(source, target) > 0
     }
 
     fun downloadUri(value: String): URI {

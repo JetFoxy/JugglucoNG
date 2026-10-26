@@ -94,14 +94,44 @@ class OttaiOtaTests {
             cipher.doFinal(packet.copyOfRange(1, 17)))
     }
 
-    @Test fun onlyHttpsAndKnownVersionedGblNamesAreAccepted() {
+    @Test fun revisionSyntaxDoesNotWhitelistFirmwareFamiliesOrRequireAPrefixOrPatch() {
+        listOf("V1.2.0", "V1.9.0", "V2.0.0", "V1.5", "1.5.0", "v1.5.0", "V1.5.0_CN",
+            "V1.5.0-beta", "1", "1.5.0+build.2").forEach {
+            assertEquals(it, OttaiOtaProtocol.version(" \u0000$it\u0000 \u0000"))
+        }
+        listOf("", "V", "V1..5", "V1.5\n.0", "V1.5\u0000.0", "1".repeat(65)).forEach {
+            assertNull(OttaiOtaProtocol.version(it))
+        }
+    }
+
+    @Test fun upgradeOrderingHandlesVariantsFutureVersionsAndLargeNumericComponents() {
+        assertTrue(OttaiOtaProtocol.isUpgrade("v1.2", "1.3.0_CN"))
+        assertTrue(OttaiOtaProtocol.isUpgrade("V1.9.0", "V1.10.0"))
+        assertTrue(OttaiOtaProtocol.isUpgrade("V1.99", "V2.0"))
+        assertTrue(OttaiOtaProtocol.isUpgrade("V1.2147483648", "V1.2147483649"))
+        assertFalse(OttaiOtaProtocol.isUpgrade("1.10", "V1.9.99"))
+        assertFalse(OttaiOtaProtocol.isUpgrade("v1.8", "V1.8.0_CN"))
+    }
+
+    @Test fun readbackComparisonNormalizesNumericSpellingButRetainsBuildIdentity() {
+        assertTrue(OttaiOtaProtocol.sameVersion("v1.8", "V1.8.0"))
+        assertTrue(OttaiOtaProtocol.sameVersion("1.08.0_CN", "V1.8_CN"))
+        assertFalse(OttaiOtaProtocol.sameVersion("V1.8_CN", "V1.8_EU"))
+        assertFalse(OttaiOtaProtocol.sameVersion("V1.8", "V1.8.1"))
+        assertEquals(9, OttaiOtaProtocol.minor("1.9"))
+        assertEquals(-1, OttaiOtaProtocol.minor("V2.8"))
+    }
+
+    @Test fun onlyHttpsAndVersionedGblNamesAreAccepted() {
         assertTrue(OttaiOtaProtocol.isUpgrade("V1.7.9", "V1.8.0"))
         assertTrue(OttaiOtaProtocol.isUpgrade("V1.7.9", "V1.7.10"))
         assertFalse(OttaiOtaProtocol.isUpgrade("V1.8.0", "V1.7.9"))
         assertFalse(OttaiOtaProtocol.isUpgrade("V1.8.0", "V1.8.0.0"))
         assertEquals("V1.8.2", OttaiOtaProtocol.targetVersion("https://cdn.example/V1.8.2.GBL?token=private"))
+        assertEquals("V1.9.0", OttaiOtaProtocol.targetVersion("https://cdn.example/V1.9.0.gbl"))
+        assertEquals("2.0_CN", OttaiOtaProtocol.targetVersion("https://cdn.example/2.0_CN.gbl"))
         listOf("http://cdn.example/V1.8.2.gbl", "https://user:pass@cdn.example/V1.8.2.gbl",
-            "https://cdn.example/random.gbl", "https://cdn.example/V1.9.0.gbl").forEach {
+            "https://cdn.example/random.gbl", "https://cdn.example/V1..8.gbl").forEach {
             assertThrows(IllegalArgumentException::class.java) { OttaiOtaProtocol.targetVersion(it) }
         }
     }
@@ -176,8 +206,9 @@ class OttaiFirmwareControllerTests {
 
     private fun normal(version: String = "V1.7.0", command: Int = 0, badSignature: Boolean = false,
         mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION,
+        target: String = "V1.8.1",
         configure: (FakeIo) -> Unit = {}): Pair<OttaiFirmwareController, FakeIo> {
-        val io = FakeIo(image.copy(source = version, target = "V1.8.1"))
+        val io = FakeIo(image.copy(source = version, target = target))
         io.commandStatus = command
         configure(io)
         val device = OttaiBleAuth.generateKeyPair()
@@ -224,15 +255,15 @@ class OttaiFirmwareControllerTests {
         val io = FakeIo(image)
         io.readAnswer = { ch ->
             assertEquals(OttaiConstants.CHAR_SOFTWARE_VERSION, ch)
-            "V1.2.0\u0000".toByteArray()
+            "release\u0000".toByteArray()
         }
         val controller = OttaiFirmwareController("AABBCCDDEEFF", materials, io) {}
         controller.start()
         io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
         assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
         assertEquals("firmware_profile", controller.state.errorCode)
-        assertEquals("V1.2.0", controller.state.firmware)
-        assertTrue(io.logs.contains("software_revision length=7 hex=56312e322e3000"))
+        assertEquals("release", controller.state.firmware)
+        assertTrue(io.logs.contains("software_revision length=8 hex=72656c6561736500"))
         assertTrue(io.closed)
         assertTrue(io.writes.isEmpty())
         assertEquals(0, io.offerRequests)
@@ -250,6 +281,61 @@ class OttaiFirmwareControllerTests {
         assertTrue(io.logs.none { '\n' in it || '\r' in it })
         assertTrue(io.writes.isEmpty())
         assertEquals(0, io.offerRequests)
+    }
+
+    @Test fun formerlyRejectedRevisionsReachTheCloudOfferAndReadyState() {
+        listOf("V1.2.0", "V1.9.0", "V2.0.0", "V1.5", "1.5.0", "v1.5.0", "V1.5.0_CN").forEach { version ->
+            val (controller, io) = normal(version = version, command = 3,
+                mode = OttaiFirmwareMode.STARTED_SENSOR, target = "V2.1.0")
+            assertEquals(version, controller.state.firmware)
+            assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
+            assertEquals(1, io.offerRequests)
+            assertEquals(version, io.image.source)
+            assertEquals(2, io.writes.size)
+        }
+    }
+
+    @Test fun recoveryAcceptsEquivalentSourceRevisionSpellingWithoutDownloadingAgain() {
+        val (controller, io) = normal(version = "1.7") { it.journal = image }
+        assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
+        assertTrue(controller.state.recovery)
+        assertEquals(0, io.offerRequests)
+    }
+
+    @Test fun verifiedTargetRecoveryAcceptsEquivalentReadbackSpelling() {
+        val (controller, io) = normal(version = "v1.8", command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR) {
+            it.journal = image.copy(mode = OttaiFirmwareMode.STARTED_SENSOR)
+        }
+        assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+        assertTrue(io.reported)
+        assertTrue(io.cleared)
+        assertEquals(0, io.offerRequests)
+        assertEquals(2, io.writes.size)
+    }
+
+    @Test fun installedFirmwareCanReadBackWithoutTheFilenamePrefix() {
+        val (controller, io) = normal(command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR)
+        controller.install()
+        while (controller.state.stage == OttaiFirmwareStage.INSTALLING) { io.tick(); io.acknowledge() }
+        val answer = requireNotNull(io.readAnswer)
+        io.readAnswer = { ch -> if (ch == OttaiConstants.CHAR_SOFTWARE_VERSION) "1.8.1".toByteArray() else answer(ch) }
+        io.tick()
+        io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
+        repeat(2) { io.tick(); io.acknowledge() }
+        assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+        assertEquals("1.8.1", controller.state.firmware)
+        assertTrue(io.reported)
+        assertTrue(io.cleared)
+    }
+
+    @Test fun anotherMajorRevisionDoesNotInheritV1FactoryWrites() {
+        val (controller, io) = normal(version = "V2.0", target = "V2.1")
+        assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
+        controller.prepareOnly()
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertEquals("factory_parameter_profile", controller.state.errorCode)
+        assertNull(io.refresh)
+        assertEquals(2, io.writes.size)
     }
 
     @Test fun normalCheckStopsBeforeAnyFirmwareOrActivationWrite() {
