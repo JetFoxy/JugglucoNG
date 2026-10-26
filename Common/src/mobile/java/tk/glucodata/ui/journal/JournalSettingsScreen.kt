@@ -296,7 +296,7 @@ fun JournalSettingsScreen(
                         text = stringResource(R.string.journal_dashboard_types_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, top = 6.dp, end = 16.dp)
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp)
                     )
                 }
             }
