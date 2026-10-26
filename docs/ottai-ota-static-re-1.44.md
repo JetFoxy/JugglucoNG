@@ -167,7 +167,7 @@ the Gecko Bootloader on the sensor via the signature/encryption tags.
 | Version check | `GET /ota/upgradeVersion/judge?mac=<mac>&deviceVersion=<cachedVersion>&deviceType=cgm` (`cgm_api.dart` @0xc094c8) |
 | Response | `OTAUpgradeModel.fromJson`: `downloadUrl`, `requiredUpgrade` (bool), `allowUpgrade` (bool), `errorCode` (`ota_upgrade_model.dart`) |
 | `deviceVersion` in the request | **from the local cache** `EmbededVersionManger.getSoftwareVersionByMac(mac)`, not read from the sensor |
-| Download | `downloadOTAFile(url)`: name = last URL segment, saved into `getApplicationDocumentsDirectory()/<name>`; if the file exists — no re-download (`DioNet.downloadFile(url, path)`) |
+| Download | `downloadOTAFile(url)`: name = last URL segment, saved into `getApplicationDocumentsDirectory()/<name>`; if the file is absent — `DioNet.downloadFile(url, path)`; no re-download once it exists |
 | Report | `POST /device/ota/upgrade` with `{mac, sourceVersion, targetVersion, upgradeStatus, remark}`; `upgradeStatus = 1` on success, `0` on error; `targetVersion` = the filename minus `.gbl` (`_getFileName`), `sourceVersion` = the cached version (i.e. the **old** one) |
 | More | `/device/getUranusVersion`, `/device/validateDeviceByMacV2` |
 

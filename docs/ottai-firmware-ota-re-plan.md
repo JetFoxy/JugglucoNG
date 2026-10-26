@@ -182,7 +182,7 @@ P0 deliverable: whether OTA is needed at all, or the task reduces to formula cho
    - `forceUpgrade` / `upgradeFlag` / `UpdateLimit`: can it be declined, is there a limit of attempts;
    - what follows OTA: a repeat Auth V2, a repeat `validateDeviceByMac*`, a new bind,
      new `method`/`coefficient`;
-   - **lifetime on the new firmware:** whether it cap `maxActive` or does a check that
+   - **lifetime on the new firmware:** whether the new firmware caps `maxActive` or has a check that
      rejects anything above 15 days. Look in 1.38: what `activeExpireTime` comes
      from (cloud or a constant), whether the app handles a NACK to `b8fd9848`. If the cap
      is in the firmware, OTA and a long lifetime are incompatible. This is the
@@ -207,7 +207,7 @@ On a **new** sensor that the user is going to activate with OTA in the official 
 5. In the HCI log, mark the exact order: OTA control/data → reboot → RTC →
    `b8fd9848` (what value) → `6AA799B6` → `ACTIVATE_CMD`. This defines where the window
    for "OTA without the official activation" is.
-5. Keep the artifacts outside the repo (like `~/Projects/Dia/anytime-native/`), e.g.
+6. Keep the artifacts outside the repo (like `~/Projects/Dia/anytime-native/`), e.g.
    `~/Projects/Dia/ottai-ota/`. Firmware image and raw captures **are not committed**.
 
 ### P3. Analysis of the `.gbl` image (risk 0)
