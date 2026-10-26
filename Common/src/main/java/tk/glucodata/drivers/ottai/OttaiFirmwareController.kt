@@ -139,13 +139,13 @@ internal class OttaiFirmwareController(
                 ?: throw IllegalArgumentException("firmware_profile")
             val saved = io.savedImage()
             require(saved == null || saved.mode == mode) { "recovery_mode" }
-            val resumed = !afterInstall && saved != null && OttaiOtaProtocol.sameVersion(saved.target, version)
+            val resumed = !afterInstall && saved != null && OttaiOtaProtocol.matchesTarget(version, saved.target)
             applicationRecovery = saved?.takeIf { !afterInstall && !resumed && OttaiOtaProtocol.sameVersion(it.source, version) }
             if (resumed) {
                 installed = saved
                 state = state.copy(before = saved.before, target = version, recovery = true)
             }
-            if (afterInstall) require(installed?.let { OttaiOtaProtocol.sameVersion(version, it.target) } == true) { "version_readback_mismatch" }
+            if (afterInstall) require(installed?.let { OttaiOtaProtocol.matchesTarget(version, it.target) } == true) { "version_readback_mismatch" }
             state = state.copy(firmware = version)
             authenticate {
                 // Ottai can change its handles after auth. Match the normal activation path's

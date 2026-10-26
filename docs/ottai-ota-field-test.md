@@ -49,12 +49,20 @@ and OTA.
 If the check stops with `firmware_profile`, the dialog displays the reported software revision
 (up to 64 printable characters). The trace records `software_revision` with the original byte
 length and first 64 bytes in hex, including padding. This diagnoses unexpected revision formats;
-malformed values still stop the check. Revision parsing accepts numeric versions with optional
-`V`/`v`, optional patch components and build suffixes such as `_CN`; it has no V1.3–V1.8
-whitelist. The actual reported spelling is sent to the CN API. Upgrade ordering compares numeric
-components, while reboot/recovery comparisons also retain build suffix identity. Factory
-parameter commands are separately limited to the understood V1 family; other major versions
-can use the Started sensor OTA experiment without inheriting V1 provisioning commands.
+empty, non-ASCII and control-containing values still stop the check. Software revisions are
+vendor strings, not semantic versions: the exact field response
+`E1.1.4(V1.7.S2530.1),STDRD` is retained for the CN API, display and recovery journal, with only
+surrounding padding removed. Unfamiliar printable vendor strings can reach the cloud check.
+When understood, the embedded application profile (`V1.7` here) supplies numeric upgrade
+ordering and factory-parameter gates; the leading `E1.1.4` does not supply those gates.
+For an unfamiliar source or differently labelled builds within the same application profile,
+update eligibility comes from the authenticated CN offer; no build-label ordering is guessed.
+
+A bare package target such as `V1.8.0` can match a composite reboot revision containing the
+same V profile. This confirms the offered application profile, not an exact build absent from
+the package name. A package naming a full composite revision or explicit build must match that
+identity; recovery of the old application also retains the full composite source identity.
+Factory commands remain separate from the Started sensor OTA experiment.
 
 With one sensor, an OTA followed by parameter writes can establish that combined setup path.
 It cannot isolate the effect of firmware from factory provisioning on early readings.

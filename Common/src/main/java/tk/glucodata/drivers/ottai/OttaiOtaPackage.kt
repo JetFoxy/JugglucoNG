@@ -57,34 +57,53 @@ internal object OttaiOtaProtocol {
     // Recovered CN 1.44 sequence in PR #727, deliberately not the standard SiLabs 0x03 finish.
     const val FINISH: Byte = 0x06
     const val WRITE_DELAY_MS = 60L
-    // Revision syntax is not a firmware compatibility whitelist. Preserve the reported spelling
-    // for the CN API; parse numbers separately for ordering and post-reboot comparison.
-    private val versionPattern = Regex("[Vv]?([0-9]+(?:\\.[0-9]+)*)([-_+][A-Za-z0-9][A-Za-z0-9._+-]*)?")
+    // 2a28 is a vendor string, not a semantic version. The CN API and journal need it intact.
+    // 512 bytes is the BLE attribute limit; only empty/control/non-ASCII values are rejected.
     fun version(value: String): String? = value.trim { it.isWhitespace() || it == '\u0000' }
-        .takeIf { it.length in 1..64 && versionPattern.matches(it) }
+        .takeIf { it.length in 1..512 && it.all { ch -> ch in ' '..'~' } }
 
-    private fun components(value: String): List<BigInteger> =
-        versionPattern.matchEntire(requireNotNull(version(value)) { "target_version" })!!
-            .groupValues[1].split('.').map { it.toBigInteger() }
+    private val applicationPattern = Regex("[Vv]?([0-9]+(?:\\.[0-9]+)*)([._+-][A-Za-z0-9][A-Za-z0-9._+-]*)?")
+    private val compositePattern = Regex("[Vv]?[Ee][0-9]+(?:\\.[0-9]+)*\\(([Vv][^()]+)\\)(?:,[A-Za-z0-9._+-]+)?")
+    private data class Revision(val numbers: List<BigInteger>, val build: String, val composite: Boolean)
+
+    private fun application(value: String): Revision? {
+        val raw = version(value) ?: return null
+        val embedded = compositePattern.matchEntire(raw)?.groupValues?.get(1)
+        val match = applicationPattern.matchEntire(embedded ?: raw) ?: return null
+        return Revision(match.groupValues[1].split('.').map { it.toBigInteger() },
+            match.groupValues[2], embedded != null)
+    }
 
     // Factory commands are understood for the V1 family. A different major revision can still
     // run the OTA experiment, but must not silently inherit V1 factory-parameter writes.
     fun minor(version: String): Int {
-        val parts = components(version)
+        val parts = application(version)?.numbers ?: return -1
         return if (parts.first() == BigInteger.ONE)
             parts.getOrNull(1)?.toString()?.toIntOrNull() ?: -1 else -1
     }
 
     fun sameVersion(left: String, right: String): Boolean {
-        if (version(left) == null || version(right) == null) return false
-        val leftSuffix = versionPattern.matchEntire(version(left)!!)!!.groupValues[2]
-        val rightSuffix = versionPattern.matchEntire(version(right)!!)!!.groupValues[2]
-        return compareVersions(left, right) == 0 && leftSuffix == rightSuffix
+        val from = version(left) ?: return false
+        val to = version(right) ?: return false
+        if (from == to) return true
+        val a = application(from) ?: return false
+        val b = application(to) ?: return false
+        // Composite identifiers include E-version/build/variant identity beyond the V profile.
+        return !a.composite && !b.composite && compareVersions(a, b) == 0 && a.build == b.build
     }
 
-    private fun compareVersions(source: String, target: String): Int {
-        val from = components(source)
-        val to = components(target)
+    /** A bare package V-profile can read back inside a full E(...),variant revision. */
+    fun matchesTarget(readback: String, target: String): Boolean {
+        if (sameVersion(readback, target)) return true
+        val actual = application(readback) ?: return false
+        val expected = application(target) ?: return false
+        return actual.composite && !expected.composite && compareVersions(actual, expected) == 0 &&
+            (expected.build.isEmpty() || actual.build == expected.build)
+    }
+
+    private fun compareVersions(source: Revision, target: Revision): Int {
+        val from = source.numbers
+        val to = target.numbers
         for (index in 0 until maxOf(from.size, to.size)) {
             val comparison = (to.getOrNull(index) ?: BigInteger.ZERO)
                 .compareTo(from.getOrNull(index) ?: BigInteger.ZERO)
@@ -94,7 +113,17 @@ internal object OttaiOtaProtocol {
     }
 
     fun isUpgrade(source: String, target: String): Boolean {
-        return compareVersions(source, target) > 0
+        require(version(source) != null && version(target) != null) { "target_version" }
+        if (sameVersion(source, target)) return false
+        val from = application(source)
+        val to = application(target)
+        // An unfamiliar vendor spelling must reach the authoritative CN offer, not a local
+        // compatibility whitelist. Numeric downgrade checks apply when both are understood.
+        if (from == null || to == null) return true
+        val order = compareVersions(from, to)
+        // Build labels have no established local ordering. A distinct explicit build selected
+        // by the cloud is eligible even within the same application profile.
+        return order > 0 || (order == 0 && (to.composite || to.build.isNotEmpty()) && !matchesTarget(source, target))
     }
 
     fun downloadUri(value: String): URI {
@@ -106,7 +135,9 @@ internal object OttaiOtaProtocol {
     fun targetVersion(url: String): String {
         val file = downloadUri(url).path.substringAfterLast('/')
         require(file.endsWith(".gbl", ignoreCase = true)) { "download_filename" }
-        return version(file.dropLast(4)) ?: throw IllegalArgumentException("target_version")
+        val target = version(file.dropLast(4)) ?: throw IllegalArgumentException("target_version")
+        require(application(target) != null) { "target_version" }
+        return target
     }
 
     fun chunkSize(mtu: Int): Int {

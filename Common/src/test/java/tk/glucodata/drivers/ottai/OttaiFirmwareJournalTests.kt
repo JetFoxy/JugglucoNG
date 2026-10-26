@@ -26,6 +26,17 @@ class OttaiFirmwareJournalTests {
         }
     }
 
+    @Test fun fullCompositeRevisionsSurviveJournalRoundTrip() {
+        val composite = image.copy(source = TEST_OTTAI_COMPOSITE_REVISION,
+            target = "E1.2.0(V1.8.S2600.1),STDRD")
+        val out = ByteArrayOutputStream()
+        OttaiFirmwareJournal.write(DataOutputStream(out), id, address, composite)
+        val saved = OttaiFirmwareJournal.read(DataInputStream(ByteArrayInputStream(out.toByteArray())), id, address)
+        assertEquals(composite.source, saved.source)
+        assertEquals(composite.target, saved.target)
+        assertEquals(composite.image.sha256, saved.image.sha256)
+    }
+
     @Test fun oldPreactivationJournalRemainsReadable() {
         val out = ByteArrayOutputStream()
         DataOutputStream(out).apply {
