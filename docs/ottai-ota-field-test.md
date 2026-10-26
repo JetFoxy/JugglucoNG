@@ -101,6 +101,11 @@ its separate provisioning flow.
   bootloader-only recovery cannot run that action.
 - An OTA success report is attempted only after matching BLE version readback and a fresh
   authenticated status allowed by the selected mode. Report failure does not substitute for sensor evidence.
+- This report mirrors the official flow and is advisory. No server acknowledgment gates OTA
+  success, activation or journal cleanup. Successful shutdown releases BLE/the handler at once
+  and lets queued/running reporting finish with normal HTTP timeouts; failure/cancellation still
+  interrupts worker tasks. There is no persistent reporting outbox or report-only recovery journal.
+  Whether the backend uses these reports for future update eligibility remains unverified.
 - Recovery retains the original experiment mode and started-sensor baseline. Select the same
   mode when reopening it. If the new application already boots after an interrupted finish,
   the matching saved target can be verified without flashing again. Old preactivation

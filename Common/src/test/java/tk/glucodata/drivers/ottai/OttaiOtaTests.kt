@@ -118,6 +118,7 @@ class OttaiFirmwareControllerTests {
         var ack: ((Result<Unit>) -> Unit)? = null
         var saved = false
         var closed = false
+        var closedSuccessfully = false
         var readAnswer: ((UUID) -> ByteArray)? = null
         var fresh: OttaiRegistry.DeviceMaterials? = null
         var refresh: ((Result<OttaiRegistry.DeviceMaterials>) -> Unit)? = null
@@ -169,7 +170,7 @@ class OttaiFirmwareControllerTests {
         override fun clearRecovery() { cleared = true }
         override fun log(message: String) {}
         override fun disconnect() {}
-        override fun close() { closed = true }
+        override fun close(completed: Boolean) { closed = true; closedSuccessfully = completed }
     }
 
     private fun normal(version: String = "V1.7.0", command: Int = 0, badSignature: Boolean = false,
@@ -321,6 +322,7 @@ class OttaiFirmwareControllerTests {
             assertEquals(io.dataNo, controller.state.after?.latestDataNo)
             assertEquals(720, controller.state.before?.latestDataNo)
             assertTrue(io.reported && io.cleared)
+            assertTrue(io.closedSuccessfully)
             assertNull(io.refresh)
             assertFalse(io.writes.any { it.first in setOf(OttaiConstants.CHAR_COMMAND,
                 OttaiConstants.CHAR_CURRENT_TIME, OttaiConstants.CHAR_MAX_ACTIVE_TIME, OttaiConstants.CHAR_DESTRUCTIVE) })
@@ -508,6 +510,7 @@ class OttaiFirmwareControllerTests {
         assertEquals(2, io.writes.size)
         assertTrue(io.scheduled.isEmpty())
         assertTrue(io.closed)
+        assertFalse(io.closedSuccessfully)
         controller.install()
         assertEquals(2, io.writes.size)
     }

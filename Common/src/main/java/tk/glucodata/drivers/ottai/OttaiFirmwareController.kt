@@ -59,7 +59,7 @@ internal interface OttaiFirmwareIo {
     fun clearRecovery()
     fun log(message: String)
     fun disconnect()
-    fun close()
+    fun close(completed: Boolean = false)
 }
 
 /**
@@ -362,7 +362,7 @@ internal class OttaiFirmwareController(
         retired = true
         epoch++
         sessionKey = ""
-        io.close()
+        io.close(completed = state.stage == OttaiFirmwareStage.COMPLETE)
     }
 
     fun close() {

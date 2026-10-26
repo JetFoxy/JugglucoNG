@@ -24,7 +24,8 @@ import tk.glucodata.logi
 
 /**
  * One dialog owns one serial BLE client. It is never registered as a managed sensor and cannot
- * activate. Closing it invalidates every outstanding GATT/network completion before releasing it.
+ * activate. Closing it invalidates every outstanding GATT/network completion before releasing it;
+ * successful shutdown lets the advisory cloud report finish without retaining BLE or the handler.
  */
 internal class OttaiFirmwareSession private constructor(
     private val context: Context,
@@ -377,12 +378,15 @@ internal class OttaiFirmwareSession private constructor(
         runCatching { old?.close() }
     }
 
-    override fun close() {
+    override fun close(completed: Boolean) {
         if (closed) return
         closed = true
         disconnect()
         handler.removeCallbacksAndMessages(null)
-        worker.shutdownNow()
+        // Success has no pending material writes: only the best-effort OTA report may remain.
+        // Drain it with the usual HTTP timeouts, without waiting here or retaining the GATT.
+        // Cancellation/failure must still interrupt outstanding downloads/material requests.
+        if (completed) worker.shutdown() else worker.shutdownNow()
         thread.quitSafely()
     }
 }
