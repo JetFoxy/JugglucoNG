@@ -500,6 +500,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="failed_to_connect">Bağlantı kurulamadı: </string>
     <string name="sensor_not_init">Sensör başlatılmadı. Önce \'Sensörü Tara\'yı kullanın.</string>
     <string name="invalid_code_format">Geçersiz kod formatı. Tekrar deneyin.</string>
+    <string name="ican_full_box_serial_required">Etkinleştirme için iCan kutusundaki 13 karakterli tam seri numarası gereklidir</string>
     <string name="sibionics_code_wrong_type">Bu bir %1$s kodu. Geri dönüp %1$s seçin.</string>
     <string name="sibionics_code_not_for_type">Bu kod %1$s ile eşleşmiyor. Geri dönüp uygun sensör türünü seçin.</string>
     <string name="sibionics_serial_wrong_type">Bu seri numarası %1$s ile eşleşmiyor. Geri dönüp uygun sensör türünü seçin.</string>
@@ -1357,6 +1358,8 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="pair">Eşleştir</string>
     <string name="points">Puanlar</string>
     <string name="position_layout">Konum ve düzen</string>
+    <string name="floating_reset_position">Konumu sıfırla</string>
+    <string name="floating_reset_position_desc">Kayan glikozu ekranın ortasına geri taşır.</string>
     <string name="preview">Önizleme</string>
     <string name="previous_calibrations">Önceki kalibrasyonlar</string>
     <string name="show_less">Daha az göster</string>
@@ -1779,6 +1782,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="journal_type_insulin">İnsülin</string>
     <string name="journal_type_food">Yiyecek</string>
     <string name="journal_type_bg_short">KŞ</string>
+    <string name="journal_type_glucose">Glikoz</string>
     <string name="journal_type_fingerstick">Parmak ölçümü</string>
     <string name="journal_type_activity">Aktivite</string>
     <string name="journal_type_note">Not</string>
@@ -2122,10 +2126,10 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="api_source_status_no_readings">Henüz API ölçümü yok</string>
     <string name="api_source_status_sync_failed">API kaynağı senkronizasyonu başarısız</string>
     <string name="outbound_api_preset_sheet_title">Hedef ön ayarını seç</string>
-    <string name="outbound_api_preset_custom_json_desc">Normalleştirilmiş glikoz JSON’unu herhangi bir endpoint’e POST eder.</string>
-    <string name="outbound_api_preset_telegram_desc">Telegram Bot API ile metin gönderir. URL bir relay’e yönlenebilir.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">VK topluluk mesajlarıyla kompakt GV metni gönderir.</string>
-    <string name="outbound_api_preset_vk_desc">VK topluluk mesajlarıyla okunabilir glikoz metni gönderir.</string>
+    <string name="outbound_api_preset_custom_json_desc">Normalleştirilmiş glikoz JSON’unu herhangi bir endpoint’e POST eder</string>
+    <string name="outbound_api_preset_telegram_desc">Telegram Bot API ile metin gönderir. URL bir relay’e yönlenebilir</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">VK topluluk mesajlarıyla kompakt GV metni gönderir</string>
+    <string name="outbound_api_preset_vk_desc">VK topluluk mesajlarıyla okunabilir glikoz metni gönderir</string>
     <string name="outbound_api_change_preset">Değiştir</string>
     <string name="outbound_api_telegram_recipient_help">Sayısal chat ID veya @kanal_adı kullanın. Kişi önce botu başlatmalıdır.</string>
     <string name="outbound_api_vk_recipient_help">Sayısal VK kullanıcı veya peer ID kullanın. Her alıcı önce topluluğa mesaj yazmalıdır.</string>
@@ -2533,7 +2537,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="ottai_cloud_offline_routes">Bulut olmadan devam etmek için bir kimlik bilgileri dosyası içe aktarın — QR taraması yalnızca sensör kodunu doldurur, NFC ise yalnızca sensörü uyandırır.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">Acil SMS</string>
-    <string name="outbound_api_preset_sms_desc">Bir alarm yanıtsız kaldığında, bir değer kritikleştiğinde veya veri bağlantısı kesildiğinde kişilere mesaj gönder.</string>
+    <string name="outbound_api_preset_sms_desc">Bir alarm yanıtsız kaldığında, bir değer kritikleştiğinde veya veri bağlantısı kesildiğinde kişilere mesaj gönder</string>
     <string name="sms_section_who">Kimin hakkında</string>
     <string name="sms_subject_name">Ad</string>
     <string name="sms_subject_name_help">Her mesajın başına eklenir, örneğin “Mia: DÜŞÜK alarmı yanıtsız”.</string>
@@ -3012,11 +3016,11 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="nightscout_secret_label">API sırrı veya erişim belirteci</string>
     <string name="nightscout_api_help">v1 için API sırrını, v3 için Nightscout erişim tokenini kullanın.</string>
     <string name="nightscout_iob_help">eIOB ve COB, standart IOB’den ayrı olarak devicestatus içindeki jugglucong alanında gönderilir.</string>
-    <string name="medtrum_sensor_desc">Yama üzerinde yazan seri numarasını girin (onaltılık)</string>
+    <string name="medtrum_sensor_desc">Verici üzerinde yazan seri numarasını girin (onaltılık)</string>
     <string name="medtrum_setup_saved_title">Sensör kaydedildi</string>
-    <string name="medtrum_setup_searching">Henüz bağlanmadı. Yama menzile girdiğinde kendiliğinden bağlanacak.</string>
-    <string name="medtrum_setup_auth_failed">Yama bu seri numarasını reddetti. Yama üzerindeki numarayı kontrol edin.</string>
-    <string name="medtrum_setup_device_rejected">Bu cihaz bir Medtrum yaması değil. Yamanın yakında olduğundan emin olun ve tekrar deneyin.</string>
+    <string name="medtrum_setup_searching">Henüz bağlanmadı. Verici menzile girdiğinde kendiliğinden bağlanacak.</string>
+    <string name="medtrum_setup_auth_failed">Verici bu seri numarasını reddetti. Verici üzerindeki numarayı kontrol edin.</string>
+    <string name="medtrum_setup_device_rejected">Bu cihaz bir Medtrum vericisi değil. Vericinin yakında olduğundan emin olun ve tekrar deneyin.</string>
 
     <string name="alert_sound_volume">Uyarı sesi düzeyi</string>
     <string name="dexcom_share_title">Dexcom Share</string>

@@ -15,6 +15,11 @@ import java.util.TreeSet
  *   every 1 to 5 minutes, and nothing says which, so the period is measured from the history itself.
  * - The caller hands batches over a little after they are stored, so the live reading of the same
  *   moment has gone out first (xDrip processes backfill the same way, after a delay).
+ * - A reading that reached the phone on time was the live reading of its moment and went out live,
+ *   whichever build was running then. Only readings that arrived late are a gap. The record of
+ *   what was sent cannot tell that on its own: a build that does not keep it (an older release
+ *   installed over a nightly) sends live without a trace, and the next build re-sent a whole day of
+ *   delivered readings, each under a second from its live copy (#686).
  *
  * What was sent survives a restart as [Coverage]: the floor below which nothing is backfilled, plus
  * the stretches that were sent without a gap. A gap that was still open when the app stopped is not
@@ -27,7 +32,11 @@ import java.util.TreeSet
 class XdripBackfillTracker(
     private val windowMs: Long = DEFAULT_WINDOW_MS,
 ) {
-    data class Candidate(val timeMs: Long, val mgdl: Double, val rate: Float)
+    /** [storedAtMs]: when the reading first reached the phone; 0 when unknown, taken as late. */
+    data class Candidate(val timeMs: Long, val mgdl: Double, val rate: Float, val storedAtMs: Long = 0L) {
+        val arrivedLive: Boolean
+            get() = storedAtMs > 0L && storedAtMs - timeMs <= LIVE_ARRIVAL_MS
+    }
 
     data class Sensor(val startWatermarkMs: Long, val sensorGen: Int, val sensorStartMs: Long)
 
@@ -101,11 +110,11 @@ class XdripBackfillTracker(
     }
 
     /**
-     * The readings of [batch] to send, oldest first. A reading is skipped when it is outside the
-     * window, in the future, at or before the sensor's start watermark, inside a stretch restored as
-     * already sent, or within the deduplication distance of something sent: 5/6 of the sample
-     * period, or [spacingMs] (the collapse interval) when that is longer. The ones returned are
-     * recorded as sent.
+     * The readings of [batch] to send, oldest first. A reading is skipped when it arrived live, is
+     * outside the window or in the future, is at or before the sensor's start watermark, inside a
+     * stretch restored as already sent, or within the deduplication distance of something sent:
+     * 5/6 of the sample period, or [spacingMs] (the collapse interval) when that is longer. The ones
+     * returned are recorded as sent.
      */
     @Synchronized
     fun pick(
@@ -121,9 +130,13 @@ class XdripBackfillTracker(
         val period = period(state)
         val dedupMs = maxOf(period - period / 6, spacingMs)
         val lowerBound = maxOf(nowMs - windowMs, state.startWatermarkMs)
+        // An on-time row went out live, so it also covers a late row of the same moment: Libre 3's
+        // 5-minute history reaches the phone about 19 minutes after the minute reading it sits next to.
+        state.sent.addAll(liveArrivals(sorted, nowMs, lowerBound))
         val picked = ArrayList<Candidate>()
         for (candidate in sorted) {
-            if (!isDeliverable(state, candidate.timeMs, nowMs, dedupMs, lowerBound)) continue
+            if (candidate.arrivedLive) continue
+            if (!isDeliverable(state.restored, state.sent, candidate.timeMs, nowMs, dedupMs, lowerBound)) continue
             if (!(candidate.mgdl.isFinite() && candidate.mgdl > 0.0)) continue
             state.sent.add(candidate.timeMs)
             picked.add(candidate)
@@ -131,29 +144,45 @@ class XdripBackfillTracker(
         return picked
     }
 
-    private fun isDeliverable(state: State, timeMs: Long, nowMs: Long, dedupMs: Long, lowerBound: Long): Boolean =
+    private fun liveArrivals(sorted: List<Candidate>, nowMs: Long, lowerBound: Long): List<Long> =
+        sorted.filter { it.arrivedLive && it.timeMs > lowerBound && it.timeMs <= nowMs }.map(Candidate::timeMs)
+
+    private fun isDeliverable(
+        restored: List<LongRange>,
+        sent: TreeSet<Long>,
+        timeMs: Long,
+        nowMs: Long,
+        dedupMs: Long,
+        lowerBound: Long,
+    ): Boolean =
         timeMs > lowerBound && timeMs <= nowMs &&
-            !isRestoredAsSent(state.restored, timeMs, dedupMs) &&
-            !hasSentWithin(state.sent, timeMs, dedupMs)
+            !isRestoredAsSent(restored, timeMs, dedupMs) &&
+            !hasSentWithin(sent, timeMs, dedupMs)
 
     /**
-     * Whether any of [times] still needs to go, without recording anything. Lets a caller skip
-     * preparing values for a batch the tracker would drop anyway.
+     * Whether [pick] would still send anything from [batch], without recording anything. Lets a
+     * caller skip preparing values for a batch the tracker would drop anyway. Only the times and
+     * arrival of [batch] are read: a row whose value turns out invalid still counts as needed.
      */
     @Synchronized
     fun needsBackfill(
         sensorId: String,
-        times: Collection<Long>,
+        batch: List<Candidate>,
         nowMs: Long,
         spacingMs: Long = 0L,
     ): Boolean {
         val state = states[sensorId] ?: return false
-        // The same period pick() would measure from this batch, so the two checks cannot
-        // disagree about what is already covered.
-        val period = measuredPeriod(times.sorted()) ?: period(state)
+        val sorted = batch.sortedBy(Candidate::timeMs)
+        // The same period and coverage pick() would derive from this batch, so the two checks
+        // cannot disagree about what is already covered.
+        val period = measuredPeriod(sorted.map(Candidate::timeMs)) ?: period(state)
         val dedupMs = maxOf(period - period / 6, spacingMs)
         val lowerBound = maxOf(nowMs - windowMs, state.startWatermarkMs)
-        return times.any { isDeliverable(state, it, nowMs, dedupMs, lowerBound) }
+        val sent = TreeSet(state.sent).apply { addAll(liveArrivals(sorted, nowMs, lowerBound)) }
+        return sorted.any { candidate ->
+            !candidate.arrivedLive &&
+                isDeliverable(state.restored, sent, candidate.timeMs, nowMs, dedupMs, lowerBound)
+        }
     }
 
     private fun period(state: State): Long = if (state.periodMs > 0L) state.periodMs else DEFAULT_PERIOD_MS
@@ -201,5 +230,12 @@ class XdripBackfillTracker(
         const val MIN_PERIOD_MS = 60_000L
         const val MAX_PERIOD_MS = 5L * 60_000L
         const val DEFAULT_PERIOD_MS = MIN_PERIOD_MS
+
+        /**
+         * A reading stored no later than this after its own time arrived live. Generous, because a
+         * driver may file its live reading under the sensor's history time up to a minute earlier;
+         * a gap row this fresh is the one next to the reconnect reading and deduplicated by it anyway.
+         */
+        const val LIVE_ARRIVAL_MS = 2L * 60_000L
     }
 }

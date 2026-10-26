@@ -523,6 +523,7 @@
     <string name="failed_to_connect">Nie udało się połączyć z </string>
     <string name="sensor_not_init">Sensor nie zainicjowany. Najpierw użyj \'Skanuj Sensor\'.</string>
     <string name="invalid_code_format">Nieprawidłowy format kodu. Spróbuj ponownie.</string>
+    <string name="ican_full_box_serial_required">Do aktywacji wymagany jest pełny, 13-znakowy numer seryjny z opakowania iCan</string>
     <string name="sibionics_code_wrong_type">To jest kod %1$s. Wróć i wybierz %1$s.</string>
     <string name="sibionics_code_not_for_type">Ten kod nie należy do %1$s. Wróć i wybierz odpowiedni typ sensora.</string>
     <string name="sibionics_serial_wrong_type">Ten numer seryjny nie pasuje do %1$s. Wróć i wybierz odpowiedni typ sensora.</string>
@@ -1364,6 +1365,8 @@
     <string name="pair">Paruj</string>
     <string name="points">Punkty</string>
     <string name="position_layout">Położenie i układ</string>
+    <string name="floating_reset_position">Resetuj położenie</string>
+    <string name="floating_reset_position_desc">Przenosi pływającą glukozę z powrotem na środek ekranu.</string>
     <string name="preview">Podgląd</string>
     <string name="previous_calibrations">Poprzednie kalibracje</string>
     <string name="show_less">Pokaż mniej</string>
@@ -1786,6 +1789,7 @@
     <string name="journal_type_insulin">Insulina</string>
     <string name="journal_type_food">Jedzenie</string>
     <string name="journal_type_bg_short">Glik</string>
+    <string name="journal_type_glucose">Glukoza</string>
     <string name="journal_type_fingerstick">Pomiar z palca</string>
     <string name="journal_type_activity">Aktywność</string>
     <string name="journal_type_note">Notatka</string>
@@ -2129,10 +2133,10 @@
     <string name="api_source_status_no_readings">Brak jeszcze odczytów API</string>
     <string name="api_source_status_sync_failed">Synchronizacja źródła API nie powiodła się</string>
     <string name="outbound_api_preset_sheet_title">Wybierz preset miejsca docelowego</string>
-    <string name="outbound_api_preset_custom_json_desc">Wysyła znormalizowany JSON glukozy metodą POST do dowolnego endpointu.</string>
-    <string name="outbound_api_preset_telegram_desc">Wysyła tekst przez Telegram Bot API. URL może wskazywać relay.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Wysyła kompaktowy tekst GV przez wiadomości społeczności VK.</string>
-    <string name="outbound_api_preset_vk_desc">Wysyła czytelny tekst glukozy przez wiadomości społeczności VK.</string>
+    <string name="outbound_api_preset_custom_json_desc">Wysyła znormalizowany JSON glukozy metodą POST do dowolnego endpointu</string>
+    <string name="outbound_api_preset_telegram_desc">Wysyła tekst przez Telegram Bot API. URL może wskazywać relay</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Wysyła kompaktowy tekst GV przez wiadomości społeczności VK</string>
+    <string name="outbound_api_preset_vk_desc">Wysyła czytelny tekst glukozy przez wiadomości społeczności VK</string>
     <string name="outbound_api_change_preset">Zmień</string>
     <string name="outbound_api_telegram_recipient_help">Użyj numerycznego chat ID lub @nazwy_kanału. Osoba musi najpierw uruchomić bota.</string>
     <string name="outbound_api_vk_recipient_help">Użyj numerycznych ID użytkowników lub peer ID VK. Każdy odbiorca musi najpierw napisać do społeczności.</string>
@@ -2539,7 +2543,7 @@
     <string name="ottai_cloud_offline_routes">Zaimportuj plik danych logowania, aby kontynuować bez chmury — skan QR tylko uzupełnia kod sensora, a NFC jedynie go wybudza.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">SMS alarmowy</string>
-    <string name="outbound_api_preset_sms_desc">Wyślij wiadomość, gdy alarm pozostaje bez reakcji, wartość staje się krytyczna albo zanika transmisja danych.</string>
+    <string name="outbound_api_preset_sms_desc">Wyślij wiadomość, gdy alarm pozostaje bez reakcji, wartość staje się krytyczna albo zanika transmisja danych</string>
     <string name="sms_section_who">Kogo dotyczy</string>
     <string name="sms_subject_name">Imię</string>
     <string name="sms_subject_name_help">Trafia na początek każdej wiadomości, na przykład „Mia: alarm NISKI bez reakcji”.</string>
@@ -3026,11 +3030,11 @@
     <string name="nightscout_secret_label">Sekret API lub token dostępu</string>
     <string name="nightscout_api_help">Dla v1 użyj sekretu API, a dla v3 tokenu dostępu Nightscout.</string>
     <string name="nightscout_iob_help">eIOB i COB są wysyłane w polu jugglucong w devicestatus, oddzielnie od standardowej IOB.</string>
-    <string name="medtrum_sensor_desc">Wpisz numer seryjny wydrukowany na plastrze (szesnastkowy)</string>
+    <string name="medtrum_sensor_desc">Wpisz numer seryjny wydrukowany na nadajniku (szesnastkowy)</string>
     <string name="medtrum_setup_saved_title">Sensor zapisany</string>
-    <string name="medtrum_setup_searching">Jeszcze nie połączono. Plaster połączy się sam, gdy będzie w zasięgu.</string>
-    <string name="medtrum_setup_auth_failed">Plaster odrzucił ten numer seryjny. Sprawdź numer wydrukowany na plastrze.</string>
-    <string name="medtrum_setup_device_rejected">To urządzenie nie jest plastrem Medtrum. Upewnij się, że plaster jest w pobliżu, i spróbuj ponownie.</string>
+    <string name="medtrum_setup_searching">Jeszcze nie połączono. Nadajnik połączy się sam, gdy będzie w zasięgu.</string>
+    <string name="medtrum_setup_auth_failed">Nadajnik odrzucił ten numer seryjny. Sprawdź numer wydrukowany na nadajniku.</string>
+    <string name="medtrum_setup_device_rejected">To urządzenie nie jest nadajnikiem Medtrum. Upewnij się, że nadajnik jest w pobliżu, i spróbuj ponownie.</string>
 
     <string name="alert_sound_volume">Głośność dźwięku alarmu</string>
     <string name="dexcom_share_title">Dexcom Share</string>

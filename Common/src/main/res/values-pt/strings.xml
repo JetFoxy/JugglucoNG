@@ -348,6 +348,7 @@
     <string name="failed_to_connect">Falha ao conectar a </string>
     <string name="sensor_not_init">Sensor não inicializado. Use \'Escanear Sensor\' primeiro.</string>
     <string name="invalid_code_format">Formato de código inválido. Tente novamente.</string>
+    <string name="ican_full_box_serial_required">A ativação requer o número de série completo de 13 caracteres da embalagem iCan</string>
     <string name="sibionics_code_wrong_type">Este é um código %1$s. Volte e escolha %1$s.</string>
     <string name="sibionics_code_not_for_type">Este código não pertence a %1$s. Volte e escolha o tipo de sensor correspondente.</string>
     <string name="sibionics_serial_wrong_type">Este número de série não corresponde a %1$s. Volte e escolha o tipo de sensor correspondente.</string>
@@ -1330,6 +1331,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="pair">Emparelhar</string>
     <string name="points">Pontos</string>
     <string name="position_layout">Posição e layout</string>
+    <string name="floating_reset_position">Redefinir posição</string>
+    <string name="floating_reset_position_desc">Leva a glicose flutuante de volta ao centro da tela.</string>
     <string name="preview">Visualização</string>
     <string name="previous_calibrations">Calibrações anteriores</string>
     <string name="show_less">Mostrar menos</string>
@@ -1752,6 +1755,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_type_insulin">Insulina</string>
     <string name="journal_type_food">Alimento</string>
     <string name="journal_type_bg_short">Glic</string>
+    <string name="journal_type_glucose">Glicose</string>
     <string name="journal_type_fingerstick">Ponta de dedo</string>
     <string name="journal_type_activity">Atividade</string>
     <string name="journal_type_note">Nota</string>
@@ -2095,10 +2099,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="api_source_status_no_readings">Ainda sem leituras API</string>
     <string name="api_source_status_sync_failed">Falha ao sincronizar fonte API</string>
     <string name="outbound_api_preset_sheet_title">Escolher predefinição de destino</string>
-    <string name="outbound_api_preset_custom_json_desc">Envia JSON de glicose normalizado por POST para qualquer endpoint.</string>
-    <string name="outbound_api_preset_telegram_desc">Envia texto pela Telegram Bot API. O URL pode apontar para um relay.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Envia texto GV compacto por mensagens de comunidade VK.</string>
-    <string name="outbound_api_preset_vk_desc">Envia texto legível de glicose por mensagens de comunidade VK.</string>
+    <string name="outbound_api_preset_custom_json_desc">Envia JSON de glicose normalizado por POST para qualquer endpoint</string>
+    <string name="outbound_api_preset_telegram_desc">Envia texto pela Telegram Bot API. O URL pode apontar para um relay</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Envia texto GV compacto por mensagens de comunidade VK</string>
+    <string name="outbound_api_preset_vk_desc">Envia texto legível de glicose por mensagens de comunidade VK</string>
     <string name="outbound_api_change_preset">Alterar</string>
     <string name="outbound_api_telegram_recipient_help">Use um chat ID numérico ou @nome_do_canal. A pessoa deve iniciar o bot primeiro.</string>
     <string name="outbound_api_vk_recipient_help">Use IDs numéricos de usuário ou peer VK. Cada destinatário deve escrever primeiro à comunidade.</string>
@@ -2506,7 +2510,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_offline_routes">Importe um ficheiro de credenciais para continuar sem a nuvem — a leitura do QR apenas preenche o código do sensor e o NFC apenas o ativa.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">SMS de emergência</string>
-    <string name="outbound_api_preset_sms_desc">Envia mensagem quando um alarme fica sem resposta, um valor fica crítico ou a ligação de dados cai.</string>
+    <string name="outbound_api_preset_sms_desc">Envia mensagem quando um alarme fica sem resposta, um valor fica crítico ou a ligação de dados cai</string>
     <string name="sms_section_who">De quem se trata</string>
     <string name="sms_subject_name">Nome</string>
     <string name="sms_subject_name_help">Fica no início de cada mensagem, por exemplo “Mia: alarme BAIXO sem resposta”.</string>
@@ -2985,11 +2989,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">Segredo da API ou token de acesso</string>
     <string name="nightscout_api_help">Use o segredo da API com v1 ou um token de acesso do Nightscout com v3.</string>
     <string name="nightscout_iob_help">eIOB e COB são enviados no campo jugglucong de devicestatus, separados da IOB padrão.</string>
-    <string name="medtrum_sensor_desc">Introduza o número de série impresso no adesivo (hexadecimal)</string>
+    <string name="medtrum_sensor_desc">Introduza o número de série impresso no transmissor (hexadecimal)</string>
     <string name="medtrum_setup_saved_title">Sensor guardado</string>
-    <string name="medtrum_setup_searching">Ainda não ligado. O adesivo liga-se sozinho quando estiver ao alcance.</string>
-    <string name="medtrum_setup_auth_failed">O adesivo recusou este número de série. Verifique o número impresso no adesivo.</string>
-    <string name="medtrum_setup_device_rejected">Este dispositivo não é um adesivo Medtrum. Verifique se o adesivo está por perto e tente novamente.</string>
+    <string name="medtrum_setup_searching">Ainda não ligado. O transmissor liga-se sozinho quando estiver ao alcance.</string>
+    <string name="medtrum_setup_auth_failed">O transmissor recusou este número de série. Verifique o número impresso no transmissor.</string>
+    <string name="medtrum_setup_device_rejected">Este dispositivo não é um transmissor Medtrum. Verifique se o transmissor está por perto e tente novamente.</string>
 
     <string name="alert_sound_volume">Volume do som de alerta</string>
     <string name="dexcom_share_title">Dexcom Share</string>

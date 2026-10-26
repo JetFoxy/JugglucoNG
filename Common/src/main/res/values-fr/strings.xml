@@ -403,6 +403,7 @@
     <string name="sensor_lost_restart">Erreur: Capteur perdu. Veuillez recommencer la configuration.</string>
     <string name="failed_to_connect">Échec de connexion à </string>
     <string name="invalid_code_format">Format de code invalide. Veuillez réessayer.</string>
+    <string name="ican_full_box_serial_required">L’activation nécessite le numéro de série complet de 13 caractères figurant sur la boîte iCan</string>
     <string name="sibionics_code_wrong_type">Ce code est un code %1$s. Revenez en arrière et choisissez %1$s.</string>
     <string name="sibionics_code_not_for_type">Ce code n’appartient pas à %1$s. Revenez en arrière et choisissez le type de capteur correspondant.</string>
     <string name="sibionics_serial_wrong_type">Ce numéro de série ne correspond pas à %1$s. Revenez en arrière et choisissez le type de capteur correspondant.</string>
@@ -1335,6 +1336,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="pair">Appairer</string>
     <string name="points">Points</string>
     <string name="position_layout">Position et disposition</string>
+    <string name="floating_reset_position">Réinitialiser la position</string>
+    <string name="floating_reset_position_desc">Replace la glycémie flottante au milieu de l’écran.</string>
     <string name="preview">Aperçu</string>
     <string name="previous_calibrations">Étalonnages précédents</string>
     <string name="show_less">Afficher moins</string>
@@ -1757,6 +1760,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_type_insulin">Insuline</string>
     <string name="journal_type_food">Aliment</string>
     <string name="journal_type_bg_short">Gly</string>
+    <string name="journal_type_glucose">Glucose</string>
     <string name="journal_type_fingerstick">Mesure capillaire</string>
     <string name="journal_type_activity">Activité</string>
     <string name="journal_type_note">Note</string>
@@ -2100,10 +2104,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="api_source_status_no_readings">Aucune valeur API pour le moment</string>
     <string name="api_source_status_sync_failed">Échec de synchronisation de la source API</string>
     <string name="outbound_api_preset_sheet_title">Choisir un préréglage de destination</string>
-    <string name="outbound_api_preset_custom_json_desc">Envoie le JSON glucose normalisé par POST vers n’importe quel endpoint.</string>
-    <string name="outbound_api_preset_telegram_desc">Envoie du texte via Telegram Bot API. L’URL peut pointer vers un relais.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Envoie le texte compact GV via les messages de communauté VK.</string>
-    <string name="outbound_api_preset_vk_desc">Envoie un texte glucose lisible via les messages de communauté VK.</string>
+    <string name="outbound_api_preset_custom_json_desc">Envoie le JSON glucose normalisé par POST vers n’importe quel endpoint</string>
+    <string name="outbound_api_preset_telegram_desc">Envoie du texte via Telegram Bot API. L’URL peut pointer vers un relais</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Envoie le texte compact GV via les messages de communauté VK</string>
+    <string name="outbound_api_preset_vk_desc">Envoie un texte glucose lisible via les messages de communauté VK</string>
     <string name="outbound_api_change_preset">Changer</string>
     <string name="outbound_api_telegram_recipient_help">Utilisez un chat ID numérique ou @nom_de_canal. La personne doit d’abord démarrer le bot.</string>
     <string name="outbound_api_vk_recipient_help">Utilisez des ID utilisateur ou peer VK numériques. Chaque destinataire doit d’abord écrire à la communauté.</string>
@@ -2511,7 +2515,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_offline_routes">Importez un fichier d’identifiants pour continuer sans le cloud — le scan QR renseigne uniquement le code du capteur et le NFC ne fait que le réveiller.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">SMS d\'urgence</string>
-    <string name="outbound_api_preset_sms_desc">Envoyer un SMS quand une alarme reste sans réponse, qu\'une valeur devient critique ou que la connexion de données tombe.</string>
+    <string name="outbound_api_preset_sms_desc">Envoyer un SMS quand une alarme reste sans réponse, qu\'une valeur devient critique ou que la connexion de données tombe</string>
     <string name="sms_section_who">De qui il s\'agit</string>
     <string name="sms_subject_name">Nom</string>
     <string name="sms_subject_name_help">Placé au début de chaque message, par exemple « Mia : alarme BAS sans réponse ».</string>
@@ -2990,11 +2994,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">Secret API ou jeton d’accès</string>
     <string name="nightscout_api_help">Utilisez le secret API pour v1 ou un jeton d’accès Nightscout pour v3.</string>
     <string name="nightscout_iob_help">eIOB et COB sont envoyés dans le champ jugglucong de devicestatus, séparément de l’IOB standard.</string>
-    <string name="medtrum_sensor_desc">Saisissez le numéro de série imprimé sur le patch (hexadécimal)</string>
+    <string name="medtrum_sensor_desc">Saisissez le numéro de série imprimé sur le transmetteur (hexadécimal)</string>
     <string name="medtrum_setup_saved_title">Capteur enregistré</string>
-    <string name="medtrum_setup_searching">Pas encore connecté. Le patch se connectera seul dès qu\'il sera à portée.</string>
-    <string name="medtrum_setup_auth_failed">Le patch a refusé ce numéro de série. Vérifiez le numéro imprimé sur le patch.</string>
-    <string name="medtrum_setup_device_rejected">Cet appareil n\'est pas un capteur Medtrum. Vérifiez que le capteur est à portée, puis réessayez.</string>
+    <string name="medtrum_setup_searching">Pas encore connecté. Le transmetteur se connectera seul dès qu\'il sera à portée.</string>
+    <string name="medtrum_setup_auth_failed">Le transmetteur a refusé ce numéro de série. Vérifiez le numéro imprimé sur le transmetteur.</string>
+    <string name="medtrum_setup_device_rejected">Cet appareil n\'est pas un transmetteur Medtrum. Vérifiez que le transmetteur est à portée, puis réessayez.</string>
 
     <string name="alert_sound_volume">Volume du son d’alerte</string>
     <string name="dexcom_share_title">Dexcom Share</string>

@@ -917,6 +917,7 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="failed_to_connect">"Sikertelen csatlakozás ehhez: "</string>
     <string name="sensor_not_init">A szenzor nincs inicializálva. Először használja a \'Szenzor szkennelése\' funkciót.</string>
     <string name="invalid_code_format">Érvénytelen kódformátum. Próbálja újra.</string>
+    <string name="ican_full_box_serial_required">Az aktiváláshoz az iCan dobozán található teljes, 13 karakteres sorozatszám szükséges</string>
     <string name="sibionics_code_wrong_type">Ez %1$s-kód. Lépjen vissza, és válassza ezt: %1$s.</string>
     <string name="sibionics_code_not_for_type">Ez a kód nem ehhez tartozik: %1$s. Lépjen vissza, és válassza a megfelelő szenzortípust.</string>
     <string name="sibionics_serial_wrong_type">Ez a sorozatszám nem ehhez tartozik: %1$s. Lépjen vissza, és válassza a megfelelő szenzortípust.</string>
@@ -1592,6 +1593,8 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="pair">Párosítás</string>
     <string name="points">Pontok</string>
     <string name="position_layout">Pozíció és elrendezés</string>
+    <string name="floating_reset_position">Pozíció visszaállítása</string>
+    <string name="floating_reset_position_desc">A lebegő glükózt visszahelyezi a képernyő közepére.</string>
     <string name="preview">Előnézet</string>
     <string name="previous_calibrations">Korábbi kalibrációk</string>
     <string name="show_less">Kevesebb</string>
@@ -2177,6 +2180,7 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="journal_type_insulin">Inzulin</string>
     <string name="journal_type_food">Étel</string>
     <string name="journal_type_bg_short">BG</string>
+    <string name="journal_type_glucose">Glükóz</string>
     <string name="journal_type_fingerstick">Ujjbegyes mérés</string>
     <string name="journal_type_activity">Aktivitás</string>
     <string name="journal_type_note">Megjegyzés</string>
@@ -2541,10 +2545,10 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="api_source_status_no_readings">Még nincs API-mérés</string>
     <string name="api_source_status_sync_failed">API-forrás szinkronizálása sikertelen</string>
     <string name="outbound_api_preset_sheet_title">Cél-előbeállítás kiválasztása</string>
-    <string name="outbound_api_preset_custom_json_desc">Normalizált glükóz JSON küldése bármely végpontra POST-tal.</string>
-    <string name="outbound_api_preset_telegram_desc">Szöveg küldése a Telegram Bot API használatával. Az URL közvetítőre is mutathat.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Tömör GV-szöveg küldése VK-közösségi üzeneteken keresztül.</string>
-    <string name="outbound_api_preset_vk_desc">Olvasható glükózszöveg küldése VK-közösségi üzeneteken keresztül.</string>
+    <string name="outbound_api_preset_custom_json_desc">Normalizált glükóz JSON küldése bármely végpontra POST-tal</string>
+    <string name="outbound_api_preset_telegram_desc">Szöveg küldése a Telegram Bot API használatával. Az URL közvetítőre is mutathat</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Tömör GV-szöveg küldése VK-közösségi üzeneteken keresztül</string>
+    <string name="outbound_api_preset_vk_desc">Olvasható glükózszöveg küldése VK-közösségi üzeneteken keresztül</string>
     <string name="outbound_api_change_preset">Módosítás</string>
     <string name="outbound_api_telegram_recipient_help">Számszerű csevegésazonosító vagy @channel felhasználónév használható. Személyes címzettnek előbb el kell indítania a botot.</string>
     <string name="outbound_api_vk_recipient_help">Számszerű VK-felhasználó- vagy partnerazonosítók használhatók. Minden címzettnek előbb üzenetet kell küldenie a közösségnek.</string>
@@ -2597,7 +2601,7 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="sensor_handover_multiple_text">A szenzor lejárt, de több utódszenzor is aktív. Az automatikus váltás kimaradt; kérjük, váltson kézzel.</string>
     <string name="sensor_handover_successor_ready">Az utódszenzor készen áll; az automatikus váltás a lejáratkor történik</string>
     <string name="outbound_api_preset_sms">Vészhelyzeti SMS</string>
-    <string name="outbound_api_preset_sms_desc">SMS küldése, ha egy riasztás nyugtázatlan marad, egy érték kritikussá válik, vagy megszakad az adatkapcsolat.</string>
+    <string name="outbound_api_preset_sms_desc">SMS küldése, ha egy riasztás nyugtázatlan marad, egy érték kritikussá válik, vagy megszakad az adatkapcsolat</string>
     <string name="sms_section_who">Érintett személy</string>
     <string name="sms_subject_name">Név</string>
     <string name="sms_subject_name_help">Minden üzenet elejére kerül, például: „Mia: ALACSONY érték riasztása nyugtázatlan”.</string>
@@ -3059,11 +3063,11 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="nightscout_secret_label">API-titok vagy hozzáférési token</string>
     <string name="nightscout_api_help">A v1-hez API-titkot, a v3-hoz Nightscout-hozzáférési tokent használj.</string>
     <string name="nightscout_iob_help">Az eIOB és COB a devicestatus jugglucong mezőjében kerül elküldésre, a hagyományos IOB-tól külön.</string>
-    <string name="medtrum_sensor_desc">Adja meg a tapaszra nyomtatott sorozatszámot (hexadecimális)</string>
+    <string name="medtrum_sensor_desc">Adja meg a jeladóra nyomtatott sorozatszámot (hexadecimális)</string>
     <string name="medtrum_setup_saved_title">Szenzor mentve</string>
-    <string name="medtrum_setup_searching">Még nincs kapcsolat. A tapasz magától csatlakozik, ha hatótávon belül van.</string>
-    <string name="medtrum_setup_auth_failed">A tapasz elutasította ezt a sorozatszámot. Ellenőrizze a tapaszon lévő számot.</string>
-    <string name="medtrum_setup_device_rejected">Ez az eszköz nem Medtrum tapasz. Ellenőrizze, hogy a tapasz a közelben van-e, majd próbálja újra.</string>
+    <string name="medtrum_setup_searching">Még nincs kapcsolat. A jeladó magától csatlakozik, ha hatótávon belül van.</string>
+    <string name="medtrum_setup_auth_failed">A jeladó elutasította ezt a sorozatszámot. Ellenőrizze a jeladón lévő számot.</string>
+    <string name="medtrum_setup_device_rejected">Ez az eszköz nem Medtrum jeladó. Ellenőrizze, hogy a jeladó a közelben van-e, majd próbálja újra.</string>
 
     <string name="alert_sound_volume">Riasztási hang hangereje</string>
     <string name="dexcom_share_title">Dexcom Share</string>

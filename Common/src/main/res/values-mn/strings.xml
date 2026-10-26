@@ -882,6 +882,7 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="failed_to_connect">"Холбогдож чадсангүй: "</string>
     <string name="sensor_not_init">Мэдрэгч эхлээгүй байна. Эхлээд Мэдрэгч уншуулах-ыг ашиглана уу.</string>
     <string name="invalid_code_format">Кодын формат буруу байна. Дахин оролдоно уу.</string>
+    <string name="ican_full_box_serial_required">Идэвхжүүлэхийн тулд iCan хайрцаг дээрх 13 тэмдэгттэй бүтэн серийн дугаар шаардлагатай</string>
     <string name="sibionics_code_wrong_type">Энэ бол %1$s код. Буцаж очоод %1$s-г сонгоно уу.</string>
     <string name="sibionics_code_not_for_type">Энэ код %1$s-д хамаарахгүй. Буцаж очоод тохирох мэдрэгчийн төрлийг сонгоно уу.</string>
     <string name="sibionics_serial_wrong_type">Энэ сериал дугаар %1$s-тай тохирохгүй байна. Буцаж очоод тохирох мэдрэгчийн төрлийг сонгоно уу.</string>
@@ -1351,6 +1352,8 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="pair">Хослуулах</string>
     <string name="points">Points</string>
     <string name="position_layout">Position and layout</string>
+    <string name="floating_reset_position">Байршлыг сэргээх</string>
+    <string name="floating_reset_position_desc">Хөвөгч глюкозыг дэлгэцийн голд буцаана.</string>
     <string name="preview">Preview</string>
     <string name="previous_calibrations">Өмнөх тохируулгууд</string>
     <string name="show_less">Бага харуулах</string>
@@ -1757,6 +1760,7 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="journal_type_insulin">Insulin</string>
     <string name="journal_type_food">Food</string>
     <string name="journal_type_bg_short">BG</string>
+    <string name="journal_type_glucose">Глюкоз</string>
     <string name="journal_type_fingerstick">Fingerstick</string>
     <string name="journal_type_activity">Activity</string>
     <string name="journal_type_note">Note</string>
@@ -2117,10 +2121,10 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="api_source_status_no_readings">API уншилт хараахан алга</string>``
     <string name="api_source_status_sync_failed">API эх үүсвэрийн синк амжилтгүй</string>
     <string name="outbound_api_preset_sheet_title">Очих газрын бэлэн тохиргоо сонгох</string>
-    <string name="outbound_api_preset_custom_json_desc">POST normalized glucose JSON to any endpoint.</string>
-    <string name="outbound_api_preset_telegram_desc">Send text with the Telegram Bot API. The URL can point to a relay.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Send compact GV text through VK community messages.</string>
-    <string name="outbound_api_preset_vk_desc">Send readable glucose text through VK community messages.</string>
+    <string name="outbound_api_preset_custom_json_desc">POST normalized glucose JSON to any endpoint</string>
+    <string name="outbound_api_preset_telegram_desc">Send text with the Telegram Bot API. The URL can point to a relay</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Send compact GV text through VK community messages</string>
+    <string name="outbound_api_preset_vk_desc">Send readable glucose text through VK community messages</string>
     <string name="outbound_api_change_preset">Өөрчлөх</string>
     <string name="outbound_api_telegram_recipient_help">Use a numeric chat ID or @channel username. A person must start the bot first.</string>
     <string name="outbound_api_vk_recipient_help">Use numeric VK user or peer IDs. Each recipient must message the community first.</string>
@@ -2612,7 +2616,7 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="ottai_cloud_offline_routes">Үүлэн үйлчилгээгүй үргэлжлүүлэхийн тулд нэвтрэх мэдээллийн файлыг импортлоно уу — QR уншуулах нь зөвхөн мэдрэгчийн кодыг бөглөж, NFC нь мэдрэгчийг зөвхөн сэрээнэ.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">Яаралтай SMS</string>
-    <string name="outbound_api_preset_sms_desc">Дохиололд хариу өгөөгүй, утга эгзэгтэй болсон эсвэл дата холболт тасарсан үед хүмүүст мессеж илгээнэ.</string>
+    <string name="outbound_api_preset_sms_desc">Дохиололд хариу өгөөгүй, утга эгзэгтэй болсон эсвэл дата холболт тасарсан үед хүмүүст мессеж илгээнэ</string>
     <string name="sms_section_who">Хэний тухай</string>
     <string name="sms_subject_name">Нэр</string>
     <string name="sms_subject_name_help">Мессеж бүрийн эхэнд тавигдана, жишээ нь «Миа: БАГА дохиололд хариу алга».</string>
@@ -3085,11 +3089,11 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="nightscout_secret_label">API нууц эсвэл хандалтын токен</string>
     <string name="nightscout_api_help">v1-д API нууц, v3-д Nightscout хандалтын токен ашиглана уу.</string>
     <string name="nightscout_iob_help">eIOB болон COB нь стандарт IOB-оос тусдаа devicestatus-ийн jugglucong талбарт илгээгдэнэ.</string>
-    <string name="medtrum_sensor_desc">Наалт дээр хэвлэсэн серийн дугаарыг оруулна уу (16-тын)</string>
+    <string name="medtrum_sensor_desc">Дамжуулагч дээр хэвлэсэн серийн дугаарыг оруулна уу (16-тын)</string>
     <string name="medtrum_setup_saved_title">Мэдрэгч хадгалагдлаа</string>
-    <string name="medtrum_setup_searching">Одоогоор холбогдоогүй. Наалт ойр байх үед өөрөө холбогдоно.</string>
-    <string name="medtrum_setup_auth_failed">Наалт энэ серийн дугаарыг хүлээн аваагүй. Наалт дээрх дугаарыг шалгана уу.</string>
-    <string name="medtrum_setup_device_rejected">Энэ төхөөрөмж Medtrum наалт биш. Наалт ойрхон байгаа эсэхийг шалгаад дахин оролдоно уу.</string>
+    <string name="medtrum_setup_searching">Одоогоор холбогдоогүй. Дамжуулагч ойр байх үед өөрөө холбогдоно.</string>
+    <string name="medtrum_setup_auth_failed">Дамжуулагч энэ серийн дугаарыг хүлээн аваагүй. Дамжуулагч дээрх дугаарыг шалгана уу.</string>
+    <string name="medtrum_setup_device_rejected">Энэ төхөөрөмж Medtrum дамжуулагч биш. Дамжуулагч ойрхон байгаа эсэхийг шалгаад дахин оролдоно уу.</string>
 
     <string name="alert_sound_volume">Дохиоллын дууны түвшин</string>
     <string name="dexcom_share_title">Dexcom Share</string>

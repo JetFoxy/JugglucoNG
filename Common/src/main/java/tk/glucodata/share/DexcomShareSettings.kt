@@ -81,6 +81,10 @@ object DexcomShareSettings {
     @JvmStatic
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
 
+    /** Switched on, or an account was saved: the settings entry stays reachable either way. */
+    fun isSetUp(context: Context): Boolean =
+        isEnabled(context) || readEncrypted(context, KEY_ACCOUNT).isNotBlank()
+
     fun load(context: Context): Config {
         val stored = prefs(context)
         return Config(

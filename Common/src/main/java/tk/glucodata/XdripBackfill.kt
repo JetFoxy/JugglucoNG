@@ -21,7 +21,14 @@ object XdripBackfill {
     private const val MAX_RATE_LOOKBACK_MS = 60L * 60L * 1000L
     private const val PROCESS_DELAY_MS = 5_000L
 
-    data class Row(val timeMs: Long, val value: Float, val rawValue: Float, val rate: Float?)
+    /** [storedAtMs]: when the row first reached Room, or 0 when unknown. */
+    data class Row(
+        val timeMs: Long,
+        val value: Float,
+        val rawValue: Float,
+        val rate: Float?,
+        val storedAtMs: Long = 0L,
+    )
 
     /** One stored reading with the mg/dL a live send would carry for it. */
     data class DisplayedRow(val timeMs: Long, val mgdl: Int)
@@ -193,7 +200,10 @@ object XdripBackfill {
     private fun backfillCausalHistoryFor(app: Context, sensorSerial: String, rows: List<Row>): List<GlucosePoint>? {
         val spacingMs = DataSmoothing.exchangeThrottleIntervalMinutes(app) * 60_000L
         val needed = tracker.needsBackfill(
-            key(sensorSerial), rows.map { it.timeMs }, System.currentTimeMillis(), spacingMs,
+            key(sensorSerial),
+            rows.map { XdripBackfillTracker.Candidate(it.timeMs, it.value.toDouble(), 0f, it.storedAtMs) },
+            System.currentTimeMillis(),
+            spacingMs,
         )
         if (!needed) return null
         return causalHistoryFor(app, sensorSerial, rows)
@@ -248,7 +258,7 @@ object XdripBackfill {
         return valid.mapIndexed { index, row ->
             val rate = row.rate?.takeIf { it.isFinite() && it != 0f }
                 ?: derivedRate(valid, shown, index)
-            XdripBackfillTracker.Candidate(row.timeMs, shown[index].toDouble(), rate)
+            XdripBackfillTracker.Candidate(row.timeMs, shown[index].toDouble(), rate, row.storedAtMs)
         }
     }
 

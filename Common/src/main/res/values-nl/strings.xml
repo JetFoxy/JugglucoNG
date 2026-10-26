@@ -535,6 +535,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="failed_to_connect">"Verbinding mislukt met "</string>
     <string name="sensor_not_init">Sensor niet geïnitialiseerd. Gebruik eerst \'Scan Sensor\'.</string>
     <string name="invalid_code_format">Ongeldige code-indeling. Probeer het opnieuw.</string>
+    <string name="ican_full_box_serial_required">Voor activering is het volledige serienummer van 13 tekens op de iCan-verpakking vereist</string>
     <string name="sibionics_code_wrong_type">Dit is een %1$s-code. Ga terug en kies %1$s.</string>
     <string name="sibionics_code_not_for_type">Deze code hoort niet bij %1$s. Ga terug en kies het juiste sensortype.</string>
     <string name="sibionics_serial_wrong_type">Dit serienummer past niet bij %1$s. Ga terug en kies het juiste sensortype.</string>
@@ -1372,6 +1373,8 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="pair">Koppelen</string>
     <string name="points">Punten</string>
     <string name="position_layout">Positie en indeling</string>
+    <string name="floating_reset_position">Positie herstellen</string>
+    <string name="floating_reset_position_desc">Zet de zwevende glucose terug in het midden van het scherm.</string>
     <string name="preview">Voorbeeld</string>
     <string name="previous_calibrations">Eerdere kalibraties</string>
     <string name="show_less">Minder tonen</string>
@@ -1794,6 +1797,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="journal_type_insulin">Insuline</string>
     <string name="journal_type_food">Voeding</string>
     <string name="journal_type_bg_short">BG</string>
+    <string name="journal_type_glucose">Glucose</string>
     <string name="journal_type_fingerstick">Vingerprik</string>
     <string name="journal_type_activity">Activiteit</string>
     <string name="journal_type_note">Notitie</string>
@@ -2137,10 +2141,10 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="api_source_status_no_readings">Nog geen API-metingen</string>
     <string name="api_source_status_sync_failed">Synchronisatie van API-bron mislukt</string>
     <string name="outbound_api_preset_sheet_title">Kies bestemmingspreset</string>
-    <string name="outbound_api_preset_custom_json_desc">POST genormaliseerde glucose-JSON naar een willekeurig endpoint.</string>
-    <string name="outbound_api_preset_telegram_desc">Stuurt tekst via Telegram Bot API. De URL kan naar een relay wijzen.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Stuurt compacte GV-tekst via VK-communityberichten.</string>
-    <string name="outbound_api_preset_vk_desc">Stuurt leesbare glucosetekst via VK-communityberichten.</string>
+    <string name="outbound_api_preset_custom_json_desc">POST genormaliseerde glucose-JSON naar een willekeurig endpoint</string>
+    <string name="outbound_api_preset_telegram_desc">Stuurt tekst via Telegram Bot API. De URL kan naar een relay wijzen</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Stuurt compacte GV-tekst via VK-communityberichten</string>
+    <string name="outbound_api_preset_vk_desc">Stuurt leesbare glucosetekst via VK-communityberichten</string>
     <string name="outbound_api_change_preset">Wijzigen</string>
     <string name="outbound_api_telegram_recipient_help">Gebruik een numerieke chat-ID of @kanaalnaam. Een persoon moet eerst de bot starten.</string>
     <string name="outbound_api_vk_recipient_help">Gebruik numerieke VK-gebruiker- of peer-ID’s. Elke ontvanger moet eerst de community berichten.</string>
@@ -2548,7 +2552,7 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="ottai_cloud_offline_routes">Importeer een bestand met aanmeldgegevens om zonder cloud verder te gaan — een QR-scan vult alleen de sensorcode in en NFC maakt de sensor alleen wakker.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">Nood-sms</string>
-    <string name="outbound_api_preset_sms_desc">Stuur mensen een bericht als een alarm onbeantwoord blijft, een waarde kritiek wordt of de dataverbinding wegvalt.</string>
+    <string name="outbound_api_preset_sms_desc">Stuur mensen een bericht als een alarm onbeantwoord blijft, een waarde kritiek wordt of de dataverbinding wegvalt</string>
     <string name="sms_section_who">Over wie dit gaat</string>
     <string name="sms_subject_name">Naam</string>
     <string name="sms_subject_name_help">Komt aan het begin van elk bericht, bijvoorbeeld “Mia: alarm LAAG onbeantwoord”.</string>
@@ -3027,11 +3031,11 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="nightscout_secret_label">API-secret of toegangstoken</string>
     <string name="nightscout_api_help">Gebruik een API-geheim voor v1 of een Nightscout-toegangstoken voor v3.</string>
     <string name="nightscout_iob_help">eIOB en COB worden in het veld jugglucong van devicestatus verstuurd, los van de standaard-IOB.</string>
-    <string name="medtrum_sensor_desc">Voer het serienummer in dat op de patch staat (hexadecimaal)</string>
+    <string name="medtrum_sensor_desc">Voer het serienummer in dat op de transmitter staat (hexadecimaal)</string>
     <string name="medtrum_setup_saved_title">Sensor opgeslagen</string>
-    <string name="medtrum_setup_searching">Nog niet verbonden. De patch maakt vanzelf verbinding zodra hij binnen bereik is.</string>
-    <string name="medtrum_setup_auth_failed">De patch heeft dit serienummer geweigerd. Controleer het nummer op de patch.</string>
-    <string name="medtrum_setup_device_rejected">Dit apparaat is geen Medtrum-patch. Zorg dat de patch binnen bereik is en probeer het opnieuw.</string>
+    <string name="medtrum_setup_searching">Nog niet verbonden. De transmitter maakt vanzelf verbinding zodra hij binnen bereik is.</string>
+    <string name="medtrum_setup_auth_failed">De transmitter heeft dit serienummer geweigerd. Controleer het nummer op de transmitter.</string>
+    <string name="medtrum_setup_device_rejected">Dit apparaat is geen Medtrum-transmitter. Zorg dat de transmitter binnen bereik is en probeer het opnieuw.</string>
 
     <string name="alert_sound_volume">Volume van het alarmgeluid</string>
     <string name="dexcom_share_title">Dexcom Share</string>

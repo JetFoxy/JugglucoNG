@@ -460,6 +460,7 @@
     <string name="failed_to_connect">Не вдалося підключитися до </string>
     <string name="sensor_not_init">Сенсор не ініціалізовано. Спочатку використовуйте \'Сканувати Сенсор\'.</string>
     <string name="invalid_code_format">Невірний формат коду. Спробуйте знову.</string>
+    <string name="ican_full_box_serial_required">Для активації потрібен повний серійний номер із 13 символів з коробки iCan</string>
     <string name="sibionics_code_wrong_type">Це код %1$s. Поверніться та виберіть %1$s.</string>
     <string name="sibionics_code_not_for_type">Цей код не належить до %1$s. Поверніться та виберіть відповідний тип датчика.</string>
     <string name="sibionics_serial_wrong_type">Цей серійний номер не відповідає %1$s. Поверніться та виберіть відповідний тип датчика.</string>
@@ -1343,6 +1344,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="pair">Спарювання</string>
     <string name="points">Очки</string>
     <string name="position_layout">Розташування та компонування</string>
+    <string name="floating_reset_position">Скинути положення</string>
+    <string name="floating_reset_position_desc">Повертає плаваючу глюкозу в центр екрана.</string>
     <string name="preview">Попередній перегляд</string>
     <string name="previous_calibrations">Попередні калібрування</string>
     <string name="show_less">Показати менше</string>
@@ -1826,6 +1829,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_type_insulin">Інсулін</string>
     <string name="journal_type_food">Їжа</string>
     <string name="journal_type_bg_short">ГК</string>
+    <string name="journal_type_glucose">Глюкоза</string>
     <string name="journal_type_fingerstick">Пальцевий замір</string>
     <string name="journal_type_activity">Активність</string>
     <string name="journal_type_note">Нотатка</string>
@@ -2170,10 +2174,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="api_source_status_no_readings">Показань API ще немає</string>
     <string name="api_source_status_sync_failed">Помилка синхронізації джерела API</string>
     <string name="outbound_api_preset_sheet_title">Виберіть пресет призначення</string>
-    <string name="outbound_api_preset_custom_json_desc">POST нормалізованого JSON глюкози до будь-якого endpoint.</string>
-    <string name="outbound_api_preset_telegram_desc">Надсилання тексту через Telegram Bot API. URL можна спрямувати на relay.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Надсилання компактного тексту GV через повідомлення спільноти VK.</string>
-    <string name="outbound_api_preset_vk_desc">Надсилання читабельного тексту глюкози через повідомлення спільноти VK.</string>
+    <string name="outbound_api_preset_custom_json_desc">POST нормалізованого JSON глюкози до будь-якого endpoint</string>
+    <string name="outbound_api_preset_telegram_desc">Надсилання тексту через Telegram Bot API. URL можна спрямувати на relay</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Надсилання компактного тексту GV через повідомлення спільноти VK</string>
+    <string name="outbound_api_preset_vk_desc">Надсилання читабельного тексту глюкози через повідомлення спільноти VK</string>
     <string name="outbound_api_change_preset">Змінити</string>
     <string name="outbound_api_telegram_recipient_help">Використовуйте числовий chat ID або @назву_каналу. Людина має спочатку написати боту.</string>
     <string name="outbound_api_vk_recipient_help">Використовуйте числові ID користувачів або peer ID VK. Кожен отримувач має спочатку написати спільноті.</string>
@@ -2577,7 +2581,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_cloud_offline_routes">Імпортуйте файл облікових даних, щоб продовжити без хмари — сканування QR лише заповнює код сенсора, а NFC лише пробуджує його.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">Екстрені SMS</string>
-    <string name="outbound_api_preset_sms_desc">Надсилати повідомлення людям, коли тривога лишилася без відповіді, значення стало критичним або зникла передача даних.</string>
+    <string name="outbound_api_preset_sms_desc">Надсилати повідомлення людям, коли тривога лишилася без відповіді, значення стало критичним або зникла передача даних</string>
     <string name="sms_section_who">Про кого йдеться</string>
     <string name="sms_subject_name">Ім\'я</string>
     <string name="sms_subject_name_help">Додається на початок кожного повідомлення, наприклад «Мія: тривога НИЗЬКИЙ без відповіді».</string>
@@ -3064,11 +3068,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">Секрет API або токен доступу</string>
     <string name="nightscout_api_help">Для v1 використовуйте секрет API, для v3 — токен доступу Nightscout.</string>
     <string name="nightscout_iob_help">eIOB і COB передаються в полі jugglucong об’єкта devicestatus окремо від звичайного IOB.</string>
-    <string name="medtrum_sensor_desc">Введіть серійний номер, надрукований на патчі (шістнадцятковий)</string>
+    <string name="medtrum_sensor_desc">Введіть серійний номер, надрукований на трансмітері (шістнадцятковий)</string>
     <string name="medtrum_setup_saved_title">Сенсор збережено</string>
-    <string name="medtrum_setup_searching">Поки не під’єднано. Патч під’єднається сам, коли буде поруч.</string>
-    <string name="medtrum_setup_auth_failed">Патч відхилив цей серійний номер. Перевірте номер на патчі.</string>
-    <string name="medtrum_setup_device_rejected">Цей пристрій не є патчем Medtrum. Переконайтеся, що патч поруч, і спробуйте ще раз.</string>
+    <string name="medtrum_setup_searching">Поки не під’єднано. Трансмітер під’єднається сам, коли буде поруч.</string>
+    <string name="medtrum_setup_auth_failed">Трансмітер відхилив цей серійний номер. Перевірте номер на трансмітері.</string>
+    <string name="medtrum_setup_device_rejected">Цей пристрій не є трансмітером Medtrum. Переконайтеся, що трансмітер поруч, і спробуйте ще раз.</string>
 
     <string name="alert_sound_volume">Гучність звуку тривоги</string>
     <string name="dexcom_share_title">Dexcom Share</string>

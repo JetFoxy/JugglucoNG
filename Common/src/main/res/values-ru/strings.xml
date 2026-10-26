@@ -546,6 +546,7 @@
     <string name="failed_to_connect">Не удалось подключиться к </string>
     <string name="sensor_not_init">Сенсор не инициализирован. Сначала используйте \'Сканировать Сенсор\'.</string>
     <string name="invalid_code_format">Неверный формат кода. Попробуйте снова.</string>
+    <string name="ican_full_box_serial_required">Для активации нужен полный серийный номер из 13 символов с коробки iCan</string>
     <string name="sibionics_code_wrong_type">Это код %1$s. Вернитесь и выберите %1$s.</string>
     <string name="sibionics_code_not_for_type">Этот код не относится к %1$s. Вернитесь и выберите подходящий тип датчика.</string>
     <string name="sibionics_serial_wrong_type">Этот серийный номер не соответствует %1$s. Вернитесь и выберите подходящий тип датчика.</string>
@@ -1366,6 +1367,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="pair">Сопряжение</string>
     <string name="points">точек</string>
     <string name="position_layout">Расположение и планировка</string>
+    <string name="floating_reset_position">Сбросить положение</string>
+    <string name="floating_reset_position_desc">Возвращает плавающую глюкозу в центр экрана.</string>
     <string name="preview">Предварительный просмотр</string>
     <string name="previous_calibrations">Предыдущие калибровки</string>
     <string name="show_less">Скрыть</string>
@@ -1794,6 +1797,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_type_insulin">Инсулин</string>
     <string name="journal_type_food">Еда</string>
     <string name="journal_type_bg_short">ГК</string>
+    <string name="journal_type_glucose">Глюкоза</string>
     <string name="journal_type_fingerstick">Пальцевый замер</string>
     <string name="journal_type_activity">Активность</string>
     <string name="journal_type_note">Заметка</string>
@@ -2161,10 +2165,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="api_source_status_no_readings">Показаний API пока нет</string>
     <string name="api_source_status_sync_failed">Сбой синхронизации источника API</string>
     <string name="outbound_api_preset_sheet_title">Выберите пресет назначения</string>
-    <string name="outbound_api_preset_custom_json_desc">POST нормализованного JSON глюкозы на любой endpoint.</string>
-    <string name="outbound_api_preset_telegram_desc">Отправка текста через Telegram Bot API. URL можно заменить на relay.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Отправка компактного текста GV через сообщения сообщества VK.</string>
-    <string name="outbound_api_preset_vk_desc">Отправка читаемого текста глюкозы через сообщения сообщества VK.</string>
+    <string name="outbound_api_preset_custom_json_desc">POST нормализованного JSON глюкозы на любой endpoint</string>
+    <string name="outbound_api_preset_telegram_desc">Отправка текста через Telegram Bot API. URL можно заменить на relay</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Отправка компактного текста GV через сообщения сообщества VK</string>
+    <string name="outbound_api_preset_vk_desc">Отправка читаемого текста глюкозы через сообщения сообщества VK</string>
     <string name="outbound_api_change_preset">Изменить</string>
     <string name="outbound_api_telegram_recipient_help">Используйте числовой chat ID или @имя_канала. Пользователь должен сначала написать боту.</string>
     <string name="outbound_api_vk_recipient_help">Используйте числовые ID пользователей или peer ID VK. Каждый получатель должен сначала написать сообществу.</string>
@@ -2571,7 +2575,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_iob_source_remote">Значения с передающего устройства (Nightscout)</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">Экстренные SMS</string>
-    <string name="outbound_api_preset_sms_desc">Отправлять сообщения людям, когда тревога осталась без ответа, значение стало критическим или пропала передача данных.</string>
+    <string name="outbound_api_preset_sms_desc">Отправлять сообщения людям, когда тревога осталась без ответа, значение стало критическим или пропала передача данных</string>
     <string name="sms_section_who">О ком речь</string>
     <string name="sms_subject_name">Имя</string>
     <string name="sms_subject_name_help">Добавляется в начало каждого сообщения, например «Мия: тревога НИЗКИЙ без ответа».</string>
@@ -3058,11 +3062,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">Секрет API или токен доступа</string>
     <string name="nightscout_api_help">Для v1 используйте секрет API, для v3 — токен доступа Nightscout.</string>
     <string name="nightscout_iob_help">eIOB и COB передаются в поле jugglucong объекта devicestatus отдельно от обычного IOB.</string>
-    <string name="medtrum_sensor_desc">Введите серийный номер, напечатанный на патче (шестнадцатеричный)</string>
+    <string name="medtrum_sensor_desc">Введите серийный номер, напечатанный на трансмиттере (шестнадцатеричный)</string>
     <string name="medtrum_setup_saved_title">Сенсор сохранён</string>
-    <string name="medtrum_setup_searching">Пока не подключён. Патч подключится сам, когда окажется рядом.</string>
-    <string name="medtrum_setup_auth_failed">Патч отклонил этот серийный номер. Проверьте номер на патче.</string>
-    <string name="medtrum_setup_device_rejected">Это устройство не является патчем Medtrum. Убедитесь, что патч рядом, и повторите попытку.</string>
+    <string name="medtrum_setup_searching">Пока не подключён. Трансмиттер подключится сам, когда окажется рядом.</string>
+    <string name="medtrum_setup_auth_failed">Трансмиттер отклонил этот серийный номер. Проверьте номер на трансмиттере.</string>
+    <string name="medtrum_setup_device_rejected">Это устройство не является трансмиттером Medtrum. Убедитесь, что трансмиттер рядом, и повторите попытку.</string>
 
     <string name="alert_sound_volume">Громкость звука тревоги</string>
 </resources>

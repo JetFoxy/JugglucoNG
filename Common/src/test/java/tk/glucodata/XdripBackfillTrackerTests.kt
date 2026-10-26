@@ -153,6 +153,50 @@ class XdripBackfillTrackerTests {
     }
 
     @Test
+    fun `readings that arrived on time were sent live and are never backfilled`() {
+        // #686: a release that keeps no record of its sends was installed over a nightly for a
+        // day. The next nightly restored the nightly's old record and re-sent that whole day.
+        val tracker = XdripBackfillTracker()
+        tracker.restore("S", XdripBackfillCoverageFormat.decode("${now - 23 * 60 * minute},3,0")!!)
+        tracker.recordSent("S", now, 1, 0L)
+
+        val onTime = (1L..60L).map { point(it).copy(storedAtMs = now - it * minute + 400L) }
+        val late = (61L..70L).map { point(it).copy(storedAtMs = now - 50 * minute) }
+
+        val picked = tracker.pick("S", onTime + late, now)
+
+        assertEquals((70L downTo 61L).map { now - it * minute }, picked.map { it.timeMs })
+    }
+
+    @Test
+    fun `a live reading filed under the sensor's earlier history time still counts as live`() {
+        val tracker = XdripBackfillTracker()
+        tracker.restore("S", floor(now - 60 * minute))
+        tracker.recordSent("S", now, 1, 0L)
+
+        val filedEarly = point(10).copy(storedAtMs = now - 10 * minute + 60 * second)
+        val gap = point(20).copy(storedAtMs = now - 10 * minute + 60 * second)
+
+        assertEquals(listOf(now - 20 * minute), tracker.pick("S", listOf(filedEarly, gap), now).map { it.timeMs })
+    }
+
+    @Test
+    fun `a late history row next to an on-time reading is not sent again`() {
+        // Libre 3 history every 5 minutes reaches the phone ~19 minutes late, seconds away from a
+        // minute reading another build already sent live: the send record knows nothing of it.
+        val tracker = XdripBackfillTracker()
+        tracker.restore("S", floor(now - 60 * minute))
+        tracker.recordSent("S", now, 1, 0L)
+
+        val minutes = (1L..30L).map { point(it).copy(storedAtMs = now - it * minute + second) }
+        val history = listOf(25L, 20L).map {
+            at(now - it * minute - 20 * second).copy(storedAtMs = now - it * minute + 19 * minute)
+        }
+
+        assertEquals(emptyList<Candidate>(), tracker.pick("S", minutes + history, now))
+    }
+
+    @Test
     fun `coverage keeps sends apart by a gap in separate stretches`() {
         val tracker = XdripBackfillTracker()
         listOf(30L, 29L, 28L, 10L, 9L).forEach { tracker.recordSent("S", now - it * minute, 1, 0L) }
@@ -170,9 +214,9 @@ class XdripBackfillTrackerTests {
         val tracker = XdripBackfillTracker()
         tracker.recordSent("S", now - 10 * minute, 1, 0L)
 
-        assertFalse(tracker.needsBackfill("S", listOf(now - 10 * minute), now))
-        assertTrue(tracker.needsBackfill("S", listOf(now - 5 * minute), now))
-        assertFalse(tracker.needsBackfill("S", listOf(now - 5 * minute), now - 60 * minute))
+        assertFalse(tracker.needsBackfill("S", listOf(point(10)), now))
+        assertTrue(tracker.needsBackfill("S", listOf(point(5)), now))
+        assertFalse(tracker.needsBackfill("S", listOf(point(5)), now - 60 * minute))
     }
 
     @Test
@@ -189,12 +233,30 @@ class XdripBackfillTrackerTests {
         val picked = seeded().pick("S", batch, now)
 
         assertTrue(picked.isNotEmpty())
-        assertEquals(picked.isNotEmpty(), seeded().needsBackfill("S", batch.map { it.timeMs }, now))
+        assertEquals(picked.isNotEmpty(), seeded().needsBackfill("S", batch, now))
+    }
+
+    @Test
+    fun `needsBackfill agrees with pick about readings that arrived on time`() {
+        fun seeded(): XdripBackfillTracker = XdripBackfillTracker().also { tracker ->
+            tracker.restore("S", floor(now - 60 * minute))
+            tracker.recordSent("S", now, 1, 0L)
+        }
+        val minutes = (1L..30L).map { point(it).copy(storedAtMs = now - it * minute + second) }
+        val history = listOf(25L, 20L).map {
+            at(now - it * minute - 20 * second).copy(storedAtMs = now - it * minute + 19 * minute)
+        }
+        val late = point(45).copy(storedAtMs = now - 10 * minute)
+
+        assertFalse(seeded().needsBackfill("S", minutes, now))
+        assertFalse(seeded().needsBackfill("S", minutes + history, now))
+        assertTrue(seeded().needsBackfill("S", minutes + late, now))
+        assertEquals(listOf(late.timeMs), seeded().pick("S", minutes + late, now).map { it.timeMs })
     }
 
     @Test
     fun `an unknown sensor needs no backfill`() {
-        assertFalse(XdripBackfillTracker().needsBackfill("S", listOf(now), now))
+        assertFalse(XdripBackfillTracker().needsBackfill("S", listOf(point(0)), now))
     }
 
     @Test

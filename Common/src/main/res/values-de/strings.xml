@@ -552,6 +552,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="failed_to_connect">Verbindung fehlgeschlagen zu </string>
     <string name="sensor_not_init">Sensor nicht initialisiert. Verwenden Sie zuerst \'Sensor scannen\'.</string>
     <string name="invalid_code_format">Ungültiges Code-Format. Bitte erneut versuchen.</string>
+    <string name="ican_full_box_serial_required">Zur Aktivierung ist die vollständige 13-stellige Seriennummer auf der iCan-Verpackung erforderlich</string>
     <string name="sibionics_code_wrong_type">Das ist ein %1$s-Code. Gehen Sie zurück und wählen Sie %1$s.</string>
     <string name="sibionics_code_not_for_type">Dieser Code gehört nicht zu %1$s. Gehen Sie zurück und wählen Sie den passenden Sensortyp.</string>
     <string name="sibionics_serial_wrong_type">Diese Seriennummer passt nicht zu %1$s. Gehen Sie zurück und wählen Sie den passenden Sensortyp.</string>
@@ -1442,6 +1443,8 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="pair">Koppeln</string>
     <string name="points">Punkte</string>
     <string name="position_layout">Position und Layout</string>
+    <string name="floating_reset_position">Position zurücksetzen</string>
+    <string name="floating_reset_position_desc">Setzt den schwebenden Glukosewert wieder in die Bildschirmmitte.</string>
     <string name="preview">Vorschau</string>
     <string name="previous_calibrations">Frühere Kalibrierungen</string>
     <string name="show_less">Weniger anzeigen</string>
@@ -1938,6 +1941,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="journal_type_insulin">Insulin</string>
     <string name="journal_type_food">Essen</string>
     <string name="journal_type_bg_short">BZ</string>
+    <string name="journal_type_glucose">Glukose</string>
     <string name="journal_type_fingerstick">Blutzuckermessung</string>
     <string name="journal_type_activity">Aktivität</string>
     <string name="journal_type_note">Notiz</string>
@@ -2289,10 +2293,10 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="api_source_status_no_readings">Noch keine API-Werte</string>
     <string name="api_source_status_sync_failed">API-Quellensynchronisierung fehlgeschlagen</string>
     <string name="outbound_api_preset_sheet_title">Zielvorlage wählen</string>
-    <string name="outbound_api_preset_custom_json_desc">Sendet normalisiertes Glukose-JSON per POST an einen beliebigen Endpunkt.</string>
-    <string name="outbound_api_preset_telegram_desc">Sendet Text über die Telegram Bot API. Die URL kann auf ein Relais zeigen.</string>
-    <string name="outbound_api_preset_gluco_watch_vk_desc">Sendet kompakten GV-Text über VK-Community-Nachrichten.</string>
-    <string name="outbound_api_preset_vk_desc">Sendet lesbaren Glukosetext über VK-Community-Nachrichten.</string>
+    <string name="outbound_api_preset_custom_json_desc">Sendet normalisiertes Glukose-JSON per POST an einen beliebigen Endpunkt</string>
+    <string name="outbound_api_preset_telegram_desc">Sendet Text über die Telegram Bot API. Die URL kann auf ein Relais zeigen</string>
+    <string name="outbound_api_preset_gluco_watch_vk_desc">Sendet kompakten GV-Text über VK-Community-Nachrichten</string>
+    <string name="outbound_api_preset_vk_desc">Sendet lesbaren Glukosetext über VK-Community-Nachrichten</string>
     <string name="outbound_api_change_preset">Ändern</string>
     <string name="outbound_api_telegram_recipient_help">Numerische Chat-ID oder @Kanalname verwenden. Eine Person muss den Bot zuerst starten.</string>
     <string name="outbound_api_vk_recipient_help">Numerische VK-Benutzer- oder Peer-IDs verwenden. Jeder Empfänger muss der Community zuerst schreiben.</string>
@@ -2618,7 +2622,7 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="ottai_cloud_offline_routes">Importieren Sie eine Zugangsdaten-Datei, um ohne Cloud fortzufahren — ein QR-Scan trägt nur den Sensorcode ein und NFC weckt den Sensor lediglich auf.</string>
     <!-- Emergency SMS destination -->
     <string name="outbound_api_preset_sms">Notfall-SMS</string>
-    <string name="outbound_api_preset_sms_desc">Personen benachrichtigen, wenn ein Alarm unbeantwortet bleibt, ein Wert kritisch wird oder die Datenverbindung ausfällt.</string>
+    <string name="outbound_api_preset_sms_desc">Personen benachrichtigen, wenn ein Alarm unbeantwortet bleibt, ein Wert kritisch wird oder die Datenverbindung ausfällt</string>
     <string name="sms_section_who">Um wen es geht</string>
     <string name="sms_subject_name">Name</string>
     <string name="sms_subject_name_help">Steht am Anfang jeder Nachricht, zum Beispiel „Mia: Alarm TIEF unbeantwortet“.</string>
@@ -3100,11 +3104,11 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="nightscout_secret_label">API-Secret oder Zugriffstoken</string>
     <string name="nightscout_api_help">Für v1 das API-Geheimnis verwenden, für v3 ein Nightscout-Zugriffstoken.</string>
     <string name="nightscout_iob_help">eIOB und COB werden im Feld jugglucong von devicestatus übertragen, getrennt vom regulären IOB.</string>
-    <string name="medtrum_sensor_desc">Seriennummer vom Patch eingeben (hexadezimal)</string>
+    <string name="medtrum_sensor_desc">Seriennummer vom Transmitter eingeben (hexadezimal)</string>
     <string name="medtrum_setup_saved_title">Sensor gespeichert</string>
-    <string name="medtrum_setup_searching">Noch nicht verbunden. Der Patch verbindet sich selbst, sobald er in Reichweite ist.</string>
-    <string name="medtrum_setup_auth_failed">Der Patch hat diese Seriennummer abgelehnt. Prüfe die Nummer auf dem Patch.</string>
-    <string name="medtrum_setup_device_rejected">Dieses Gerät ist kein Medtrum-Patch. Stellen Sie sicher, dass sich der Patch in Reichweite befindet, und versuchen Sie es erneut.</string>
+    <string name="medtrum_setup_searching">Noch nicht verbunden. Der Transmitter verbindet sich selbst, sobald er in Reichweite ist.</string>
+    <string name="medtrum_setup_auth_failed">Der Transmitter hat diese Seriennummer abgelehnt. Prüfe die Nummer auf dem Transmitter.</string>
+    <string name="medtrum_setup_device_rejected">Dieses Gerät ist kein Medtrum-Transmitter. Stellen Sie sicher, dass sich der Transmitter in Reichweite befindet, und versuchen Sie es erneut.</string>
 
     <string name="alert_sound_volume">Lautstärke des Alarmtons</string>
     <string name="dexcom_share_title">Dexcom Share</string>
