@@ -2992,11 +2992,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">Secret API ou jeton d’accès</string>
     <string name="nightscout_api_help">Utilisez le secret API pour v1 ou un jeton d’accès Nightscout pour v3.</string>
     <string name="nightscout_iob_help">eIOB et COB sont envoyés dans le champ jugglucong de devicestatus, séparément de l’IOB standard.</string>
-    <string name="medtrum_sensor_desc">Saisissez le numéro de série imprimé sur le patch (hexadécimal)</string>
+    <string name="medtrum_sensor_desc">Saisissez le numéro de série imprimé sur le transmetteur (hexadécimal)</string>
     <string name="medtrum_setup_saved_title">Capteur enregistré</string>
-    <string name="medtrum_setup_searching">Pas encore connecté. Le patch se connectera seul dès qu\'il sera à portée.</string>
-    <string name="medtrum_setup_auth_failed">Le patch a refusé ce numéro de série. Vérifiez le numéro imprimé sur le patch.</string>
-    <string name="medtrum_setup_device_rejected">Cet appareil n\'est pas un capteur Medtrum. Vérifiez que le capteur est à portée, puis réessayez.</string>
+    <string name="medtrum_setup_searching">Pas encore connecté. Le transmetteur se connectera seul dès qu\'il sera à portée.</string>
+    <string name="medtrum_setup_auth_failed">Le transmetteur a refusé ce numéro de série. Vérifiez le numéro imprimé sur le transmetteur.</string>
+    <string name="medtrum_setup_device_rejected">Cet appareil n\'est pas un transmetteur Medtrum. Vérifiez que le transmetteur est à portée, puis réessayez.</string>
 
     <string name="alert_sound_volume">Volume du son d’alerte</string>
     <string name="dexcom_share_title">Dexcom Share</string>

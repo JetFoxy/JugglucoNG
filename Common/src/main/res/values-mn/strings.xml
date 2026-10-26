@@ -3087,11 +3087,11 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="nightscout_secret_label">API нууц эсвэл хандалтын токен</string>
     <string name="nightscout_api_help">v1-д API нууц, v3-д Nightscout хандалтын токен ашиглана уу.</string>
     <string name="nightscout_iob_help">eIOB болон COB нь стандарт IOB-оос тусдаа devicestatus-ийн jugglucong талбарт илгээгдэнэ.</string>
-    <string name="medtrum_sensor_desc">Наалт дээр хэвлэсэн серийн дугаарыг оруулна уу (16-тын)</string>
+    <string name="medtrum_sensor_desc">Дамжуулагч дээр хэвлэсэн серийн дугаарыг оруулна уу (16-тын)</string>
     <string name="medtrum_setup_saved_title">Мэдрэгч хадгалагдлаа</string>
-    <string name="medtrum_setup_searching">Одоогоор холбогдоогүй. Наалт ойр байх үед өөрөө холбогдоно.</string>
-    <string name="medtrum_setup_auth_failed">Наалт энэ серийн дугаарыг хүлээн аваагүй. Наалт дээрх дугаарыг шалгана уу.</string>
-    <string name="medtrum_setup_device_rejected">Энэ төхөөрөмж Medtrum наалт биш. Наалт ойрхон байгаа эсэхийг шалгаад дахин оролдоно уу.</string>
+    <string name="medtrum_setup_searching">Одоогоор холбогдоогүй. Дамжуулагч ойр байх үед өөрөө холбогдоно.</string>
+    <string name="medtrum_setup_auth_failed">Дамжуулагч энэ серийн дугаарыг хүлээн аваагүй. Дамжуулагч дээрх дугаарыг шалгана уу.</string>
+    <string name="medtrum_setup_device_rejected">Энэ төхөөрөмж Medtrum дамжуулагч биш. Дамжуулагч ойрхон байгаа эсэхийг шалгаад дахин оролдоно уу.</string>
 
     <string name="alert_sound_volume">Дохиоллын дууны түвшин</string>
     <string name="dexcom_share_title">Dexcom Share</string>

@@ -1089,11 +1089,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_sensor_desc" translatable="false">M8, X1</string>
     <string name="medtrum_sensor" translatable="false">Medtrum TouchCare</string>
     <string name="medtrum_sensor_models" translatable="false">S9 MD3660</string>
-    <string name="medtrum_sensor_desc">Enter the serial number printed on the patch (hexadecimal)</string>
+    <string name="medtrum_sensor_desc">Enter the serial number printed on the transmitter (hexadecimal)</string>
     <string name="medtrum_setup_saved_title">Sensor saved</string>
-    <string name="medtrum_setup_searching">Not connected yet. The patch connects on its own when it is in range.</string>
-    <string name="medtrum_setup_auth_failed">The patch rejected this serial number. Check the number printed on the patch.</string>
-    <string name="medtrum_setup_device_rejected">This device is not a Medtrum patch. Make sure the patch is in range and try again.</string>
+    <string name="medtrum_setup_searching">Not connected yet. The transmitter connects on its own when it is in range.</string>
+    <string name="medtrum_setup_auth_failed">The transmitter rejected this serial number. Check the number printed on the transmitter.</string>
+    <string name="medtrum_setup_device_rejected">This device is not a Medtrum transmitter. Make sure the transmitter is in range and try again.</string>
     <string name="medtrum_serial_hint" translatable="false">1B2C3D4E</string>
     <string name="medtrum_serial_echo" translatable="false">SN %1$s = %2$d</string>
     <string name="icanhealth_sensor" translatable="false">Sinocare iCan</string>

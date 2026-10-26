@@ -3060,11 +3060,11 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="nightscout_secret_label">Секрет API или токен доступа</string>
     <string name="nightscout_api_help">Для v1 используйте секрет API, для v3 — токен доступа Nightscout.</string>
     <string name="nightscout_iob_help">eIOB и COB передаются в поле jugglucong объекта devicestatus отдельно от обычного IOB.</string>
-    <string name="medtrum_sensor_desc">Введите серийный номер, напечатанный на патче (шестнадцатеричный)</string>
+    <string name="medtrum_sensor_desc">Введите серийный номер, напечатанный на трансмиттере (шестнадцатеричный)</string>
     <string name="medtrum_setup_saved_title">Сенсор сохранён</string>
-    <string name="medtrum_setup_searching">Пока не подключён. Патч подключится сам, когда окажется рядом.</string>
-    <string name="medtrum_setup_auth_failed">Патч отклонил этот серийный номер. Проверьте номер на патче.</string>
-    <string name="medtrum_setup_device_rejected">Это устройство не является патчем Medtrum. Убедитесь, что патч рядом, и повторите попытку.</string>
+    <string name="medtrum_setup_searching">Пока не подключён. Трансмиттер подключится сам, когда окажется рядом.</string>
+    <string name="medtrum_setup_auth_failed">Трансмиттер отклонил этот серийный номер. Проверьте номер на трансмиттере.</string>
+    <string name="medtrum_setup_device_rejected">Это устройство не является трансмиттером Medtrum. Убедитесь, что трансмиттер рядом, и повторите попытку.</string>
 
     <string name="alert_sound_volume">Громкость звука тревоги</string>
 </resources>
