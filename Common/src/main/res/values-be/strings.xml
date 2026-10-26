@@ -3181,4 +3181,17 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_confirm">Усталяваць эксперыментальнае абнаўленне? Сенсар можа назаўсёды выйсці са строю. Актывацыя выконваецца асобна пасля праверкі версіі і заводскіх параметраў.</string>
     <string name="ottai_ota_parameters_confirm">Запісаць падтрыманыя заводскія каэфіцыенты і каліброўку? Гэта зменіць налады без абнаўлення прашыўкі і запуску тэрміну працы сенсара.</string>
     <string name="ottai_ota_check">Праверыць прашыўку (эксперыментальна)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Спачатку адключыце гэты сенсар ад маніторынгу. Абнаўленне запушчанага сенсара можа сцерці паказанні, скінуць тэрмін працы або завяршыць працу сенсара.</string>
+    <string name="ottai_ota_fresh_mode">Новы сенсар</string>
+    <string name="ottai_ota_started_mode">Запушчаны сенсар</string>
+    <string name="ottai_ota_started_ready">Абнаўленне запушчанага сенсара гатова. Перад усталяваннем праверце пачатковыя даныя.</string>
+    <string name="ottai_ota_result_active">Прашыўка абноўлена. Сенсар паведамляе пра актыўны стан; перад падключэннем маніторынгу праверце журнал.</string>
+    <string name="ottai_ota_result_ended">Прашыўка абноўлена. Сенсар паведамляе пра завяршэнне працы; праверце журнал.</string>
+    <string name="ottai_ota_result_reset">Прашыўка абноўлена. Сенсар паведамляе, што не актываваны; паўторная актывацыя не выконвалася.</string>
+    <string name="ottai_ota_started_confirm">Усталяваць на запушчаны сенсар? Паказанні і стан працы могуць быць сцёрты або скінуты. Тэст запіша вынік без паўторнай актывацыі і запісу заводскіх параметраў.</string>
+    <string name="ottai_ota_observation">%1$s · стан %2$d · тэрмін %3$s с · апошні запіс %4$s · RTC %5$s с</string>
+    <string name="ottai_ota_before">Да</string>
+    <string name="ottai_ota_after">Пасля</string>
 </resources>

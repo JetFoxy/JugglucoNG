@@ -3148,4 +3148,17 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="ottai_ota_confirm">Deze experimentele update installeren? Dit kan de sensor permanent uitschakelen. Activering volgt apart na controle van de versie en fabrieksparameters.</string>
     <string name="ottai_ota_parameters_confirm">De ondersteunde fabriekscoëfficiënten en kalibratie schrijven? Dit wijzigt de configuratie zonder firmwareupdate of het starten van de levensduur.</string>
     <string name="ottai_ota_check">Firmware controleren (experimenteel)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Koppel deze sensor eerst los van de bewaking. Een update van een gestarte sensor kan metingen wissen, de levensduur resetten of de sensor beëindigen.</string>
+    <string name="ottai_ota_fresh_mode">Nieuwe sensor</string>
+    <string name="ottai_ota_started_mode">Gestarte sensor</string>
+    <string name="ottai_ota_started_ready">Update voor de gestarte sensor gereed. Controleer de beginwaarden vóór installatie.</string>
+    <string name="ottai_ota_result_active">Firmware bijgewerkt. De sensor meldt actief; controleer het tracelogboek voordat je de bewaking verbindt.</string>
+    <string name="ottai_ota_result_ended">Firmware bijgewerkt. De sensor meldt beëindigd; controleer het tracelogboek.</string>
+    <string name="ottai_ota_result_reset">Firmware bijgewerkt. De sensor meldt niet geactiveerd; er is geen heractivering geprobeerd.</string>
+    <string name="ottai_ota_started_confirm">Op deze gestarte sensor installeren? Metingen en bedrijfsstatus kunnen worden gewist of gereset. De test registreert het resultaat zonder heractivering of het schrijven van fabrieksparameters.</string>
+    <string name="ottai_ota_observation">%1$s · status %2$d · levensduur %3$s s · laatste record %4$s · RTC %5$s s</string>
+    <string name="ottai_ota_before">Voor</string>
+    <string name="ottai_ota_after">Na</string>
 </resources>

@@ -3133,4 +3133,17 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="ottai_ota_confirm">Bu deneysel güncelleme yüklensin mi? Sensör kalıcı olarak kullanılamaz hâle gelebilir. Sürüm ve fabrika parametreleri doğrulandıktan sonra ayrıca etkinleştirilir.</string>
     <string name="ottai_ota_parameters_confirm">Desteklenen fabrika katsayıları ve kalibrasyon yazılsın mı? Bu işlem ürün yazılımını güncellemeden veya sensör ömrünü başlatmadan yapılandırmayı değiştirir.</string>
     <string name="ottai_ota_check">Ürün yazılımını denetle (deneysel)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Önce bu sensörün izleme bağlantısını kesin. Başlatılmış bir sensörü güncellemek okumaları silebilir, ömrünü sıfırlayabilir veya sensörü sonlandırabilir.</string>
+    <string name="ottai_ota_fresh_mode">Yeni sensör</string>
+    <string name="ottai_ota_started_mode">Başlatılmış sensör</string>
+    <string name="ottai_ota_started_ready">Başlatılmış sensör için güncelleme hazır. Yüklemeden önce başlangıç verilerini inceleyin.</string>
+    <string name="ottai_ota_result_active">Ürün yazılımı güncellendi. Sensör etkin olduğunu bildiriyor; izlemeye yeniden bağlamadan önce günlüğü inceleyin.</string>
+    <string name="ottai_ota_result_ended">Ürün yazılımı güncellendi. Sensör sona erdiğini bildiriyor; günlüğü inceleyin.</string>
+    <string name="ottai_ota_result_reset">Ürün yazılımı güncellendi. Sensör etkin olmadığını bildiriyor; yeniden etkinleştirme denenmedi.</string>
+    <string name="ottai_ota_started_confirm">Bu başlatılmış sensöre yüklensin mi? Okumalar ve çalışma durumu silinebilir veya sıfırlanabilir. Test, yeniden etkinleştirmeden veya fabrika parametrelerini yazmadan sonucu kaydeder.</string>
+    <string name="ottai_ota_observation">%1$s · durum %2$d · ömür %3$s sn · son kayıt %4$s · RTC %5$s sn</string>
+    <string name="ottai_ota_before">Önce</string>
+    <string name="ottai_ota_after">Sonra</string>
 </resources>

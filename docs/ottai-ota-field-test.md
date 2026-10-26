@@ -2,8 +2,9 @@
 
 This implements an experimental alternative to the official-app capture proposed in
 [PR #727](https://github.com/ctqvva/JugglucoNG/pull/727). No official app is required on
-the test phone. The sensor must be fresh/unactivated, with saved credentials and a signed-in
-CN phone account. An already-managed, activated or ended sensor is refused.
+the test phone. Saved credentials and a signed-in CN phone account are required. Choose
+**Fresh sensor** for the preactivation experiment or **Started sensor** for a running-sensor
+OTA experiment. Both require the sensor to be disconnected from managed monitoring first.
 
 ## Test on the phone
 
@@ -13,7 +14,7 @@ CN phone account. An already-managed, activated or ended sensor is refused.
    select its actual Bluetooth advertisement. NFC wake may be needed. Let the existing
    credential fetch/bootstrap finish, then export the credentials JSON for recovery.
 3. **Do not press the normal Connect/activate button yet.** Choose **Check firmware
-   (experimental)** below it. This stops the setup scanner and opens a separate BLE client,
+   (experimental)** below it, then **Fresh sensor**. This stops the setup scanner and opens a separate BLE client,
    outside the managed-sensor list. It reads software revision `2a28`, checks the sensor's
    auth signature against the saved keys, authenticates, then reads the command status.
    Only status 0–2 can continue.
@@ -41,6 +42,37 @@ process, so an unfinished attempt is persisted before the first OTA write.
 With one sensor, an OTA followed by parameter writes can establish that combined setup path.
 It cannot isolate the effect of firmware from factory provisioning on early readings.
 
+## Test an already-started sensor
+
+1. Export its credentials and any history you want to keep. Disconnect it from monitoring
+   while retaining local credentials/history. Stop other apps from reconnecting to it. A
+   managed record or callback in this test app still prevents the separate BLE session;
+   choosing Started sensor does not take over a live monitoring connection.
+2. In Ottai setup select the sensor, choose **Check firmware (experimental)**, then
+   **Started sensor**. This mode requires an authenticated command status of **3** before
+   the experiment. Fresh, ended and unknown entry states are refused.
+3. The baseline displays command status, provisioned lifetime in seconds, latest decoded
+   live-record number and RTC seconds. Missing/undecodable optional fields show `—`.
+   These are observations, not prerequisites that the update must preserve.
+4. Review the offered target/version/digest and choose **Install firmware**. The CN cloud
+   must offer an actual newer package for this sensor; there is no guessed image, downgrade
+   or bypass of a cloud refusal.
+5. After reboot the target firmware must match `2a28` and the sensor must reauthenticate.
+   Post-update command states **0–2 (unactivated/reset), 3 (active), and 4 (ended)** are all
+   accepted test outcomes. The dialog and `OttaiOTA` trace show before/after observations.
+   A reset, erased readings, changed lifetime or ended state does not fail the experiment.
+6. Export the trace before reconnecting monitoring. This mode performs **no automatic
+   reactivation, factory-parameter writes, cloud material rebind, local-history rewrite or
+   monitoring restart**. Its purpose is to observe the update, including resets. If it reset
+   to an unactivated state, fresh-sensor preparation and any subsequent activation are
+   separate explicit actions. This test alone does not reconcile a reset sensor's old
+   local/cloud history, timestamps or formula for continued monitoring.
+
+The latest decoded record number is a limited continuity observation, not a full history
+comparison or proof of a renewed usable lifetime. No requirement to preserve either is
+imposed by the test. The existing fresh-sensor experiment still requires status 0–2 and keeps
+its separate provisioning flow.
+
 ## Transfer and recovery
 
 - CN 1.44's reported sequence is used: control `00`, exact file bytes on the data
@@ -59,10 +91,15 @@ It cannot isolate the effect of firmware from factory provisioning on early read
   scans neighbouring devices or picks a different image. Address changes and a corrupt or
   missing recovery package require investigation, rather than speculative writes.
 - An unfinished journal blocks normal and forced activation. It is cleared only after
-  successful version-appropriate preparation. If the old application still boots, the
+  successful version-appropriate preparation in Fresh sensor mode, or verified target
+  firmware/authentication/status observation in Started sensor mode. If the old application still boots, the
   separate parameter-only action can finish preparation without completing the update.
 - An OTA success report is attempted only after matching BLE version readback and a fresh
-  authenticated unactivated status. Report failure does not substitute for sensor evidence.
+  authenticated status allowed by the selected mode. Report failure does not substitute for sensor evidence.
+- Recovery retains the original experiment mode and started-sensor baseline. Select the same
+  mode when reopening it. If the new application already boots after an interrupted finish,
+  the matching saved target can be verified without flashing again. Old preactivation
+  recovery journals remain readable.
 
 ## Validation and remaining hardware questions
 

@@ -3151,4 +3151,17 @@
     <string name="ottai_ota_confirm">Zainstalować eksperymentalną aktualizację? Może to trwale uszkodzić sensor. Aktywacja nastąpi osobno po sprawdzeniu wersji i parametrów fabrycznych.</string>
     <string name="ottai_ota_parameters_confirm">Zapisać obsługiwane współczynniki i kalibrację fabryczną? Zmieni to konfigurację bez aktualizacji oprogramowania ani rozpoczęcia czasu pracy sensora.</string>
     <string name="ottai_ota_check">Sprawdź oprogramowanie (eksperymentalnie)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Najpierw odłącz ten sensor od monitorowania. Aktualizacja uruchomionego sensora może usunąć odczyty, zresetować czas pracy lub zakończyć działanie sensora.</string>
+    <string name="ottai_ota_fresh_mode">Nowy sensor</string>
+    <string name="ottai_ota_started_mode">Uruchomiony sensor</string>
+    <string name="ottai_ota_started_ready">Aktualizacja uruchomionego sensora gotowa. Przed instalacją sprawdź dane początkowe.</string>
+    <string name="ottai_ota_result_active">Oprogramowanie zaktualizowane. Sensor zgłasza stan aktywny; sprawdź dziennik przed wznowieniem monitorowania.</string>
+    <string name="ottai_ota_result_ended">Oprogramowanie zaktualizowane. Sensor zgłasza zakończenie działania; sprawdź dziennik.</string>
+    <string name="ottai_ota_result_reset">Oprogramowanie zaktualizowane. Sensor zgłasza brak aktywacji; nie próbowano ponownej aktywacji.</string>
+    <string name="ottai_ota_started_confirm">Zainstalować na uruchomionym sensorze? Odczyty i stan działania mogą zostać usunięte lub zresetowane. Test zapisze wynik bez ponownej aktywacji i zapisu parametrów fabrycznych.</string>
+    <string name="ottai_ota_observation">%1$s · stan %2$d · czas pracy %3$s s · ostatni rekord %4$s · RTC %5$s s</string>
+    <string name="ottai_ota_before">Przed</string>
+    <string name="ottai_ota_after">Po</string>
 </resources>

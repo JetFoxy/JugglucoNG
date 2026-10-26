@@ -3177,4 +3177,17 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="ottai_ota_confirm">Telepíti ezt a kísérleti frissítést? Az érzékelő végleg használhatatlanná válhat. Az aktiválás külön, a verzió és a gyári paraméterek ellenőrzése után történik.</string>
     <string name="ottai_ota_parameters_confirm">Kiírja a támogatott gyári együtthatókat és kalibrációt? Ez firmware-frissítés és az élettartam indítása nélkül módosítja a beállításokat.</string>
     <string name="ottai_ota_check">Firmware ellenőrzése (kísérleti)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Először válassza le az érzékelőt a megfigyelésről. Egy elindított érzékelő frissítése törölheti a méréseket, visszaállíthatja az élettartamot vagy leállíthatja az érzékelőt.</string>
+    <string name="ottai_ota_fresh_mode">Új érzékelő</string>
+    <string name="ottai_ota_started_mode">Elindított érzékelő</string>
+    <string name="ottai_ota_started_ready">Az elindított érzékelő frissítése kész. Telepítés előtt ellenőrizze a kiindulási adatokat.</string>
+    <string name="ottai_ota_result_active">Firmware frissítve. Az érzékelő aktív állapotot jelez; az újracsatlakoztatás előtt ellenőrizze a naplót.</string>
+    <string name="ottai_ota_result_ended">Firmware frissítve. Az érzékelő befejezett állapotot jelez; ellenőrizze a naplót.</string>
+    <string name="ottai_ota_result_reset">Firmware frissítve. Az érzékelő nincs aktiválva; nem történt újraaktiválási kísérlet.</string>
+    <string name="ottai_ota_started_confirm">Telepíti erre az elindított érzékelőre? A mérések és a működési állapot törlődhetnek vagy visszaállhatnak. A teszt újraaktiválás és gyári paraméterek írása nélkül rögzíti az eredményt.</string>
+    <string name="ottai_ota_observation">%1$s · állapot %2$d · élettartam %3$s s · utolsó rekord %4$s · RTC %5$s s</string>
+    <string name="ottai_ota_before">Előtte</string>
+    <string name="ottai_ota_after">Utána</string>
 </resources>

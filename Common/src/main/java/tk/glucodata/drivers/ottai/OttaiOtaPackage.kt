@@ -88,6 +88,24 @@ internal object OttaiOtaProtocol {
         return (minOf(244, mtu - 3) / 4) * 4
     }
 
+    fun maxActiveSeconds(value: ByteArray, session: String): Long? {
+        fun decode(bytes: ByteArray): Long? {
+            if (bytes.size < 4) return null
+            val count = if (bytes.size >= 8) 8 else 4
+            var seconds = 0L
+            for (index in 0 until count) seconds = seconds or ((bytes[index].toLong() and 255) shl (8 * index))
+            return seconds.takeIf { it in 0..(45L * 86_400L) }
+        }
+        return OttaiCrypto.decryptPayload(value, session)?.let(::decode)
+            ?: value.takeIf { it.size == 4 || it.size == 8 }?.let(::decode)
+    }
+
+    fun latestDataNo(cipher: ByteArray, session: String, version: String): Int? = runCatching {
+        val payload = OttaiCrypto.decryptPayload(cipher, session) ?: return null
+        OttaiParser.frameRecords(payload, version).map(OttaiParser::parseRecord)
+            .lastOrNull(OttaiParser::isRecordSane)?.dataNo
+    }.getOrNull()
+
     fun coefficientPacket(csv: String): ByteArray {
         val values = csv.split(',').map { it.trim().toFloatOrNull() ?: throw IllegalArgumentException("coefficient") }
         require(values.size in 1..255 && values.all { it.isFinite() }) { "coefficient" }

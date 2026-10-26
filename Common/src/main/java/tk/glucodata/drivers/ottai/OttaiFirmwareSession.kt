@@ -31,6 +31,7 @@ internal class OttaiFirmwareSession private constructor(
     private val sensorId: String,
     private val address: String,
     materials: OttaiRegistry.DeviceMaterials,
+    mode: OttaiFirmwareMode,
     publish: (OttaiFirmwareState) -> Unit,
 ) : OttaiFirmwareIo {
     private val thread = HandlerThread("OttaiFirmware").also { it.start() }
@@ -49,7 +50,7 @@ internal class OttaiFirmwareSession private constructor(
     private var operationTimeout: Runnable? = null
     private var discoveryStarted = false
     private val recovery = AtomicFile(File(context.filesDir, "ottai-ota/$sensorId.bin"))
-    private val controller = OttaiFirmwareController(sensorId, materials, this) { state ->
+    private val controller = OttaiFirmwareController(sensorId, materials, this, mode) { state ->
         main.post { publish(state) }
     }
 
@@ -65,7 +66,9 @@ internal class OttaiFirmwareSession private constructor(
             return file.exists() || File(file.path + ".bak").exists()
         }
 
-        fun start(context: Context, sensorId: String, address: String, publish: (OttaiFirmwareState) -> Unit): OttaiFirmwareSession? {
+        fun start(context: Context, sensorId: String, address: String,
+            mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION,
+            publish: (OttaiFirmwareState) -> Unit): OttaiFirmwareSession? {
             val id = OttaiConstants.canonicalSensorId(sensorId)
             val ble = OttaiConstants.normalizeBleAddress(address) ?: return null
             if (!OttaiConstants.looksLikeMac(id) || !OttaiCloudClient.loadCnOtaSession(context)) return null
@@ -75,7 +78,7 @@ internal class OttaiFirmwareSession private constructor(
                 }) return null
             val materials = OttaiRegistry.loadMaterials(context, id)
             if (materials.authKeys == null) return null
-            return OttaiFirmwareSession(context.applicationContext, id, ble, materials, publish).also { session ->
+            return OttaiFirmwareSession(context.applicationContext, id, ble, materials, mode, publish).also { session ->
                 session.handler.post { session.controller.start() }
             }
         }
@@ -202,6 +205,13 @@ internal class OttaiFirmwareSession private constructor(
         if (!runCatching { gatt?.readCharacteristic(ch) == true }.getOrDefault(false)) controller.fail("read_start")
     }
 
+    override fun readOptional(service: UUID, characteristic: UUID, done: (Result<ByteArray>) -> Unit) {
+        if (closed) return
+        if (idle() && characteristic(service, characteristic) == null) {
+            done(Result.failure(IllegalStateException("optional_missing")))
+        } else read(service, characteristic, done)
+    }
+
     override fun write(service: UUID, characteristic: UUID, value: ByteArray, done: (Result<Unit>) -> Unit) {
         if (closed) return
         val ch = characteristic(service, characteristic)
@@ -315,17 +325,7 @@ internal class OttaiFirmwareSession private constructor(
 
     override fun savedImage(): OttaiFirmwareImage? = runCatching {
         DataInputStream(recovery.openRead()).use { input ->
-            require(input.readInt() == 1 && input.readUTF() == sensorId && input.readUTF() == address)
-            val source = OttaiOtaProtocol.version(input.readUTF()) ?: error("source")
-            val target = OttaiOtaProtocol.version(input.readUTF()) ?: error("target")
-            val sha = input.readUTF()
-            val size = input.readInt()
-            require(size in 28..OttaiOtaPackage.MAX_BYTES)
-            val bytes = ByteArray(size).also { input.readFully(it) }
-            require(input.read() == -1)
-            val image = OttaiOtaPackage.parse(bytes)
-            require(image.sha256 == sha)
-            OttaiFirmwareImage(source, target, image)
+            OttaiFirmwareJournal.read(input, sensorId, address)
         }
     }.getOrNull()
 
@@ -334,15 +334,7 @@ internal class OttaiFirmwareSession private constructor(
         val output = recovery.startWrite()
         try {
             val data = DataOutputStream(output)
-            data.writeInt(1)
-            data.writeUTF(sensorId)
-            data.writeUTF(address)
-            data.writeUTF(image.source)
-            data.writeUTF(image.target)
-            data.writeUTF(image.image.sha256)
-            data.writeInt(image.image.size)
-            data.write(image.image.bytes())
-            data.flush()
+            OttaiFirmwareJournal.write(data, sensorId, address, image)
             recovery.finishWrite(output)
         } catch (error: Exception) {
             recovery.failWrite(output)

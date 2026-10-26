@@ -3107,4 +3107,17 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_confirm">Instalar esta atualização experimental? Pode inutilizar o sensor permanentemente. A ativação é feita separadamente após verificar a versão e os parâmetros de fábrica.</string>
     <string name="ottai_ota_parameters_confirm">Escrever os coeficientes e a calibração de fábrica suportados? Isto altera a configuração sem atualizar o firmware nem iniciar a vida útil do sensor.</string>
     <string name="ottai_ota_check">Verificar firmware (experimental)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Desligue primeiro este sensor da monitorização. Atualizar um sensor iniciado pode apagar leituras, repor a vida útil ou terminar o sensor.</string>
+    <string name="ottai_ota_fresh_mode">Sensor novo</string>
+    <string name="ottai_ota_started_mode">Sensor iniciado</string>
+    <string name="ottai_ota_started_ready">Atualização pronta para o sensor iniciado. Verifique os dados iniciais antes de instalar.</string>
+    <string name="ottai_ota_result_active">Firmware atualizado. O sensor indica ativo; consulte o registo antes de voltar à monitorização.</string>
+    <string name="ottai_ota_result_ended">Firmware atualizado. O sensor indica terminado; consulte o registo.</string>
+    <string name="ottai_ota_result_reset">Firmware atualizado. O sensor indica não ativado; não foi tentada reativação.</string>
+    <string name="ottai_ota_started_confirm">Instalar neste sensor iniciado? As leituras e o estado de funcionamento podem ser apagados ou repostos. O teste regista o resultado sem reativar nem escrever parâmetros de fábrica.</string>
+    <string name="ottai_ota_observation">%1$s · estado %2$d · vida útil %3$s s · último registo %4$s · RTC %5$s s</string>
+    <string name="ottai_ota_before">Antes</string>
+    <string name="ottai_ota_after">Depois</string>
 </resources>

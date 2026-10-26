@@ -3105,4 +3105,17 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_confirm">Installera denna experimentella uppdatering? Sensorn kan sluta fungera permanent. Aktivering sker separat efter kontroll av version och fabriksparametrar.</string>
     <string name="ottai_ota_parameters_confirm">Skriva de fabrikskoefficienter och kalibreringsvärden som stöds? Detta ändrar konfigurationen utan firmwareuppdatering eller start av sensorns livslängd.</string>
     <string name="ottai_ota_check">Kontrollera firmware (experimentellt)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Koppla först bort sensorn från övervakningen. Uppdatering av en startad sensor kan radera mätvärden, återställa livslängden eller avsluta sensorn.</string>
+    <string name="ottai_ota_fresh_mode">Ny sensor</string>
+    <string name="ottai_ota_started_mode">Startad sensor</string>
+    <string name="ottai_ota_started_ready">Uppdatering för startad sensor klar. Kontrollera utgångsvärdena före installation.</string>
+    <string name="ottai_ota_result_active">Firmware uppdaterad. Sensorn rapporterar aktiv; kontrollera spårningsloggen innan övervakningen ansluts igen.</string>
+    <string name="ottai_ota_result_ended">Firmware uppdaterad. Sensorn rapporterar avslutad; kontrollera spårningsloggen.</string>
+    <string name="ottai_ota_result_reset">Firmware uppdaterad. Sensorn rapporterar inte aktiverad; ingen återaktivering har försökts.</string>
+    <string name="ottai_ota_started_confirm">Installera på denna startade sensor? Mätvärden och driftstatus kan raderas eller återställas. Testet registrerar resultatet utan återaktivering eller skrivning av fabriksparametrar.</string>
+    <string name="ottai_ota_observation">%1$s · status %2$d · livslängd %3$s s · senaste post %4$s · RTC %5$s s</string>
+    <string name="ottai_ota_before">Före</string>
+    <string name="ottai_ota_after">Efter</string>
 </resources>

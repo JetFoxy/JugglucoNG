@@ -29,22 +29,52 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import tk.glucodata.R
 import tk.glucodata.drivers.ottai.OttaiFirmwareSession
+import tk.glucodata.drivers.ottai.OttaiFirmwareMode
+import tk.glucodata.drivers.ottai.OttaiFirmwareObservation
 import tk.glucodata.drivers.ottai.OttaiFirmwareStage
 import tk.glucodata.drivers.ottai.OttaiFirmwareState
 
 @Composable
 internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismiss: () -> Unit) {
+    var mode by remember(sensorId, address) { mutableStateOf<OttaiFirmwareMode?>(null) }
+    val selected = mode
+    if (selected != null) {
+        OttaiFirmwareSessionDialog(sensorId, address, selected, onDismiss)
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.ottai_ota_title)) },
+            text = { Text(stringResource(R.string.ottai_ota_mode_hint)) },
+            confirmButton = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { mode = OttaiFirmwareMode.PREACTIVATION },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shapes = ButtonDefaults.shapes()) {
+                        Text(stringResource(R.string.ottai_ota_fresh_mode))
+                    }
+                    OutlinedButton(onClick = { mode = OttaiFirmwareMode.STARTED_SENSOR },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shapes = ButtonDefaults.shapes()) {
+                        Text(stringResource(R.string.ottai_ota_started_mode))
+                    }
+                    TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.cancel)) }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun OttaiFirmwareSessionDialog(sensorId: String, address: String, mode: OttaiFirmwareMode, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
-    var state by remember(sensorId, address) { mutableStateOf(OttaiFirmwareState()) }
+    var state by remember(sensorId, address, mode) { mutableStateOf(OttaiFirmwareState(mode = mode)) }
     var session by remember(sensorId, address) { mutableStateOf<OttaiFirmwareSession?>(null) }
     var confirmInstall by remember { mutableStateOf(false) }
     var confirmParameters by remember { mutableStateOf(false) }
-    DisposableEffect(sensorId, address) {
+    DisposableEffect(sensorId, address, mode) {
         var disposed = false
         val keepScreenOn = view.keepScreenOn
         view.keepScreenOn = true
-        val owned = OttaiFirmwareSession.start(context, sensorId, address) { if (!disposed) state = it }
+        val owned = OttaiFirmwareSession.start(context, sensorId, address, mode) { if (!disposed) state = it }
         session = owned
         if (owned == null) state = state.copy(stage = OttaiFirmwareStage.FAILED, errorCode = "session_unavailable")
         onDispose {
@@ -57,12 +87,21 @@ internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismis
         OttaiFirmwareStage.CONNECTING -> R.string.ottai_ota_connecting
         OttaiFirmwareStage.AUTHENTICATING -> R.string.ottai_ota_authenticating
         OttaiFirmwareStage.CHECKING -> R.string.ottai_ota_checking
-        OttaiFirmwareStage.READY -> if (state.recovery) R.string.ottai_ota_recovery else R.string.ottai_ota_ready
+        OttaiFirmwareStage.READY -> when {
+            state.recovery -> R.string.ottai_ota_recovery
+            mode == OttaiFirmwareMode.STARTED_SENSOR -> R.string.ottai_ota_started_ready
+            else -> R.string.ottai_ota_ready
+        }
         OttaiFirmwareStage.NO_UPDATE -> R.string.ottai_ota_no_update
         OttaiFirmwareStage.INSTALLING -> R.string.ottai_ota_installing
         OttaiFirmwareStage.RECONNECTING -> R.string.ottai_ota_reconnecting
         OttaiFirmwareStage.PREPARING -> R.string.ottai_ota_preparing
-        OttaiFirmwareStage.COMPLETE -> R.string.ottai_ota_complete
+        OttaiFirmwareStage.COMPLETE -> when {
+            mode == OttaiFirmwareMode.PREACTIVATION -> R.string.ottai_ota_complete
+            state.after?.commandStatus == 3 -> R.string.ottai_ota_result_active
+            state.after?.commandStatus == 4 -> R.string.ottai_ota_result_ended
+            else -> R.string.ottai_ota_result_reset
+        }
         OttaiFirmwareStage.FAILED -> R.string.ottai_ota_failed
         OttaiFirmwareStage.CLOSED -> R.string.cancel
     }
@@ -73,7 +112,10 @@ internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismis
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.ottai_ota_warning))
+                if (mode == OttaiFirmwareMode.STARTED_SENSOR) Text(stringResource(R.string.ottai_ota_mode_hint))
                 Text(stringResource(stageText))
+                state.before?.let { ObservationText(R.string.ottai_ota_before, it) }
+                state.after?.let { ObservationText(R.string.ottai_ota_after, it) }
                 if (state.firmware.isNotEmpty()) Text(stringResource(R.string.ottai_ota_version, state.firmware, state.target.ifEmpty { "—" }))
                 if (state.totalBytes > 0) {
                     Text(stringResource(R.string.ottai_ota_package, state.totalBytes, state.sha256))
@@ -91,7 +133,8 @@ internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismis
                     Button(onClick = { confirmInstall = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                         shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.ottai_ota_install)) }
                 }
-                if (!state.recovery && state.stage in setOf(OttaiFirmwareStage.READY, OttaiFirmwareStage.NO_UPDATE)) {
+                if (mode == OttaiFirmwareMode.PREACTIVATION && !state.recovery &&
+                    state.stage in setOf(OttaiFirmwareStage.READY, OttaiFirmwareStage.NO_UPDATE)) {
                     OutlinedButton(onClick = { confirmParameters = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                         shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.ottai_ota_parameters)) }
                 }
@@ -106,7 +149,11 @@ internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismis
         AlertDialog(
             onDismissRequest = { confirmInstall = false; confirmParameters = false },
             title = { Text(stringResource(if (confirmInstall) R.string.ottai_ota_install else R.string.ottai_ota_parameters)) },
-            text = { Text(stringResource(if (confirmInstall) R.string.ottai_ota_confirm else R.string.ottai_ota_parameters_confirm)) },
+            text = { Text(stringResource(when {
+                !confirmInstall -> R.string.ottai_ota_parameters_confirm
+                mode == OttaiFirmwareMode.STARTED_SENSOR -> R.string.ottai_ota_started_confirm
+                else -> R.string.ottai_ota_confirm
+            })) },
             confirmButton = {
                 TextButton(onClick = {
                     if (confirmInstall) session?.install() else session?.prepareOnly()
@@ -121,4 +168,12 @@ internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismis
             },
         )
     }
+}
+
+@Composable
+private fun ObservationText(label: Int, observation: OttaiFirmwareObservation) {
+    val numbers = java.text.NumberFormat.getIntegerInstance()
+    fun number(value: Long?): String = value?.let(numbers::format) ?: "—"
+    Text(stringResource(R.string.ottai_ota_observation, stringResource(label), observation.commandStatus,
+        number(observation.maxActiveSeconds), number(observation.latestDataNo?.toLong()), number(observation.rtcSeconds)))
 }

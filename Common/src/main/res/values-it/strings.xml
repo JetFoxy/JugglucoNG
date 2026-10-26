@@ -3096,4 +3096,17 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_confirm">Installare questo aggiornamento sperimentale? Il sensore potrebbe diventare inutilizzabile in modo permanente. L’attivazione avviene separatamente dopo la verifica della versione e dei parametri di fabbrica.</string>
     <string name="ottai_ota_parameters_confirm">Scrivere i coefficienti e la calibrazione di fabbrica supportati? Questo modifica la configurazione senza aggiornare il firmware o avviare la durata del sensore.</string>
     <string name="ottai_ota_check">Controlla firmware (sperimentale)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Scollega prima questo sensore dal monitoraggio. L’aggiornamento di un sensore avviato può cancellare le letture, azzerare la durata o terminare il sensore.</string>
+    <string name="ottai_ota_fresh_mode">Sensore nuovo</string>
+    <string name="ottai_ota_started_mode">Sensore già avviato</string>
+    <string name="ottai_ota_started_ready">Aggiornamento pronto per il sensore avviato. Controlla i dati iniziali prima dell’installazione.</string>
+    <string name="ottai_ota_result_active">Firmware aggiornato. Il sensore risulta attivo; controlla il registro prima di riconnettere il monitoraggio.</string>
+    <string name="ottai_ota_result_ended">Firmware aggiornato. Il sensore risulta terminato; controlla il registro.</string>
+    <string name="ottai_ota_result_reset">Firmware aggiornato. Il sensore risulta non attivato; non è stata tentata la riattivazione.</string>
+    <string name="ottai_ota_started_confirm">Installare su questo sensore già avviato? Letture e stato operativo potrebbero essere cancellati o azzerati. Il test registra il risultato senza riattivare o scrivere parametri di fabbrica.</string>
+    <string name="ottai_ota_observation">%1$s · stato %2$d · durata %3$s s · ultima registrazione %4$s · RTC %5$s s</string>
+    <string name="ottai_ota_before">Prima</string>
+    <string name="ottai_ota_after">Dopo</string>
 </resources>

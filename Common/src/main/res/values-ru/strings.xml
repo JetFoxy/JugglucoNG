@@ -3157,4 +3157,17 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_confirm">Установить экспериментальное обновление? Сенсор может навсегда выйти из строя. Активация выполняется отдельно после проверки версии и заводских параметров.</string>
     <string name="ottai_ota_parameters_confirm">Записать заводские коэффициенты и калибровку, поддерживаемые этой прошивкой? Это изменит настройки сенсора без обновления прошивки и запуска срока работы.</string>
     <string name="ottai_ota_check">Проверить прошивку (экспериментально)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Сначала отключите этот сенсор от мониторинга. Обновление запущенного сенсора может стереть показания, сбросить срок работы или завершить работу сенсора.</string>
+    <string name="ottai_ota_fresh_mode">Новый сенсор</string>
+    <string name="ottai_ota_started_mode">Запущенный сенсор</string>
+    <string name="ottai_ota_started_ready">Обновление для запущенного сенсора готово. Перед установкой проверьте исходные данные.</string>
+    <string name="ottai_ota_result_active">Прошивка обновлена. Сенсор сообщает об активном состоянии; перед подключением мониторинга проверьте журнал.</string>
+    <string name="ottai_ota_result_ended">Прошивка обновлена. Сенсор сообщает о завершении работы; проверьте журнал.</string>
+    <string name="ottai_ota_result_reset">Прошивка обновлена. Сенсор сообщает, что не активирован; повторная активация не выполнялась.</string>
+    <string name="ottai_ota_started_confirm">Установить обновление на запущенный сенсор? Его показания и состояние работы могут быть стёрты или сброшены. Тест запишет результат без повторной активации и записи заводских параметров.</string>
+    <string name="ottai_ota_observation">%1$s · состояние %2$d · срок %3$s с · последняя запись %4$s · RTC %5$s с</string>
+    <string name="ottai_ota_before">До</string>
+    <string name="ottai_ota_after">После</string>
 </resources>

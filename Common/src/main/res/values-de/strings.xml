@@ -3218,4 +3218,17 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="ottai_ota_confirm">Dieses experimentelle Update installieren? Der Sensor kann dauerhaft ausfallen. Die Aktivierung erfolgt separat nach Prüfung der Version und der Werksparameter.</string>
     <string name="ottai_ota_parameters_confirm">Die von dieser Firmware unterstützten Werkskoeffizienten und Kalibrierungswerte schreiben? Dies ändert die Sensorkonfiguration ohne Firmwareupdate oder Start der Laufzeit.</string>
     <string name="ottai_ota_check">Firmware prüfen (experimentell)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Diesen Sensor zuerst von der Überwachung trennen. Ein Update eines gestarteten Sensors kann Messwerte löschen, die Laufzeit zurücksetzen oder den Sensor beenden.</string>
+    <string name="ottai_ota_fresh_mode">Neuer Sensor</string>
+    <string name="ottai_ota_started_mode">Gestarteter Sensor</string>
+    <string name="ottai_ota_started_ready">Update für den gestarteten Sensor bereit. Vor der Installation die Ausgangswerte prüfen.</string>
+    <string name="ottai_ota_result_active">Firmware aktualisiert. Der Sensor meldet aktiv; vor der Überwachung das Trace-Protokoll prüfen.</string>
+    <string name="ottai_ota_result_ended">Firmware aktualisiert. Der Sensor meldet beendet; das Trace-Protokoll prüfen.</string>
+    <string name="ottai_ota_result_reset">Firmware aktualisiert. Der Sensor meldet nicht aktiviert; keine erneute Aktivierung versucht.</string>
+    <string name="ottai_ota_started_confirm">Auf diesem gestarteten Sensor installieren? Messwerte und Betriebszustand können gelöscht oder zurückgesetzt werden. Der Test protokolliert das Ergebnis ohne erneute Aktivierung oder Schreiben von Werksparametern.</string>
+    <string name="ottai_ota_observation">%1$s · Status %2$d · Laufzeit %3$s s · letzter Datensatz %4$s · RTC %5$s s</string>
+    <string name="ottai_ota_before">Vorher</string>
+    <string name="ottai_ota_after">Nachher</string>
 </resources>

@@ -123,6 +123,12 @@ class OttaiFirmwareControllerTests {
         var refresh: ((Result<OttaiRegistry.DeviceMaterials>) -> Unit)? = null
         var reported = false
         var cleared = false
+        var journal: OttaiFirmwareImage? = null
+        var onWrite: (UUID, ByteArray) -> Unit = { _, _ -> }
+        var commandStatus = 0
+        var durationSeconds = 28L * 86_400
+        var dataNo = 720
+        var optionalUnavailable = false
         override fun connect(done: (Result<OttaiFirmwareGatt>) -> Unit) { connected = done }
         override fun rediscover(done: (Result<OttaiFirmwareGatt>) -> Unit) {
             done(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
@@ -130,9 +136,14 @@ class OttaiFirmwareControllerTests {
         override fun read(service: UUID, characteristic: UUID, done: (Result<ByteArray>) -> Unit) {
             done(Result.success(requireNotNull(readAnswer)(characteristic)))
         }
+        override fun readOptional(service: UUID, characteristic: UUID, done: (Result<ByteArray>) -> Unit) {
+            if (optionalUnavailable) done(Result.failure(IllegalStateException("not_supported")))
+            else read(service, characteristic, done)
+        }
         override fun write(service: UUID, characteristic: UUID, value: ByteArray, done: (Result<Unit>) -> Unit) {
             check(ack == null)
             writes += characteristic to value.copyOf()
+            onWrite(characteristic, value)
             ack = done
         }
         fun acknowledge(result: Result<Unit> = Result.success(Unit)) {
@@ -147,8 +158,8 @@ class OttaiFirmwareControllerTests {
             refresh = done
             fresh?.let { done(Result.success(it)) }
         }
-        override fun savedImage() = image
-        override fun markTransferStarted(image: OttaiFirmwareImage) { saved = true }
+        override fun savedImage() = journal
+        override fun markTransferStarted(image: OttaiFirmwareImage) { saved = true; journal = image }
         override fun reportVerified(image: OttaiFirmwareImage) { reported = true }
         override fun clearRecovery() { cleared = true }
         override fun log(message: String) {}
@@ -156,11 +167,21 @@ class OttaiFirmwareControllerTests {
         override fun close() { closed = true }
     }
 
-    private fun normal(version: String = "V1.7.0", command: Int = 0, badSignature: Boolean = false): Pair<OttaiFirmwareController, FakeIo> {
+    private fun normal(version: String = "V1.7.0", command: Int = 0, badSignature: Boolean = false,
+        mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION): Pair<OttaiFirmwareController, FakeIo> {
         val io = FakeIo(image.copy(source = version, target = "V1.8.1"))
+        io.commandStatus = command
         val device = OttaiBleAuth.generateKeyPair()
         val (x, y) = OttaiBleAuth.publicCoords(device.public as java.security.interfaces.ECPublicKey)
         val time = byteArrayOf(1, 2, 3)
+        var session = ""
+        io.onWrite = { ch, value ->
+            if (ch == OttaiConstants.CHAR_AUTH_APP_PARAM) {
+                session = requireNotNull(OttaiBleAuth.deriveSessionKey(
+                    OttaiCrypto.bytesToHex(value.copyOfRange(4, 36)), OttaiCrypto.bytesToHex(value.copyOfRange(36, 68)),
+                    device.private as java.security.interfaces.ECPrivateKey))
+            }
+        }
         io.readAnswer = { ch ->
             when (ch) {
                 OttaiConstants.CHAR_SOFTWARE_VERSION -> version.toByteArray()
@@ -168,11 +189,22 @@ class OttaiFirmwareControllerTests {
                 OttaiConstants.CHAR_AUTH_DEVICE_PARAM -> byteArrayOf(0) + time + x + y
                 OttaiConstants.CHAR_AUTH_SIGN -> if (badSignature) ByteArray(32) else
                     OttaiBleAuth.authSign(ByteArray(16), OttaiCrypto.hexToBytes("AABBCCDDEEFF"), x, y, time)
-                OttaiConstants.CHAR_COMMAND -> byteArrayOf(command.toByte())
+                OttaiConstants.CHAR_COMMAND -> byteArrayOf(io.commandStatus.toByte())
+                OttaiConstants.CHAR_MAX_ACTIVE_TIME -> requireNotNull(OttaiCrypto.encryptPayload(
+                    ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(io.durationSeconds).array(), session))
+                OttaiConstants.CHAR_GLUCOSE_LIVE -> {
+                    val frame = ByteArray(16)
+                    frame[4] = io.dataNo.toByte(); frame[5] = (io.dataNo ushr 8).toByte()
+                    val runtime = io.dataNo * 60
+                    frame[8] = 100; frame[9] = (runtime ushr 16).toByte()
+                    frame[10] = runtime.toByte(); frame[11] = (runtime ushr 8).toByte()
+                    frame[12] = 50; frame[14] = 0x80.toByte(); frame[15] = 0x0c
+                    requireNotNull(OttaiCrypto.encryptPayload(frame, session))
+                }
                 else -> error("unexpected characteristic")
             }
         }
-        val controller = OttaiFirmwareController("AABBCCDDEEFF", materials.copy(deviceVersion = version), io) {}
+        val controller = OttaiFirmwareController("AABBCCDDEEFF", materials.copy(deviceVersion = version), io, mode) {}
         controller.start()
         io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
         if (!badSignature) repeat(2) { io.tick(); io.acknowledge() }
@@ -186,6 +218,101 @@ class OttaiFirmwareControllerTests {
         assertFalse(io.saved)
         assertFalse(io.reported)
         assertFalse(io.cleared)
+    }
+
+    @Test fun startedModeChecksAndRecordsBaselineWithoutWritingParameters() {
+        val (controller, io) = normal(command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR)
+        assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
+        assertEquals(3, controller.state.before?.commandStatus)
+        assertEquals(28L * 86_400, controller.state.before?.maxActiveSeconds)
+        assertEquals(720, controller.state.before?.latestDataNo)
+        assertNotNull(controller.state.before?.rtcSeconds)
+        controller.prepareOnly()
+        assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
+        assertNull(io.refresh)
+        assertEquals(2, io.writes.size)
+    }
+
+    @Test fun startedModeAcceptsEveryKnownPostUpdateStateAndNeverRestoresOrReactivates() {
+        for (status in 0..4) {
+            val (controller, io) = normal(command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR)
+            controller.install()
+            assertEquals(OttaiFirmwareMode.STARTED_SENSOR, io.journal?.mode)
+            assertEquals(controller.state.before, io.journal?.before)
+            while (controller.state.stage == OttaiFirmwareStage.INSTALLING) { io.tick(); io.acknowledge() }
+            val oldAnswer = requireNotNull(io.readAnswer)
+            io.readAnswer = { ch -> if (ch == OttaiConstants.CHAR_SOFTWARE_VERSION) "V1.8.1".toByteArray() else oldAnswer(ch) }
+            io.commandStatus = status
+            io.durationSeconds = if (status == 3) 28L * 86_400 else 0
+            io.dataNo = if (status == 3) 725 else 0
+            io.tick()
+            io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
+            repeat(2) { io.tick(); io.acknowledge() }
+            assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+            assertEquals(status, controller.state.after?.commandStatus)
+            assertEquals(io.durationSeconds, controller.state.after?.maxActiveSeconds)
+            assertEquals(io.dataNo, controller.state.after?.latestDataNo)
+            assertEquals(720, controller.state.before?.latestDataNo)
+            assertTrue(io.reported && io.cleared)
+            assertNull(io.refresh)
+            assertFalse(io.writes.any { it.first in setOf(OttaiConstants.CHAR_COMMAND,
+                OttaiConstants.CHAR_CURRENT_TIME, OttaiConstants.CHAR_MAX_ACTIVE_TIME, OttaiConstants.CHAR_DESTRUCTIVE) })
+        }
+    }
+
+    @Test fun optionalObservationFailuresDoNotPreventStartedUpdateVerification() {
+        val (controller, io) = normal(command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR)
+        controller.install()
+        while (controller.state.stage == OttaiFirmwareStage.INSTALLING) { io.tick(); io.acknowledge() }
+        val oldAnswer = requireNotNull(io.readAnswer)
+        io.readAnswer = { ch -> if (ch == OttaiConstants.CHAR_SOFTWARE_VERSION) "V1.8.1".toByteArray() else oldAnswer(ch) }
+        io.optionalUnavailable = true
+        io.tick()
+        io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
+        repeat(2) { io.tick(); io.acknowledge() }
+        assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+        assertNull(controller.state.after?.maxActiveSeconds)
+        assertNull(controller.state.after?.latestDataNo)
+    }
+
+    @Test fun startedRecoveryRecognizesAlreadyBootedTargetAndRetainsOriginalBaseline() {
+        val (controller, io) = normal(command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR)
+        controller.install()
+        while (controller.state.stage == OttaiFirmwareStage.INSTALLING) { io.tick(); io.acknowledge() }
+        controller.close()
+        io.scheduled.clear()
+        val oldAnswer = requireNotNull(io.readAnswer)
+        io.readAnswer = { ch -> if (ch == OttaiConstants.CHAR_SOFTWARE_VERSION) "V1.8.1".toByteArray() else oldAnswer(ch) }
+        io.commandStatus = 0
+        val transfers = io.writes.count { it.first == OttaiConstants.CHAR_OTA_CONTROL }
+        val resumed = OttaiFirmwareController("AABBCCDDEEFF", materials, io, OttaiFirmwareMode.STARTED_SENSOR) {}
+        resumed.start()
+        io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
+        repeat(2) { io.tick(); io.acknowledge() }
+        assertEquals(OttaiFirmwareStage.COMPLETE, resumed.state.stage)
+        assertEquals(3, resumed.state.before?.commandStatus)
+        assertEquals(0, resumed.state.after?.commandStatus)
+        assertEquals(transfers, io.writes.count { it.first == OttaiConstants.CHAR_OTA_CONTROL })
+    }
+
+    @Test fun startedModeRefusesFreshEndedAndUnknownEntryStates() {
+        for (status in listOf(0, 1, 2, 4, 255)) {
+            val (controller, _) = normal(command = status, mode = OttaiFirmwareMode.STARTED_SENSOR)
+            assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+            assertEquals("started_sensor_status", controller.state.errorCode)
+        }
+    }
+
+    @Test fun recoveryCannotSilentlyChangeExperimentMode() {
+        val io = FakeIo(image)
+        io.journal = image.copy(mode = OttaiFirmwareMode.STARTED_SENSOR,
+            before = OttaiFirmwareObservation(3, 28L * 86_400, 720, 100))
+        val controller = OttaiFirmwareController("AABBCCDDEEFF", materials, io) {}
+        controller.start()
+        io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = true, hasOta = true)))
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertEquals("recovery_mode", controller.state.errorCode)
+        assertTrue(io.writes.isEmpty())
     }
 
     @Test fun activeEndedAndWrongIdentitySensorsCannotReachTheOfferOrFlash() {
@@ -273,6 +400,7 @@ class OttaiFirmwareControllerTests {
 
     private fun recovery(): Pair<OttaiFirmwareController, FakeIo> {
         val io = FakeIo(image)
+        io.journal = image
         val controller = OttaiFirmwareController("AABBCCDDEEFF", materials, io) {}
         controller.start()
         io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = true, hasOta = true)))

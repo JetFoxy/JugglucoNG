@@ -3287,4 +3287,17 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="ottai_ota_confirm">Rakib cusboonaysiintan tijaabada ah? Waxay dareemaha si joogto ah u joojin kartaa. Hawlgelintu waxay si gooni ah u dhacdaa ka dib xaqiijinta nooca iyo dejimaha warshadda.</string>
     <string name="ottai_ota_parameters_confirm">Qor isku-dhufayaasha iyo cabbir-habaynta warshadda ee la taageero? Tani waxay beddeshaa dejimaha iyada oo aan firmware la cusboonaysiin ama muddada dareemaha la bilaabin.</string>
     <string name="ottai_ota_check">Hubi firmware-ka (tijaabo)</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Marka hore dareemahan ka gooy kormeerka. Cusboonaysiinta dareeme bilaabmay waxay tirtiri kartaa akhrisyada, dib u bilaabi kartaa muddadiisa ama joojin kartaa dareemaha.</string>
+    <string name="ottai_ota_fresh_mode">Dareeme cusub</string>
+    <string name="ottai_ota_started_mode">Dareeme bilaabmay</string>
+    <string name="ottai_ota_started_ready">Cusboonaysiinta dareemaha bilaabmay waa diyaar. Eeg xogta bilowga ah ka hor rakibidda.</string>
+    <string name="ottai_ota_result_active">Firmware waa la cusboonaysiiyey. Dareemuhu wuxuu sheegayaa inuu firfircoon yahay; eeg diiwaanka ka hor dib ugu xidhidda kormeerka.</string>
+    <string name="ottai_ota_result_ended">Firmware waa la cusboonaysiiyey. Dareemuhu wuxuu sheegayaa inuu dhammaaday; eeg diiwaanka.</string>
+    <string name="ottai_ota_result_reset">Firmware waa la cusboonaysiiyey. Dareemuhu wuxuu sheegayaa inaan la hawlgelin; dib u hawlgelin lama isku dayin.</string>
+    <string name="ottai_ota_started_confirm">Ku rakib dareemahan bilaabmay? Akhrisyada iyo xaaladda shaqada waa la tirtiri karaa ama dib ayaa loo bilaabi karaa. Tijaabadu waxay diiwaangelisaa natiijada iyada oo aan dib loo hawlgelin ama dejimaha warshadda la qorin.</string>
+    <string name="ottai_ota_observation">%1$s · xaalad %2$d · muddada %3$s ilbiriqsi · diiwaankii u dambeeyey %4$s · RTC %5$s ilbiriqsi</string>
+    <string name="ottai_ota_before">Ka hor</string>
+    <string name="ottai_ota_after">Ka dib</string>
 </resources>

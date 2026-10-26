@@ -9,6 +9,15 @@ internal enum class OttaiFirmwareStage {
     PREPARING, COMPLETE, FAILED, CLOSED,
 }
 
+internal enum class OttaiFirmwareMode { PREACTIVATION, STARTED_SENSOR }
+
+internal data class OttaiFirmwareObservation(
+    val commandStatus: Int,
+    val maxActiveSeconds: Long? = null,
+    val latestDataNo: Int? = null,
+    val rtcSeconds: Long? = null,
+)
+
 internal data class OttaiFirmwareState(
     val stage: OttaiFirmwareStage = OttaiFirmwareStage.CONNECTING,
     val firmware: String = "",
@@ -18,11 +27,19 @@ internal data class OttaiFirmwareState(
     val sha256: String = "",
     val recovery: Boolean = false,
     val errorCode: String = "",
+    val mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION,
+    val before: OttaiFirmwareObservation? = null,
+    val after: OttaiFirmwareObservation? = null,
 ) {
-    val transferring: Boolean get() = stage in setOf(OttaiFirmwareStage.INSTALLING, OttaiFirmwareStage.RECONNECTING, OttaiFirmwareStage.PREPARING)
+    val transferring: Boolean get() = stage in setOf(OttaiFirmwareStage.INSTALLING, OttaiFirmwareStage.RECONNECTING, OttaiFirmwareStage.PREPARING) ||
+        (acknowledgedBytes > 0 && stage == OttaiFirmwareStage.AUTHENTICATING)
 }
 
-internal data class OttaiFirmwareImage(val source: String, val target: String, val image: OttaiOtaPackage)
+internal data class OttaiFirmwareImage(
+    val source: String, val target: String, val image: OttaiOtaPackage,
+    val mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION,
+    val before: OttaiFirmwareObservation? = null,
+)
 internal data class OttaiFirmwareGatt(val mtu: Int, val bootloaderOnly: Boolean, val hasOta: Boolean)
 
 /** All calls and completions belong to one serial owner (the session Handler). */
@@ -30,6 +47,7 @@ internal interface OttaiFirmwareIo {
     fun connect(done: (Result<OttaiFirmwareGatt>) -> Unit)
     fun rediscover(done: (Result<OttaiFirmwareGatt>) -> Unit)
     fun read(service: UUID, characteristic: UUID, done: (Result<ByteArray>) -> Unit)
+    fun readOptional(service: UUID, characteristic: UUID, done: (Result<ByteArray>) -> Unit) = read(service, characteristic, done)
     fun write(service: UUID, characteristic: UUID, value: ByteArray, done: (Result<Unit>) -> Unit)
     fun after(delayMs: Long, action: () -> Unit)
     fun prepareImage(version: String, done: (Result<OttaiFirmwareImage?>) -> Unit)
@@ -44,16 +62,17 @@ internal interface OttaiFirmwareIo {
 }
 
 /**
- * Wizard-only preactivation transaction. No RTC, lifetime, retain or ACTIVATE_CMD writes exist
+ * Wizard-only experiment. No RTC, lifetime, retain or ACTIVATE_CMD writes exist
  * here. Firmware and factory-parameter experiments are explicit, separate actions.
  */
 internal class OttaiFirmwareController(
     private val sensorId: String,
     private var materials: OttaiRegistry.DeviceMaterials,
     private val io: OttaiFirmwareIo,
+    private val mode: OttaiFirmwareMode = OttaiFirmwareMode.PREACTIVATION,
     private val publish: (OttaiFirmwareState) -> Unit,
 ) {
-    var state = OttaiFirmwareState()
+    var state = OttaiFirmwareState(mode = mode)
         private set
     private var epoch = 0
     private var retired = false
@@ -62,10 +81,11 @@ internal class OttaiFirmwareController(
     private var packageForInstall: OttaiFirmwareImage? = null
     private var installed: OttaiFirmwareImage? = null
     private var sessionKey = ""
+    private var deviceRtcSeconds: Long? = null
 
     private fun update(stage: OttaiFirmwareStage, change: (OttaiFirmwareState) -> OttaiFirmwareState = { it }) {
         state = change(state.copy(stage = stage))
-        io.log("stage=$stage source=${state.firmware} target=${state.target} ack=${state.acknowledgedBytes}/${state.totalBytes} recovery=${state.recovery} error=${state.errorCode}")
+        io.log("mode=$mode stage=$stage source=${state.firmware} target=${state.target} ack=${state.acknowledgedBytes}/${state.totalBytes} recovery=${state.recovery} error=${state.errorCode}")
         publish(state)
     }
 
@@ -99,16 +119,24 @@ internal class OttaiFirmwareController(
         if (gatt.bootloaderOnly) {
             require(!afterInstall) { "still_in_bootloader" }
             val saved = io.savedImage() ?: throw IllegalArgumentException("no_recovery_image")
+            require(saved.mode == mode) { "recovery_mode" }
             packageForInstall = saved
             update(OttaiFirmwareStage.READY) {
                 it.copy(firmware = saved.source, target = saved.target, totalBytes = saved.image.size,
-                    sha256 = saved.image.sha256, recovery = true)
+                    sha256 = saved.image.sha256, recovery = true, before = saved.before)
             }
             return
         }
         read(OttaiConstants.SERVICE_DEVICE_INFO, OttaiConstants.CHAR_SOFTWARE_VERSION) { bytes ->
             val version = OttaiOtaProtocol.version(bytes.toString(Charsets.US_ASCII).trimEnd('\u0000'))
                 ?: throw IllegalArgumentException("firmware_profile")
+            val saved = io.savedImage()
+            require(saved == null || saved.mode == mode) { "recovery_mode" }
+            val resumed = !afterInstall && saved?.target == version
+            if (resumed) {
+                installed = saved
+                state = state.copy(before = saved?.before, target = version, recovery = true)
+            }
             if (afterInstall) require(version == installed?.target) { "version_readback_mismatch" }
             state = state.copy(firmware = version)
             authenticate {
@@ -118,32 +146,69 @@ internal class OttaiFirmwareController(
                     require(!refreshed.bootloaderOnly) { "post_auth_services" }
                     mtu = refreshed.mtu
                     hasOta = refreshed.hasOta
-                    checkUnactivated(version, afterInstall)
+                    checkCommandStatus(version, afterInstall || resumed)
                 })
             }
         }
     }
 
-    private fun checkUnactivated(version: String, afterInstall: Boolean) {
+    private fun checkCommandStatus(version: String, afterInstall: Boolean) {
         read(OttaiConstants.SERVICE_CGM, OttaiConstants.CHAR_COMMAND) { command ->
-            require(command.isNotEmpty() && OttaiConstants.commandNeedsActivation(command[0].toInt() and 255)) { "sensor_already_active_or_ended" }
-            if (afterInstall) {
-                io.reportVerified(requireNotNull(installed))
-                prepareParameters()
+            val status = command.firstOrNull()?.toInt()?.and(255) ?: -1
+            if (mode == OttaiFirmwareMode.PREACTIVATION) {
+                require(OttaiConstants.commandNeedsActivation(status)) { "sensor_already_active_or_ended" }
+                continueAfterStatus(version, afterInstall)
             } else {
-                update(OttaiFirmwareStage.CHECKING)
-                io.prepareImage(version, completion { image ->
-                    packageForInstall = image
-                    if (image == null) update(OttaiFirmwareStage.NO_UPDATE)
-                    else {
-                        require(hasOta && image.source == version && OttaiOtaProtocol.isUpgrade(version, image.target)) { "ota_offer_mismatch" }
-                        update(OttaiFirmwareStage.READY) {
-                            it.copy(target = image.target, totalBytes = image.image.size, sha256 = image.image.sha256)
-                        }
-                    }
-                })
+                // A reset or ended state AFTER the transfer is an observation, not a failure.
+                require(if (afterInstall) status in 0..4 else status == 3) { "started_sensor_status" }
+                observe(status) { observation ->
+                    io.log("observation=${if (afterInstall) "after" else "before"} $observation")
+                    state = if (afterInstall) state.copy(after = observation) else state.copy(before = observation)
+                    continueAfterStatus(version, afterInstall)
+                }
             }
         }
+    }
+
+    private fun continueAfterStatus(version: String, afterInstall: Boolean) {
+        if (afterInstall) {
+            io.reportVerified(requireNotNull(installed))
+            if (mode == OttaiFirmwareMode.STARTED_SENSOR) {
+                io.clearRecovery()
+                update(OttaiFirmwareStage.COMPLETE)
+                retire()
+            } else prepareParameters()
+        } else {
+            update(OttaiFirmwareStage.CHECKING)
+            io.prepareImage(version, completion { image ->
+                packageForInstall = image?.copy(mode = mode, before = state.before)
+                if (image == null) update(OttaiFirmwareStage.NO_UPDATE)
+                else {
+                    require(hasOta && image.source == version && OttaiOtaProtocol.isUpgrade(version, image.target)) { "ota_offer_mismatch" }
+                    update(OttaiFirmwareStage.READY) {
+                        it.copy(target = image.target, totalBytes = image.image.size, sha256 = image.image.sha256)
+                    }
+                }
+            })
+        }
+    }
+
+    private fun observe(status: Int, done: (OttaiFirmwareObservation) -> Unit) {
+        optionalRead(OttaiConstants.SERVICE_DEVICE_INFO, OttaiConstants.CHAR_MAX_ACTIVE_TIME) { duration ->
+            val seconds = duration?.let { OttaiOtaProtocol.maxActiveSeconds(it, sessionKey) }
+            optionalRead(OttaiConstants.SERVICE_CGM, OttaiConstants.CHAR_GLUCOSE_LIVE) { live ->
+                val number = live?.let { OttaiOtaProtocol.latestDataNo(it, sessionKey, state.firmware) }
+                done(OttaiFirmwareObservation(status, seconds, number, deviceRtcSeconds))
+            }
+        }
+    }
+
+    private fun optionalRead(service: UUID, characteristic: UUID, action: (ByteArray?) -> Unit) {
+        val done = completion<Result<ByteArray>> { result ->
+            if (result.isFailure) io.log("optional_read_unavailable=$characteristic")
+            action(result.getOrNull())
+        }
+        io.readOptional(service, characteristic) { done(Result.success(it)) }
     }
 
     private fun authenticate(done: () -> Unit) {
@@ -151,6 +216,7 @@ internal class OttaiFirmwareController(
         val keys = materials.authKeys ?: throw IllegalArgumentException("credentials_missing")
         read(OttaiConstants.SERVICE_DEVICE_INFO, OttaiConstants.CHAR_CURRENT_TIME) { time ->
             require(time.size == 4) { "auth_time" }
+            deviceRtcSeconds = OttaiBleAuth.bytesToIntLE(time).toLong() and 0xffffffffL
             read(OttaiConstants.SERVICE_AUTH, OttaiConstants.CHAR_AUTH_DEVICE_PARAM) { param ->
                 require(param.size >= 68) { "auth_parameter" }
                 val index = param[0].toInt() and 255
@@ -220,7 +286,8 @@ internal class OttaiFirmwareController(
     }
 
     fun prepareOnly() {
-        if (retired || state.recovery || state.stage !in setOf(OttaiFirmwareStage.READY, OttaiFirmwareStage.NO_UPDATE)) return
+        if (retired || mode == OttaiFirmwareMode.STARTED_SENSOR || state.recovery ||
+            state.stage !in setOf(OttaiFirmwareStage.READY, OttaiFirmwareStage.NO_UPDATE)) return
         runCatching { prepareParameters() }.onFailure { fail(it.message ?: "parameters") }
     }
 
