@@ -26,13 +26,19 @@ internal object ICanHealthProvisioningPolicy {
      * that is already running is never provisioned mid-session — the 2026-10-27 trace (issue
      * #744) has the three `F2` chunks landing two seconds before a live iCGM-t3 stopped
      * advancing its `0x2AA9` counter.
+     *
+     * `sessionStartReadPending` keeps the zero-session branch honest: `0x2AA9` is read before
+     * `0x2AAA`, and `launcherState == 0` is also what a live iCGM-t6 reports, so an unread
+     * session start must not be mistaken for "no session".
      */
     fun writeWindow(
         launcherState: Int,
         sessionStartEpochMs: Long,
         startCommandIssuedThisConnection: Boolean,
+        sessionStartReadPending: Boolean = false,
     ): WriteWindow = when {
         startCommandIssuedThisConnection -> WriteWindow.ACTIVATION
+        sessionStartReadPending -> WriteWindow.UNKNOWN_STATE
         sessionStartEpochMs > 0L -> WriteWindow.ALREADY_RUNNING
         launcherState == ICanHealthConstants.LAUNCHER_STATE_IDLE -> WriteWindow.ACTIVATION
         launcherState < 0 -> WriteWindow.UNKNOWN_STATE

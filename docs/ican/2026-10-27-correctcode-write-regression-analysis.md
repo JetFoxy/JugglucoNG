@@ -2,7 +2,7 @@
 
 Branch: `ican/correctcode-activation-window`. Source trace: `juggluco-trace-20261027-111415.log`
 (JugglucoNG 1.2.6-Alpha-phone, Android 14, ASUS AI2401). Sensor: iCGM-t3,
-`87600CE200070000` / auth `7600CE22404A`, session start 2026-10-20 08:27:26 +03.
+`87600CE2…0000` / auth `7600CE2…4A` (both masked), session start 2026-10-20 08:27:26 +03.
 
 Status: **hypothesis, not proof**. The trace cannot separate "sensor stopped on its own" from
 "our parameter write stopped it". It does narrow the window to about two seconds.
@@ -49,7 +49,7 @@ value (3.9 mmol/L) is displayed as "now" purely because of that anchor.
 ## 3. What the written table actually contained
 
 Decrypting the three chunks from the trace (AES-128-ECB, key from
-`ICanHealthConstants.DEFAULT_CORRECT_CODE_AES_KEY_ASCII`, challenge `8B C0 AE 8E` from `06 F3 01 …`)
+`ICanHealthConstants.DEFAULT_CORRECT_CODE_AES_KEY_ASCII`, challenge from the same session's `F3` reply)
 and undoing the aux/XOR layer gives a well-formed table:
 
 ```
@@ -57,7 +57,7 @@ x1..x15 (raw/1000):
 0.015 32.0 25.0 1.0 0.8 0.3 40.0 0.5 0.5 1.2 13.0 1.4 0.4 3.5 15.0
 ```
 
-`x13 = 0.40` is the box code derived from the 13-char serial `87600CE22404A` (`"40"`), as intended.
+`x13 = 0.40` is the box code derived from the 13-char serial's `[9,11)` substring (`"40"`), as intended.
 No stray non-zero bytes outside the value slots; no uint16 wrap. It is not the generic default table
 (it differs in x6, x8, x9, x12), so it passed the `isGenericTable` guard with real-looking values.
 

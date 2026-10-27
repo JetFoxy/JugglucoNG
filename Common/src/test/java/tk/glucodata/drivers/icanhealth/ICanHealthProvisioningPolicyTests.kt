@@ -121,6 +121,48 @@ class ICanHealthProvisioningPolicyTests {
         )
     }
 
+    @Test fun anUnreadSessionStartIsNotMistakenForAFreshSensor() {
+        // 0x2AA9 is read before 0x2AAA, and a live iCGM-t6 also reports launcherState 0x00.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.UNKNOWN_STATE,
+            policy.writeWindow(
+                launcherState = ICanHealthConstants.LAUNCHER_STATE_IDLE,
+                sessionStartEpochMs = 0L,
+                startCommandIssuedThisConnection = false,
+                sessionStartReadPending = true,
+            ),
+        )
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ACTIVATION,
+            policy.writeWindow(
+                launcherState = ICanHealthConstants.LAUNCHER_STATE_IDLE,
+                sessionStartEpochMs = 0L,
+                startCommandIssuedThisConnection = false,
+                sessionStartReadPending = false,
+            ),
+        )
+        // The reply lands: this is a running sensor after all.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ALREADY_RUNNING,
+            policy.writeWindow(
+                launcherState = ICanHealthConstants.LAUNCHER_STATE_IDLE,
+                sessionStartEpochMs = 1792474046000L,
+                startCommandIssuedThisConnection = false,
+                sessionStartReadPending = false,
+            ),
+        )
+        // Our own 1A is the activation window even while its replies are in flight.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ACTIVATION,
+            policy.writeWindow(
+                launcherState = ICanHealthConstants.LAUNCHER_STATE_RUNNING,
+                sessionStartEpochMs = 0L,
+                startCommandIssuedThisConnection = true,
+                sessionStartReadPending = true,
+            ),
+        )
+    }
+
     @Test fun negativeF2RepliesAreRecognizedImmediately() {
         assertEquals(1, ICanHealthParser.parseCorrectCodeResult(byteArrayOf(0x1c, 0xf2.toByte(), 1)))
         assertEquals(2, ICanHealthParser.parseCorrectCodeResult(byteArrayOf(0x1c, 0xf2.toByte(), 2)))

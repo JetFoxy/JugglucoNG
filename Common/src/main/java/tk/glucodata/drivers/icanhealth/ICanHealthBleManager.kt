@@ -223,6 +223,7 @@ class ICanHealthBleManager(
     private var correctCodeRecheckRunnable: Runnable? = null
     @Volatile private var lastSensorInfoMarker: Int? = null
     @Volatile private var correctCodeCandidateThisConnection = false
+    @Volatile private var sessionStartReadPending = false
     private var correctCodeFactorySerial: String? = null
     private var correctCodeChallenge: ByteArray? = null
     private var gattWriteInFlight: GattOp.Write? = null
@@ -1528,6 +1529,11 @@ class ICanHealthBleManager(
     ) {
         if (status != BluetoothGatt.GATT_SUCCESS) {
             Log.w(TAG, "Read failed for ${characteristic.uuid} status=$status")
+            if (characteristic.uuid == ICanHealthConstants.CGM_SESSION_START_TIME) {
+                // Do not guess the activation window from an unread session start; this
+                // connection will not provision and the next one re-reads it.
+                sessionStartReadPending = false
+            }
             if (characteristic.uuid == ICanHealthConstants.CGM_STATUS && awaitingFreshStatusForHistoryBackfill) {
                 continuePendingHistoryBackfill("status read failed")
             }
@@ -1643,6 +1649,7 @@ class ICanHealthBleManager(
 
             ICanHealthConstants.CGM_SESSION_START_TIME -> {
                 val sessionStart = ICanHealthParser.parseSessionStartTime(data)
+                sessionStartReadPending = false
                 if (sessionStart != null) {
                     sessionStartEpochMs = sessionStart.toEpochMillis()
                     sensorstartmsec = sessionStartEpochMs
@@ -2521,6 +2528,7 @@ class ICanHealthBleManager(
             launcherState = launcherState,
             sessionStartEpochMs = sessionStartEpochMs,
             startCommandIssuedThisConnection = startCommandIssuedThisConnection,
+            sessionStartReadPending = sessionStartReadPending,
         )) {
             ICanHealthProvisioningPolicy.WriteWindow.ACTIVATION -> {
                 correctCodeCandidateThisConnection = false
@@ -2644,7 +2652,13 @@ class ICanHealthBleManager(
         val serial = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
         if (stop || uiPaused || !isAuthenticated ||
             ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, serial) != ICanHealthProvisioningPolicy.Eligibility.FRESH ||
-            serial != correctCodeFactorySerial || lastAuthChallenge?.contentEquals(correctCodeChallenge ?: byteArrayOf()) != true) {
+            serial != correctCodeFactorySerial || lastAuthChallenge?.contentEquals(correctCodeChallenge ?: byteArrayOf()) != true ||
+            ICanHealthProvisioningPolicy.writeWindow(
+                launcherState = launcherState,
+                sessionStartEpochMs = sessionStartEpochMs,
+                startCommandIssuedThisConnection = startCommandIssuedThisConnection,
+                sessionStartReadPending = sessionStartReadPending,
+            ) != ICanHealthProvisioningPolicy.WriteWindow.ACTIVATION) {
             resetCorrectCodeState()
             return
         }
@@ -2715,6 +2729,7 @@ class ICanHealthBleManager(
         correctCodeNextChunk = 0
         correctCodeChainActive = false
         correctCodeCandidateThisConnection = false
+        sessionStartReadPending = false
     }
 
     private fun enqueuePreAuthReads() {
@@ -2807,7 +2822,10 @@ class ICanHealthBleManager(
         }
         if (refreshSessionInfo) {
             charStatus?.let { enqueueOp(GattOp.Read(ICanHealthConstants.CGM_STATUS)) }
-            charSessionStart?.let { enqueueOp(GattOp.Read(ICanHealthConstants.CGM_SESSION_START_TIME)) }
+            charSessionStart?.let {
+                sessionStartReadPending = true
+                enqueueOp(GattOp.Read(ICanHealthConstants.CGM_SESSION_START_TIME))
+            }
         }
         drainGattQueue()
         maybeHandleQueueDrained()
