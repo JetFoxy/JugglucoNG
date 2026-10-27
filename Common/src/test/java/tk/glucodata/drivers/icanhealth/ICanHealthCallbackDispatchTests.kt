@@ -47,4 +47,28 @@ class ICanHealthCallbackDispatchTests {
         assertTrue(acknowledgement.contains("if (result == 1) onCorrectCodeAck() else {"))
         assertTrue(acknowledgement.contains("resetCorrectCodeState()"))
     }
+
+    @Test fun cachedSetupProbesStatusWithoutGoingThroughBackfill() {
+        val setup = manager.substringAfter("private fun startPostAuthSetup(reason: String)")
+            .substringBefore("private fun resolveAutomaticGlucoseHistoryStartSequence()")
+        assertTrue(setup.contains("repairState.statusProbeDue(SystemClock.elapsedRealtime())"))
+        assertTrue(setup.contains("enqueueOp(GattOp.Read(ICanHealthConstants.CGM_STATUS))"))
+        assertFalse(setup.contains("shouldRequestAuthenticatedHistoryBackfill"))
+        assertFalse(setup.contains("suppressAutomaticHistoryBackfill"))
+        assertFalse(setup.contains("handler.post"))
+    }
+
+    @Test fun repairAttemptsBelongToAcceptedFirstChunkDispatchNotScheduling() {
+        val schedule = manager.substringAfter("private fun scheduleCorrectCodeWrite(")
+            .substringBefore("private fun scheduleCorrectCodeRecheck()")
+        assertFalse(schedule.contains("repairState.startWrite"))
+        val dispatch = manager.substringAfter("private fun drainGattQueue()")
+            .substringBefore("private fun reconnectAlarmPendingIntent(")
+        assertTrue(dispatch.contains("correctCodeChunks === op.correctCodeOwner"))
+        assertTrue(dispatch.contains("op.correctCodeOwner != null && op.correctCodeIndex == 0"))
+        assertTrue(dispatch.contains("repairState.startWrite("))
+        assertTrue(dispatch.contains(
+            "nowMs = SystemClock.elapsedRealtime(), ) { gatt.writeCharacteristic(char) }",
+        ))
+    }
 }

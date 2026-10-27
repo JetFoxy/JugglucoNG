@@ -40,8 +40,8 @@ internal object ICanHealthProvisioningPolicy {
      * further attempt — one ineffective write would close the rescue path for good.
      *
      * @param installedMarker last `F6` value; anything but `0xFFFF` means a table is installed
-     * @param sensorSilentMs how long the `0x2AA9` counter has been standing still
-     * @param sinceLastWriteMs time since the last completed table write, or [Long.MAX_VALUE]
+     * @param sensorSilentMs elapsed time since last observed forward production progress
+     * @param sinceLastWriteMs elapsed time since a table write started/completed, or [Long.MAX_VALUE]
      * @param attempts repair writes already made for this sensor in this process
      */
     fun repairDecision(

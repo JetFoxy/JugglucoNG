@@ -25,6 +25,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import java.util.ArrayDeque
 import java.util.LinkedHashMap
 import java.util.Locale
@@ -153,6 +154,8 @@ class ICanHealthBleManager(
             val charUuid: UUID,
             val data: ByteArray,
             val serviceUuid: UUID = ICanHealthConstants.CGM_SERVICE,
+            val correctCodeOwner: List<ByteArray>? = null,
+            val correctCodeIndex: Int = -1,
         ) : GattOp()
         data class Read(
             val charUuid: UUID,
@@ -223,12 +226,7 @@ class ICanHealthBleManager(
     private var correctCodeRecheckRunnable: Runnable? = null
     @Volatile private var lastSensorInfoMarker: Int? = null
     private var correctCodeRepairChain = false
-    @Volatile private var repairAttempts = 0
-    @Volatile private var lastProvisioningWriteAtMs = 0L
-    @Volatile private var lastCounterAdvanceAtMs = 0L
-    private var repairSensorId: String? = null
-    /** Last `0x2AA9` value read from the status characteristic; live readings move [currentSequenceNumber] too. */
-    private var lastStatusSequence = -1
+    private val repairState = ICanHealthRepairState()
     private var repairExhaustedLogged = false
     private var correctCodeFactorySerial: String? = null
     private var correctCodeChallenge: ByteArray? = null
@@ -1642,6 +1640,7 @@ class ICanHealthBleManager(
                         "CGM status offset=$observedSequence launcherState=0x${"%02X".format(launcherState)}"
                     )
                     trackCounterProgress(observedSequence)
+                    repairState.statusProbeRequested(SystemClock.elapsedRealtime())
                     maybeRepairUnresponsiveProvisioning()
                 }
                 if (awaitingFreshStatusForHistoryBackfill) {
@@ -1920,6 +1919,7 @@ class ICanHealthBleManager(
                 currentSequenceNumber = reading.sequenceNumber
                 currentSequenceObservedAtMs = nowMs
             }
+            trackCounterProgress(reading.sequenceNumber)
             if (historyBackfillRequested && historyBackfillPhase == HistoryBackfillPhase.GLUCOSE) {
                 logd(TAG) {
                     "Delivering live seq=${reading.sequenceNumber} while iCan history backfill continues"
@@ -2519,6 +2519,7 @@ class ICanHealthBleManager(
      */
     private fun scheduleCorrectCodeWrite(repair: Boolean = false): Boolean {
         if (correctCodeChainActive || !isAuthenticated) return false
+        resetRepairStateForNewSensor()
         val context = Applic.app ?: return false
         val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
         when (ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, sn)) {
@@ -2628,15 +2629,11 @@ class ICanHealthBleManager(
         }
         correctCodeNextChunk = index
         correctCodePendingChunk = chunks[index]
-        if (index == 0) {
-            // The cooldown starts when the first chunk goes out, not when the last one is acked:
-            // a chain that dies mid-way must still hold the next attempt off for REPAIR_COOLDOWN_MS.
-            lastProvisioningWriteAtMs = System.currentTimeMillis()
-        }
         Log.i(TAG, "CorrectCode write ${index + 1}/${chunks.size}: ${chunks[index].toHexString()}")
-        enqueueOp(GattOp.Write(ICanHealthConstants.CGM_SPECIFIC_OPS, chunks[index]))
-        drainGattQueue()
+        enqueueOp(GattOp.Write(ICanHealthConstants.CGM_SPECIFIC_OPS, chunks[index],
+            correctCodeOwner = chunks, correctCodeIndex = index))
         armCorrectCodeAckTimeout(index, CORRECT_CODE_CHUNK_GUARD_MS)
+        drainGattQueue()
     }
 
     /**
@@ -2661,11 +2658,11 @@ class ICanHealthBleManager(
         val chunks = correctCodeChunks ?: return
         val next = correctCodeNextChunk + 1
         if (next >= chunks.size) {
-            lastProvisioningWriteAtMs = System.currentTimeMillis()
+            repairState.writeCompleted(SystemClock.elapsedRealtime())
             Log.i(
                 TAG,
                 "CorrectCode write complete: ${chunks.size}/${chunks.size} chunks acked" +
-                    if (correctCodeRepairChain) " (repair attempt $repairAttempts/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS})" else ""
+                    if (correctCodeRepairChain) " (repair attempt ${repairState.attemptCount()}/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS})" else ""
             )
             resetCorrectCodeState()
             return
@@ -2700,90 +2697,36 @@ class ICanHealthBleManager(
         correctCodeRepairChain = false
     }
 
-    /** Repair counters are per sensor: a different sensor starts with a full budget. */
+    /** Reconnects preserve the budget; changing sensor identity does not. */
     private fun resetRepairStateForNewSensor() {
-        val sensorId = SerialNumber
-        if (sensorId == repairSensorId) return
-        repairSensorId = sensorId
-        repairAttempts = 0
-        lastProvisioningWriteAtMs = 0L
-        lastCounterAdvanceAtMs = 0L
-        lastStatusSequence = -1
-        repairExhaustedLogged = false
+        if (repairState.selectSensor(SerialNumber)) repairExhaustedLogged = false
     }
 
-    /**
-     * Tracks whether the sensor is still producing records. `0x2AA9` only moves when a new record
-     * exists, so a standing counter is the driver's only sensor-side liveness signal.
-     *
-     * Compares status reads with the previous *status* read, not with [currentSequenceNumber]:
-     * live readings advance that field on their own, so a status read repeating the live value
-     * would otherwise look like a stall on a perfectly healthy sensor.
-     */
     private fun trackCounterProgress(observedSequence: Int) {
         resetRepairStateForNewSensor()
-        val now = System.currentTimeMillis()
-        val previousSequence = lastStatusSequence
-        lastStatusSequence = observedSequence
-        if (previousSequence >= 0 && observedSequence != previousSequence) {
-            lastCounterAdvanceAtMs = now
-            if (repairAttempts > 0) {
-                Log.i(
-                    TAG,
-                    "CorrectCode repair worked: counter advanced $previousSequence->$observedSequence " +
-                        "after $repairAttempts attempt(s)"
-                )
-                repairAttempts = 0
-                repairExhaustedLogged = false
+        val previousAttempts = repairState.attemptCount()
+        if (repairState.observeSequence(observedSequence, SystemClock.elapsedRealtime())) {
+            if (previousAttempts > 0) {
+                Log.i(TAG, "CorrectCode repair: production resumed after $previousAttempts attempt(s)")
             }
-        } else if (lastCounterAdvanceAtMs <= 0L) {
-            // Baseline for this process: silence is measured from here, not from app start.
-            lastCounterAdvanceAtMs = now
+            repairExhaustedLogged = false
         }
     }
 
-    /**
-     * Unprovisioned iCan sensors stop producing after about a week, and writing the table into a
-     * stalled one has been observed to bring it back. A single write can also miss, and since our
-     * own write sets `F6` to a non-`0xFFFF` value the eligibility check would refuse every further
-     * attempt — one ineffective write would close the rescue path for good. Retry it a bounded
-     * number of times while the counter stays silent.
-     */
+    private fun provisioningRepairDecision(): ICanHealthProvisioningPolicy.RepairDecision =
+        repairState.decision(lastSensorInfoMarker, canUseHistoryPastEndedStatusCap(), SystemClock.elapsedRealtime())
+
     private fun maybeRepairUnresponsiveProvisioning() {
         if (correctCodeChainActive || !isAuthenticated) return
-        if (lastCounterAdvanceAtMs <= 0L) return
         if (currentSequenceNumber < readingIntervalMinutes()) return
-        val now = System.currentTimeMillis()
-        when (ICanHealthProvisioningPolicy.repairDecision(
-            installedMarker = lastSensorInfoMarker,
-            sensorSilentMs = now - lastCounterAdvanceAtMs,
-            sinceLastWriteMs = if (lastProvisioningWriteAtMs > 0L) {
-                now - lastProvisioningWriteAtMs
-            } else {
-                Long.MAX_VALUE
-            },
-            attempts = repairAttempts,
-        )) {
-            ICanHealthProvisioningPolicy.RepairDecision.RETRY -> {
-                if (scheduleCorrectCodeWrite(repair = true)) {
-                    // Count only writes that actually start: an installed sensor with no cached
-                    // table must not burn the budget while nothing reaches the sensor.
-                    repairAttempts++
-                    Log.i(
-                        TAG,
-                        "CorrectCode repair $repairAttempts/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS}: " +
-                            "counter silent for ${(now - lastCounterAdvanceAtMs) / 60_000L}min " +
-                            "(seq=$currentSequenceNumber, F6=0x${"%04X".format(lastSensorInfoMarker ?: 0)}); " +
-                            "rewriting the table"
-                    )
-                }
-            }
+        when (provisioningRepairDecision()) {
+            ICanHealthProvisioningPolicy.RepairDecision.RETRY -> scheduleCorrectCodeWrite(repair = true)
             ICanHealthProvisioningPolicy.RepairDecision.EXHAUSTED -> {
                 if (!repairExhaustedLogged) {
                     repairExhaustedLogged = true
                     Log.w(
                         TAG,
-                        "CorrectCode repair exhausted after $repairAttempts attempt(s); " +
+                        "CorrectCode repair exhausted after ${repairState.attemptCount()} attempt(s); " +
                             "counter still at seq=$currentSequenceNumber — the sensor is not producing"
                     )
                 }
@@ -2864,7 +2807,7 @@ class ICanHealthBleManager(
         val refreshStaticInfo = shouldRefreshStaticDeviceInfo()
         val refreshSessionInfo = shouldRefreshSessionMetadata()
         if (!refreshStaticInfo && !refreshSessionInfo) {
-            Log.d(TAG, "Using cached iCan metadata on reconnect; waiting for measurement only")
+            Log.d(TAG, "Using cached iCan metadata on reconnect; status probe remains independent of history")
         }
         if (refreshStaticInfo) {
             disService?.getCharacteristic(ICanHealthConstants.MODEL_NUMBER)?.let {
@@ -2880,8 +2823,16 @@ class ICanHealthBleManager(
                 enqueueOp(GattOp.Read(ICanHealthConstants.SOFTWARE_REVISION, ICanHealthConstants.DEVICE_INFO_SERVICE))
             }
         }
-        if (refreshSessionInfo) {
+        resetRepairStateForNewSensor()
+        // Backfill can already be satisfied (or suppressed) while a sensor stops producing.
+        // Probe from this callback-owned setup path independently of that history state.
+        // The no-data watchdog reconnects silent streaming sessions; fast reconnect loops
+        // request at most one additional status probe per minute.
+        if (refreshSessionInfo || (isAuthenticated && repairState.statusProbeDue(SystemClock.elapsedRealtime()))) {
+            repairState.statusProbeRequested(SystemClock.elapsedRealtime())
             charStatus?.let { enqueueOp(GattOp.Read(ICanHealthConstants.CGM_STATUS)) }
+        }
+        if (refreshSessionInfo) {
             charSessionStart?.let { enqueueOp(GattOp.Read(ICanHealthConstants.CGM_SESSION_START_TIME)) }
         }
         drainGattQueue()
@@ -4510,6 +4461,24 @@ class ICanHealthBleManager(
             }
 
             is GattOp.Write -> {
+                if (op.correctCodeOwner != null) {
+                    // Delayed/queued chunks must still belong to the current authenticated chain.
+                    // In particular, production may have resumed while chunk zero was waiting.
+                    val serial = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
+                    val eligibility = ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, serial)
+                    val eligible = eligibility == ICanHealthProvisioningPolicy.Eligibility.FRESH ||
+                        (correctCodeRepairChain && eligibility == ICanHealthProvisioningPolicy.Eligibility.INSTALLED_TABLE)
+                    val currentOwner = correctCodeChunks === op.correctCodeOwner
+                    if (!currentOwner || !correctCodeChainActive || stop || uiPaused || !isAuthenticated ||
+                        !eligible || serial != correctCodeFactorySerial ||
+                        lastAuthChallenge?.contentEquals(correctCodeChallenge ?: byteArrayOf()) != true ||
+                        (correctCodeRepairChain && op.correctCodeIndex == 0 &&
+                            provisioningRepairDecision() != ICanHealthProvisioningPolicy.RepairDecision.RETRY)) {
+                        if (currentOwner) resetCorrectCodeState()
+                        finishGattOp()
+                        return
+                    }
+                }
                 val char = findCharacteristic(op.serviceUuid, op.charUuid) ?: run {
                     Log.w(TAG, "Write missing ${op.charUuid} in ${op.serviceUuid}")
                     gattOpActive = false
@@ -4520,11 +4489,26 @@ class ICanHealthBleManager(
                 char.value = op.data
                 char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                 gattWriteInFlight = op
-                if (!gatt.writeCharacteristic(char)) {
+                val started = if (op.correctCodeOwner != null && op.correctCodeIndex == 0) {
+                    repairState.startWrite(
+                        repair = correctCodeRepairChain,
+                        marker = lastSensorInfoMarker,
+                        counterCapped = canUseHistoryPastEndedStatusCap(),
+                        nowMs = SystemClock.elapsedRealtime(),
+                    ) { gatt.writeCharacteristic(char) }
+                } else {
+                    gatt.writeCharacteristic(char)
+                }
+                if (!started) {
                     Log.e(TAG, "Write failed to start ${op.charUuid} in ${op.serviceUuid}")
+                    if (op.correctCodeOwner != null) resetCorrectCodeState()
                     gattWriteInFlight = null
                     gattOpActive = false
                     drainGattQueue()
+                } else if (op.correctCodeOwner != null && op.correctCodeIndex == 0) {
+                    if (correctCodeRepairChain) {
+                        Log.i(TAG, "CorrectCode repair ${repairState.attemptCount()}/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS} started (seq=$currentSequenceNumber)")
+                    }
                 }
             }
 
