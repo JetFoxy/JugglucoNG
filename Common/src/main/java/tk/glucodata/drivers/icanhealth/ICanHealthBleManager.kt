@@ -227,6 +227,8 @@ class ICanHealthBleManager(
     @Volatile private var lastProvisioningWriteAtMs = 0L
     @Volatile private var lastCounterAdvanceAtMs = 0L
     private var repairSensorId: String? = null
+    /** Last `0x2AA9` value read from the status characteristic; live readings move [currentSequenceNumber] too. */
+    private var lastStatusSequence = -1
     private var repairExhaustedLogged = false
     private var correctCodeFactorySerial: String? = null
     private var correctCodeChallenge: ByteArray? = null
@@ -1639,7 +1641,7 @@ class ICanHealthBleManager(
                         TAG,
                         "CGM status offset=$observedSequence launcherState=0x${"%02X".format(launcherState)}"
                     )
-                    trackCounterProgress(previousSequence, observedSequence)
+                    trackCounterProgress(observedSequence)
                     maybeRepairUnresponsiveProvisioning()
                 }
                 if (awaitingFreshStatusForHistoryBackfill) {
@@ -2515,33 +2517,33 @@ class ICanHealthBleManager(
      * from the cloud-fetched cache ([maybeFetchVendorCalibrationCode] warms it on the
      * `F6 = 0xFFFF` marker). Dry-run arms nothing and only logs the packets.
      */
-    private fun scheduleCorrectCodeWrite(repair: Boolean = false) {
-        if (correctCodeChainActive || !isAuthenticated) return
-        val context = Applic.app ?: return
+    private fun scheduleCorrectCodeWrite(repair: Boolean = false): Boolean {
+        if (correctCodeChainActive || !isAuthenticated) return false
+        val context = Applic.app ?: return false
         val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
         when (ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, sn)) {
             ICanHealthProvisioningPolicy.Eligibility.INSTALLED_TABLE -> {
                 if (!repair) {
                     ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
-                    return
+                    return false
                 }
             }
             ICanHealthProvisioningPolicy.Eligibility.INVALID_FACTORY_SERIAL -> {
                 Log.w(TAG, "CorrectCode needs the full 13-character factory serial; legacy connection identity is insufficient")
                 setUiStatus(UiStatusKind.CUSTOM, context.getString(R.string.ican_full_box_serial_required))
-                return
+                return false
             }
-            ICanHealthProvisioningPolicy.Eligibility.UNKNOWN_SENSOR -> return
+            ICanHealthProvisioningPolicy.Eligibility.UNKNOWN_SENSOR -> return false
             ICanHealthProvisioningPolicy.Eligibility.FRESH -> Unit
         }
         val challenge = lastAuthChallenge
         if (challenge == null || challenge.size != 4) {
             Log.i(TAG, "CorrectCode write skipped: no 4-byte session challenge")
-            return
+            return false
         }
         if (negotiatedMtu < 20) {
             Log.i(TAG, "CorrectCode write skipped: MTU ${negotiatedMtu} cannot fit an 18-byte chunk")
-            return
+            return false
         }
         val codeJson = ICanHealthCloudCode.cachedCode(context, sn)
         val floats = codeJson?.let { ICanHealthCloudCodeProtocol.parseProvisioningCode(it) }
@@ -2556,7 +2558,7 @@ class ICanHealthBleManager(
                 "CorrectCode write deferred: cloud fetch for ${ICanHealthCloudCode.maskSn(sn)} is in flight",
             )
             scheduleCorrectCodeRecheck()
-            return
+            return false
         }
         if (decision.table == null) {
             // No real per-SN table available (cloud unreachable or not yet fetched):
@@ -2567,12 +2569,12 @@ class ICanHealthBleManager(
                 "CorrectCode write skipped: no cached per-SN table for ${ICanHealthCloudCode.maskSn(sn)} — calibration pending, installed calibration preserved",
             )
             ICanHealthCloudStatusNotifier.notifyCalibrationPending(context)
-            return
+            return false
         }
         val chunks = ICanHealthCorrectCode.buildCorrectCodeChunks(decision.table, challenge, sn)
         if (chunks == null) {
             Log.w(TAG, "CorrectCode table cannot be encoded; no parameter writes scheduled")
-            return
+            return false
         }
         // A real (cached or manually pushed) table landing on a sensor clears any stale
         // pending notice.
@@ -2590,12 +2592,13 @@ class ICanHealthBleManager(
                     chunks.joinToString(separator = "") { it.toHexString() }
             )
             resetCorrectCodeState()
-            return
+            return false
         }
         Log.i(TAG, "CorrectCode write armed, first chunk in ${CORRECT_CODE_WRITE_DELAY_MS} ms")
         val start = Runnable { sendCorrectCodeChunk(0) }
         correctCodeStartRunnable = start
         handler.postDelayed(start, CORRECT_CODE_WRITE_DELAY_MS)
+        return true
     }
 
     private fun scheduleCorrectCodeRecheck() {
@@ -2625,6 +2628,11 @@ class ICanHealthBleManager(
         }
         correctCodeNextChunk = index
         correctCodePendingChunk = chunks[index]
+        if (index == 0) {
+            // The cooldown starts when the first chunk goes out, not when the last one is acked:
+            // a chain that dies mid-way must still hold the next attempt off for REPAIR_COOLDOWN_MS.
+            lastProvisioningWriteAtMs = System.currentTimeMillis()
+        }
         Log.i(TAG, "CorrectCode write ${index + 1}/${chunks.size}: ${chunks[index].toHexString()}")
         enqueueOp(GattOp.Write(ICanHealthConstants.CGM_SPECIFIC_OPS, chunks[index]))
         drainGattQueue()
@@ -2700,16 +2708,23 @@ class ICanHealthBleManager(
         repairAttempts = 0
         lastProvisioningWriteAtMs = 0L
         lastCounterAdvanceAtMs = 0L
+        lastStatusSequence = -1
         repairExhaustedLogged = false
     }
 
     /**
      * Tracks whether the sensor is still producing records. `0x2AA9` only moves when a new record
      * exists, so a standing counter is the driver's only sensor-side liveness signal.
+     *
+     * Compares status reads with the previous *status* read, not with [currentSequenceNumber]:
+     * live readings advance that field on their own, so a status read repeating the live value
+     * would otherwise look like a stall on a perfectly healthy sensor.
      */
-    private fun trackCounterProgress(previousSequence: Int, observedSequence: Int) {
+    private fun trackCounterProgress(observedSequence: Int) {
         resetRepairStateForNewSensor()
         val now = System.currentTimeMillis()
+        val previousSequence = lastStatusSequence
+        lastStatusSequence = observedSequence
         if (previousSequence >= 0 && observedSequence != previousSequence) {
             lastCounterAdvanceAtMs = now
             if (repairAttempts > 0) {
@@ -2750,15 +2765,18 @@ class ICanHealthBleManager(
             attempts = repairAttempts,
         )) {
             ICanHealthProvisioningPolicy.RepairDecision.RETRY -> {
-                repairAttempts++
-                Log.i(
-                    TAG,
-                    "CorrectCode repair $repairAttempts/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS}: " +
-                        "counter silent for ${(now - lastCounterAdvanceAtMs) / 60_000L}min " +
-                        "(seq=$currentSequenceNumber, F6=0x${"%04X".format(lastSensorInfoMarker ?: 0)}); " +
-                        "rewriting the table"
-                )
-                scheduleCorrectCodeWrite(repair = true)
+                if (scheduleCorrectCodeWrite(repair = true)) {
+                    // Count only writes that actually start: an installed sensor with no cached
+                    // table must not burn the budget while nothing reaches the sensor.
+                    repairAttempts++
+                    Log.i(
+                        TAG,
+                        "CorrectCode repair $repairAttempts/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS}: " +
+                            "counter silent for ${(now - lastCounterAdvanceAtMs) / 60_000L}min " +
+                            "(seq=$currentSequenceNumber, F6=0x${"%04X".format(lastSensorInfoMarker ?: 0)}); " +
+                            "rewriting the table"
+                    )
+                }
             }
             ICanHealthProvisioningPolicy.RepairDecision.EXHAUSTED -> {
                 if (!repairExhaustedLogged) {
