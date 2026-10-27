@@ -11,8 +11,9 @@ package tk.glucodata.data.journal
  *
  * The same basal can arrive twice: from the local AAPS status line, kept as one row per run,
  * and from Nightscout, as one row per treatment. Where the status line has a segment, it
- * wins: a Nightscout copy overlapping it is left out, so it can neither cut the status line
- * segment short nor draw a second bar over it.
+ * wins: a Nightscout copy starting inside it is left out, so it can neither cut the status
+ * line segment short nor draw a second bar over it. One that started earlier keeps its
+ * history and is cut where the status line segment starts, like any replaced temp basal.
  */
 fun tempBasalEndsMillis(entries: List<JournalEntry>): Map<Long, Long> {
     val all = entries.filter { it.type == JournalEntryType.TEMP_BASAL }
@@ -20,7 +21,7 @@ fun tempBasalEndsMillis(entries: List<JournalEntry>): Map<Long, Long> {
     val tempBasals = all
         .filter { entry ->
             AapsStatusLine.isStatusLineRecord(entry.sourceRecordId) ||
-                statusLine.none { it.overlaps(entry) }
+                statusLine.none { entry.timestamp in it.timestamp until it.ownEndMillis() }
         }
         .sortedWith(compareBy({ it.timestamp }, { it.id }))
     return buildMap {
@@ -34,6 +35,3 @@ fun tempBasalEndsMillis(entries: List<JournalEntry>): Map<Long, Long> {
 
 private fun JournalEntry.ownEndMillis(): Long =
     timestamp + (durationMinutes ?: 0).coerceAtLeast(1) * 60_000L
-
-private fun JournalEntry.overlaps(other: JournalEntry): Boolean =
-    timestamp < other.ownEndMillis() && other.timestamp < ownEndMillis()

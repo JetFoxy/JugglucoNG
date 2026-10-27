@@ -92,6 +92,22 @@ class TempBasalSegmentsTests {
         assertFalse(2L in ends)
     }
 
+    /**
+     * AAPS import switched on during a basal Nightscout already has: 10:00–10:30 from
+     * Nightscout, the first status line segment at 10:10. The 10:00–10:10 history stays.
+     */
+    @Test
+    fun aNightscoutBasalStartedEarlierKeepsItsHistory() {
+        val ends = tempBasalEndsMillis(
+            listOf(
+                entry(1, atMinute = 0, durationMinutes = 30),
+                statusLine(2, atMinute = 10, durationMinutes = 1),
+            )
+        )
+        assertEquals(minutes(10), ends[1])
+        assertEquals(minutes(11), ends[2])
+    }
+
     /** Before the status line started, Nightscout is all there is; it ends where that starts. */
     @Test
     fun nightscoutStillFillsTimeTheStatusLineDoesNotCover() {
