@@ -3306,6 +3306,9 @@ fun InteractiveGlucoseChart(
                             ?: 1f
                         val maxBarHeight = chartHeight * 0.32f
                         val minBarWidth = 1.5.dp.toPx()
+                        // xDrip style: a see-through fill so the curve stays readable under
+                        // it, edged by a solid step line along the bar's sides and bottom.
+                        val edgeWidth = 1.5.dp.toPx()
                         // activeEndMillis is already cut at the replacing temp basal's start
                         // (tempBasalEndsMillis), so the window filter above never resurrects
                         // a replaced segment.
@@ -3322,11 +3325,17 @@ fun InteractiveGlucoseChart(
                             val right = maxOf(startX, endX)
                             val barHit = (rate / maxRate).coerceIn(0f, 1f)
                             val barHeight = (barHit * maxBarHeight).coerceAtLeast(2.dp.toPx())
+                            val barRight = left + (right - left).coerceAtLeast(minBarWidth)
+                            val tint = Color(marker.accentColor)
                             drawRect(
-                                color = Color(marker.accentColor),
+                                color = tint.copy(alpha = 0.22f),
                                 topLeft = Offset(left, 0f),
-                                size = Size((right - left).coerceAtLeast(minBarWidth), barHeight)
+                                size = Size(barRight - left, barHeight)
                             )
+                            val edge = tint.copy(alpha = 0.9f)
+                            drawLine(edge, Offset(left, 0f), Offset(left, barHeight), edgeWidth)
+                            drawLine(edge, Offset(left, barHeight), Offset(barRight, barHeight), edgeWidth)
+                            drawLine(edge, Offset(barRight, barHeight), Offset(barRight, 0f), edgeWidth)
                         }
                     }
 
