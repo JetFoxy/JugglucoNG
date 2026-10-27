@@ -17,6 +17,28 @@ internal object ICanHealthProvisioningPolicy {
         else -> Eligibility.FRESH
     }
 
+    /** Where a fresh sensor sits relative to the vendor's provisioning window. */
+    enum class WriteWindow { ACTIVATION, ALREADY_RUNNING, UNKNOWN_STATE }
+
+    /**
+     * The vendor writes the calibration table only in the activation window: `launcherState == 0`
+     * on a sensor that has no session yet, or right after its own `1A` start command. A sensor
+     * that is already running is never provisioned mid-session — the 2026-10-27 trace (issue
+     * #744) has the three `F2` chunks landing two seconds before a live iCGM-t3 stopped
+     * advancing its `0x2AA9` counter.
+     */
+    fun writeWindow(
+        launcherState: Int,
+        sessionStartEpochMs: Long,
+        startCommandIssuedThisConnection: Boolean,
+    ): WriteWindow = when {
+        startCommandIssuedThisConnection -> WriteWindow.ACTIVATION
+        sessionStartEpochMs > 0L -> WriteWindow.ALREADY_RUNNING
+        launcherState == ICanHealthConstants.LAUNCHER_STATE_IDLE -> WriteWindow.ACTIVATION
+        launcherState < 0 -> WriteWindow.UNKNOWN_STATE
+        else -> WriteWindow.ALREADY_RUNNING
+    }
+
     // Known server fallback for unknown identities. It is reference data, never provisioning data.
     val defaultTable: Map<String, Float> = mapOf(
         "x1" to 0.015f,

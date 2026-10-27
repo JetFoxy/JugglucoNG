@@ -77,6 +77,50 @@ class ICanHealthProvisioningPolicyTests {
         assertEquals(1, commits)
     }
 
+    @Test fun writeWindowFollowsTheVendorActivationRule() {
+        // Right after our own 1A: the sensor was started by this connection, so this is the
+        // activation window even though a session start is already known.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ACTIVATION,
+            policy.writeWindow(
+                launcherState = ICanHealthConstants.LAUNCHER_STATE_RUNNING,
+                sessionStartEpochMs = 1792474046000L,
+                startCommandIssuedThisConnection = true,
+            ),
+        )
+        // IDLE sensor with no session yet: the vendor's own trigger.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ACTIVATION,
+            policy.writeWindow(ICanHealthConstants.LAUNCHER_STATE_IDLE, 0L, false),
+        )
+    }
+
+    @Test fun writeWindowRefusesSensorsThatAreAlreadyRunning() {
+        // The 2026-10-27 trace: 7-day-old session, launcherState 0x01, F6 = 0xFFFF.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ALREADY_RUNNING,
+            policy.writeWindow(ICanHealthConstants.LAUNCHER_STATE_WARMUP, 1792474046000L, false),
+        )
+        // WARMUP without a known session start: the standalone-start flow owns this connection,
+        // so a write here would be an unvalidated mid-session write.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ALREADY_RUNNING,
+            policy.writeWindow(ICanHealthConstants.LAUNCHER_STATE_WARMUP, 0L, false),
+        )
+        // A stale session start alone is enough to keep the table out.
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.ALREADY_RUNNING,
+            policy.writeWindow(ICanHealthConstants.LAUNCHER_STATE_IDLE, 1792474046000L, false),
+        )
+    }
+
+    @Test fun writeWindowWaitsWhenTheSensorStateIsStillUnknown() {
+        assertEquals(
+            ICanHealthProvisioningPolicy.WriteWindow.UNKNOWN_STATE,
+            policy.writeWindow(launcherState = -1, sessionStartEpochMs = 0L, startCommandIssuedThisConnection = false),
+        )
+    }
+
     @Test fun negativeF2RepliesAreRecognizedImmediately() {
         assertEquals(1, ICanHealthParser.parseCorrectCodeResult(byteArrayOf(0x1c, 0xf2.toByte(), 1)))
         assertEquals(2, ICanHealthParser.parseCorrectCodeResult(byteArrayOf(0x1c, 0xf2.toByte(), 2)))

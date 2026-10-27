@@ -222,6 +222,7 @@ class ICanHealthBleManager(
     private var correctCodePendingChunk: ByteArray? = null
     private var correctCodeRecheckRunnable: Runnable? = null
     @Volatile private var lastSensorInfoMarker: Int? = null
+    @Volatile private var correctCodeCandidateThisConnection = false
     private var correctCodeFactorySerial: String? = null
     private var correctCodeChallenge: ByteArray? = null
     private var gattWriteInFlight: GattOp.Write? = null
@@ -1633,6 +1634,7 @@ class ICanHealthBleManager(
                         TAG,
                         "CGM status offset=$observedSequence launcherState=0x${"%02X".format(launcherState)}"
                     )
+                    maybeScheduleCorrectCodeWrite()
                 }
                 if (awaitingFreshStatusForHistoryBackfill) {
                     continuePendingHistoryBackfill("after fresh status read")
@@ -1647,6 +1649,7 @@ class ICanHealthBleManager(
                     ensureNativeDataptr(SerialNumber)
                     applyNativeSensorMetadata()
                     Log.i(TAG, "Session start epochMs=$sessionStartEpochMs")
+                    maybeScheduleCorrectCodeWrite()
                 } else {
                     sessionStartEpochMs = 0L
                 }
@@ -2326,7 +2329,8 @@ class ICanHealthBleManager(
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_STATUS))
                     enqueueOp(GattOp.Read(ICanHealthConstants.CGM_SESSION_START_TIME))
                     drainGattQueue()
-                    scheduleCorrectCodeWrite()
+                    correctCodeCandidateThisConnection = true
+                    maybeScheduleCorrectCodeWrite()
                 } else {
                     Log.w(TAG, "Start sensor command rejected: ${data.toHexString()}")
                     // Recovery path for half-activated WARMUP state: if the sensor
@@ -2430,10 +2434,9 @@ class ICanHealthBleManager(
                     Applic.app?.let { ICanHealthCloudStatusNotifier.clearServerUnavailable(it) }
                 }
                 maybeFetchVendorCalibrationCode(data)
-                if (lastSensorInfoMarker == 0xffff &&
-                    (startCommandIssuedThisConnection || !shouldAttemptStandaloneStart())) {
-                    // A fresh sensor's 1A-success path is the normal provisioning window.
-                    scheduleCorrectCodeWrite()
+                if (lastSensorInfoMarker == 0xffff) {
+                    correctCodeCandidateThisConnection = true
+                    maybeScheduleCorrectCodeWrite()
                 }
                 startPostAuthSetup("sensor-info")
             }
@@ -2500,12 +2503,52 @@ class ICanHealthBleManager(
     }
 
     /**
+     * Decides whether this connection is allowed to write the table at all. `F6 = 0xFFFF` alone
+     * is only "the sensor never got a table" — the vendor still waits for its activation window,
+     * and so do we. The state needed for that decision (launcherState, session start) arrives
+     * after the sensor-info reply, so this is called again from the status and session-start
+     * handlers.
+     */
+    private fun maybeScheduleCorrectCodeWrite() {
+        if (!correctCodeCandidateThisConnection || correctCodeChainActive || !isAuthenticated) return
+        val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
+        if (ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, sn) !=
+            ICanHealthProvisioningPolicy.Eligibility.FRESH) {
+            correctCodeCandidateThisConnection = false
+            return
+        }
+        when (ICanHealthProvisioningPolicy.writeWindow(
+            launcherState = launcherState,
+            sessionStartEpochMs = sessionStartEpochMs,
+            startCommandIssuedThisConnection = startCommandIssuedThisConnection,
+        )) {
+            ICanHealthProvisioningPolicy.WriteWindow.ACTIVATION -> {
+                correctCodeCandidateThisConnection = false
+                scheduleCorrectCodeWrite()
+            }
+            ICanHealthProvisioningPolicy.WriteWindow.ALREADY_RUNNING -> {
+                correctCodeCandidateThisConnection = false
+                Log.i(
+                    TAG,
+                    "CorrectCode write skipped: sensor already running " +
+                        "(launcherState=0x${"%02X".format(launcherState.coerceAtLeast(0))}, " +
+                        "sessionStart=$sessionStartEpochMs); the vendor writes the table only at activation"
+                )
+            }
+            ICanHealthProvisioningPolicy.WriteWindow.UNKNOWN_STATE -> Unit
+        }
+    }
+
+    /**
      * Vendor mirror of the sensor provisioning write. The 2026-10-20 capture shows the
      * vendor phone writing the correctCode table after the sensor accepted `1A` and the
      * session start time: three `[F2 10 <16 B>]` writes ~3 s later, each one acked
      * `1C F2 01`. The challenge comes from the same session's `F3` response and the table
      * from the cloud-fetched cache ([maybeFetchVendorCalibrationCode] warms it on the
      * `F6 = 0xFFFF` marker). Dry-run arms nothing and only logs the packets.
+     *
+     * Callers must go through [maybeScheduleCorrectCodeWrite], which enforces the activation
+     * window; a sensor that is already running must keep its installed calibration.
      */
     private fun scheduleCorrectCodeWrite() {
         if (correctCodeChainActive || !isAuthenticated) return
@@ -2671,6 +2714,7 @@ class ICanHealthBleManager(
         correctCodeChallenge = null
         correctCodeNextChunk = 0
         correctCodeChainActive = false
+        correctCodeCandidateThisConnection = false
     }
 
     private fun enqueuePreAuthReads() {
@@ -2767,6 +2811,9 @@ class ICanHealthBleManager(
         }
         drainGattQueue()
         maybeHandleQueueDrained()
+        // Cached metadata means no status/session-start read is queued; decide now instead of
+        // leaving the candidate armed for the rest of the connection.
+        maybeScheduleCorrectCodeWrite()
     }
 
     private fun resolveAutomaticGlucoseHistoryStartSequence(): Int? {
