@@ -474,6 +474,18 @@ object ICanHealthConstants {
     }
 
     /**
+     * True when the sensor's counter has not moved since the edge was persisted. The anchor then
+     * diverges from `now` because the sensor is silent, not because the edge is mis-anchored;
+     * re-anchoring it to `now` would re-import the same frozen records with fresh timestamps (see
+     * the 2026-10-27 trace: 3.4/3.6/3.7/3.9 re-saved at 11:09, 11:20 and 11:31 while the counter
+     * stayed at 9516).
+     */
+    internal fun isPersistedCoveredEdgeStalled(
+        persistedCoveredSequence: Int,
+        currentSequenceNumber: Int,
+    ): Boolean = persistedCoveredSequence >= 0 && currentSequenceNumber == persistedCoveredSequence
+
+    /**
      * True when an edge-derived time for the sensor's current sequence disagrees with the moment
      * that sequence was actually read. No observation yet means nothing to compare against.
      */

@@ -216,6 +216,60 @@ class ICanHealthTimelinePolicyTests {
         )
     }
 
+    /**
+     * Replay of juggluco-trace-20261027-114127.log: the sensor stopped at seq 9516 at 11:05:34 and
+     * the counter never moved again. Every ~11 minutes the driver dropped the edge as "too old",
+     * re-anchored it to `now` and re-imported the same four records with fresh timestamps
+     * (3.4/3.6/3.7/3.9 at 11:09:29, again at 11:20:17, again at 11:31:10 — all uploaded to
+     * Nightscout). A non-advancing counter must keep its anchor.
+     */
+    @Test
+    fun stalledCounterKeepsItsAnchorInsteadOfReanchoringTheFrozenTail() {
+        val coveredSequence = 9516
+        val coveredAtMs = 1_793_088_334_127L // 11:05:34, the last record the sensor produced
+        val counterReadAtMs = 1_793_089_109_171L // 11:18:29, same counter value
+        val anchor = ICanHealthConstants.persistedCoveredAnchorMs(
+            persistedCoveredSequence = coveredSequence,
+            persistedCoveredTimestampMs = coveredAtMs,
+            currentSequenceNumber = coveredSequence,
+            sequenceUnitMs = 60_000L,
+        )
+        assertEquals(coveredAtMs, anchor)
+
+        assertTrue(
+            ICanHealthConstants.isPersistedCoveredEdgeStalled(
+                persistedCoveredSequence = coveredSequence,
+                currentSequenceNumber = coveredSequence,
+            )
+        )
+        // The old behaviour: 13 minutes adrift from the counter read, so "unusable", dropped and
+        // re-anchored to the read moment — which is what fabricated the repeated readings.
+        assertFalse(
+            ICanHealthConstants.isPersistedCoveredAnchorUsable(
+                anchorMs = anchor,
+                sequenceObservedAtMs = counterReadAtMs,
+                divergenceToleranceMs = 10 * 60_000L,
+                plausibleRange = (coveredAtMs - 6 * 60 * 60_000L)..counterReadAtMs,
+            )
+        )
+    }
+
+    @Test
+    fun advancedCounterIsNotMistakenForAStall() {
+        assertFalse(
+            ICanHealthConstants.isPersistedCoveredEdgeStalled(
+                persistedCoveredSequence = 9516,
+                currentSequenceNumber = 9519,
+            )
+        )
+        assertFalse(
+            ICanHealthConstants.isPersistedCoveredEdgeStalled(
+                persistedCoveredSequence = -1,
+                currentSequenceNumber = 9516,
+            )
+        )
+    }
+
     @Test
     fun persistedAnchorOutsideThePlausibleRangeIsNotUsedEvenWithoutACounterRead() {
         assertFalse(

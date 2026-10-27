@@ -3666,6 +3666,15 @@ class ICanHealthBleManager(
                 currentSequenceNumber = currentSequenceNumber,
                 sequenceUnitMs = SEQUENCE_UNIT_MS,
             )
+            if (ICanHealthConstants.isPersistedCoveredEdgeStalled(
+                    persistedCoveredSequence = persistedCoveredSequence,
+                    currentSequenceNumber = currentSequenceNumber,
+                )) {
+                // The counter has not advanced since this edge was stored: the sensor produced
+                // nothing new. Keep its original timestamp instead of re-anchoring the frozen
+                // tail to `now` — that re-imports the same records as if they were fresh.
+                return persistedAnchorTimeMs.coerceAtMost(fallbackNowMs + MAX_LIVE_TIMESTAMP_FUTURE_SKEW_MS)
+            }
             if (ICanHealthConstants.isPersistedCoveredAnchorUsable(
                     anchorMs = persistedAnchorTimeMs,
                     sequenceObservedAtMs = currentSequenceObservedAtMs,
