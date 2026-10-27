@@ -169,11 +169,13 @@ internal class AnytimeSessionChurnState {
     var consecutiveFailedSessions: Int = 0
         private set
 
+    @Synchronized
     fun onSessionDeliveredData() {
         consecutiveFailedSessions = 0
     }
 
     /** Called once per GATT session, after it is over. */
+    @Synchronized
     fun onSessionEnded(deliveredData: Boolean) {
         if (deliveredData) {
             consecutiveFailedSessions = 0
@@ -182,6 +184,7 @@ internal class AnytimeSessionChurnState {
         }
     }
 
+    @Synchronized
     fun retryDelayMs(baseDelayMs: Long, capMs: Long = SESSION_RETRY_MAX_DELAY_MS): Long =
         sessionRetryDelayMs(consecutiveFailedSessions, baseDelayMs, capMs)
 }

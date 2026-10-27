@@ -324,6 +324,35 @@ internal fun ct5ReconnectGap(
 ): AnytimeIdRange? = anytimeReconnectGap(highestKnownId, liveId, maxRecords)
 
 /**
+ * What a finished gap pass still owes.
+ *
+ * A live id that jumps again during the pass widens the pending envelope past
+ * the range the pass was started with. `100 -> 103` repaired, `103 -> 105`
+ * arriving mid-pass, and 104 was never requested: clearing the envelope on
+ * completion would drop it. Returns null when the pass covered everything that
+ * is still owed.
+ */
+internal fun gapRemainder(
+    runStopBeforeId: Int,
+    reachedId: Int,
+    pendingFromId: Int,
+    pendingStopBeforeId: Int,
+): AnytimeIdRange? {
+    if (pendingFromId < 0 || pendingStopBeforeId <= pendingFromId) return null
+    val fromId = maxOf(pendingFromId, runStopBeforeId, reachedId)
+    if (fromId >= pendingStopBeforeId) return null
+    return AnytimeIdRange(fromId, pendingStopBeforeId)
+}
+
+/** True when a running pass already asks for every id in `[fromId, stopBeforeId)`. */
+internal fun backfillCoversRange(
+    nextRequestId: Int,
+    stopBeforeId: Int,
+    fromId: Int,
+    gapStopBeforeId: Int,
+): Boolean = nextRequestId <= fromId && stopBeforeId >= gapStopBeforeId
+
+/**
  * What is still owed from a persisted gap.
  *
  * Only ids **inside** the range count as progress. This is the whole point:

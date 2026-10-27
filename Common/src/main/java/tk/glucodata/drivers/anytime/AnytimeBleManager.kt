@@ -338,6 +338,13 @@ class AnytimeBleManager(
     /** How many GATT sessions in a row established a link and then delivered nothing. */
     private val sessionChurn = AnytimeSessionChurnState()
 
+    /**
+     * Guards the per-session flags below. Recovery runs on the handler thread and
+     * `onConnectionStateChange` on the BLE callback thread, so setting the outcome
+     * has to be check-and-set under one lock rather than two volatile reads.
+     */
+    private val sessionLock = Any()
+
     /** Proof of life for the current GATT session; read by [recordSessionOutcome]. */
     @Volatile private var sessionDeliveredData: Boolean = false
 
@@ -1464,11 +1471,11 @@ class AnytimeBleManager(
 
     private fun finishHistoryBackfill() {
         val completedReason = historyBackfillReason
+        val completedStopBeforeId = historyStopBeforeId
         stopHistoryBackfill()
 
         if (completedReason.startsWith("ct2-gap")) {
-            finishCt2GapRun()
-            maybeStartPendingFreshOlderBackfill()
+            finishCt2GapRun(completedStopBeforeId)
             return
         }
         if (completedReason.startsWith("ct5-gap") || completedReason.startsWith("ct5-reconnect-catchup")) {
@@ -1853,31 +1860,51 @@ class AnytimeBleManager(
     }
 
     /**
-     * Close out a CT-14 gap run. [historyLastPulledId] is the newest id the
-     * transmitter actually answered with, so finishing short of the end means it
-     * has nothing to give for the rest: retrying the same empty range would only
-     * burn GATT sessions, so the hole is accepted and logged instead.
+     * Close out a CT-14 gap pass.
+     *
+     * [historyLastPulledId] is the newest id the transmitter actually answered
+     * with, so finishing short of the range means it has nothing to give for the
+     * rest: retrying the same empty range would only burn GATT sessions, so that
+     * hole is accepted and logged. A live jump during the pass is different — the
+     * envelope can now be wider than the range this pass asked for, and the ids
+     * beyond it were never requested, so they stay outstanding.
      */
-    private fun finishCt2GapRun() {
+    private fun finishCt2GapRun(runStopBeforeId: Int) {
         if (!isCt2()) return
         val reached = (historyLastPulledId + 1).coerceAtLeast(0)
-        val stopBefore = ct2PendingGapStopBeforeId
-        if (stopBefore > reached) {
+        if (reached < runStopBeforeId) {
             Log.w(
                 TAG,
-                "CT2 gap repair stopped at id=$reached before $stopBefore; " +
+                "CT2 gap repair stopped at id=$reached before $runStopBeforeId; " +
                         "transmitter has no more history for it",
             )
         } else {
-            Log.i(TAG, "CT2 gap repair complete through id=$historyLastPulledId")
+            Log.i(TAG, "CT2 gap repair complete through id=$reached")
+        }
+        val stillOwed = gapRemainder(
+            runStopBeforeId = runStopBeforeId,
+            reachedId = reached,
+            pendingFromId = ct2PendingGapFromId,
+            pendingStopBeforeId = ct2PendingGapStopBeforeId,
+        )
+        if (stillOwed != null) {
+            ct2PendingGapFromId = stillOwed.fromId
+            Log.i(TAG, "CT2 gap $stillOwed still outstanding")
+            if (maybeResumeCt2Gap()) return
         }
         clearCt2Gap()
+        // A forward or older-prefix pass displaced by this repair gets its turn now.
+        if (!maybeResumeInterruptedBackfill()) maybeStartPendingFreshOlderBackfill()
     }
 
     /**
-     * Ask for the ids the live cursor has already moved past. A forward pull
-     * started before the jump (post-init from lastGlucoseId + 1) cannot cover
-     * them, so it is paused; a manual backfill is left alone.
+     * Ask for the ids the live cursor has already moved past.
+     *
+     * A running pass that already asks for the whole range is left alone, whatever
+     * it is — a restored factory-calibrated session starts `post-init` from the
+     * oldest missing raw id, and that pass covers the live gap as well. Only a pass
+     * that would finish before the gap does is displaced, and it is remembered so
+     * it resumes after this repair instead of being dropped.
      */
     private fun maybeResumeCt2Gap(): Boolean {
         if (!isCt2() || phase != Phase.STREAMING) return false
@@ -1885,21 +1912,32 @@ class AnytimeBleManager(
         val stopBefore = ct2PendingGapStopBeforeId
         if (from < 0 || stopBefore <= from) return false
         if (historyBackfillActive) {
-            // This pass is already repairing it; the range survives a wider live jump.
+            // An active gap pass owns the envelope; a wider live jump is picked up
+            // by finishCt2GapRun, so restarting it here would only re-request ids.
             if (historyBackfillReason.startsWith("ct2-gap")) return true
-            if (historyBackfillReason.startsWith("post-init") || historyBackfillReason.startsWith("interrupted")) {
-                Log.i(
-                    TAG,
-                    "Pausing $historyBackfillReason so CT2 gap $from..${stopBefore - 1} can be repaired first",
-                )
-                stopHistoryBackfill()
-            } else {
-                return false
-            }
+            val coversGap = backfillCoversRange(
+                nextRequestId = nextBackfillIdSkippingCached((historyLastPulledId + 1).coerceAtLeast(0)),
+                stopBeforeId = historyStopBeforeId,
+                fromId = from,
+                gapStopBeforeId = stopBefore,
+            )
+            if (coversGap) return true
+            if (!isDisplaceableBackfillReason()) return false
+            Log.i(
+                TAG,
+                "Pausing $historyBackfillReason so CT2 gap $from..${stopBefore - 1} can be repaired first",
+            )
+            stopHistoryBackfill(rememberForReconnect = true)
         }
         startHistoryBackfill("ct2-gap", fromId = from, stopBeforeId = stopBefore)
         return historyBackfillActive
     }
+
+    /** Automatic passes a gap repair may take the link from; a manual request may not be. */
+    private fun isDisplaceableBackfillReason(reason: String = historyBackfillReason): Boolean =
+        reason.startsWith("post-init") ||
+                reason.startsWith("interrupted") ||
+                reason.startsWith("ct2-gap")
 
     private fun noteCt5ImportedId(glucoseId: Int) {
         if (!isCt5() || glucoseId < 0) return
@@ -2392,14 +2430,18 @@ class AnytimeBleManager(
 
     /** A new GATT session has proved nothing yet, including that it can carry data. */
     private fun beginGattSession() {
-        sessionDeliveredData = false
-        sessionOutcomeRecorded = false
+        synchronized(sessionLock) {
+            sessionDeliveredData = false
+            sessionOutcomeRecorded = false
+        }
     }
 
     /** Any decoded frame from the sensor proves this session is usable. */
     private fun noteSessionSensorData() {
-        sessionDeliveredData = true
-        sessionChurn.onSessionDeliveredData()
+        synchronized(sessionLock) {
+            sessionDeliveredData = true
+            sessionChurn.onSessionDeliveredData()
+        }
     }
 
     /**
@@ -2408,9 +2450,11 @@ class AnytimeBleManager(
      * often produces the second one — counting it twice would double the backoff.
      */
     private fun recordSessionOutcome() {
-        if (sessionOutcomeRecorded) return
-        sessionOutcomeRecorded = true
-        sessionChurn.onSessionEnded(sessionDeliveredData)
+        synchronized(sessionLock) {
+            if (sessionOutcomeRecorded) return
+            sessionOutcomeRecorded = true
+            sessionChurn.onSessionEnded(sessionDeliveredData)
+        }
     }
 
     /** Backoff earned by sessions that established a link and then delivered nothing. */
