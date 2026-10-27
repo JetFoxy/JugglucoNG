@@ -21,11 +21,21 @@ The current CN client was downloaded from the [Tencent distribution listing](htt
 APK, disassembly and raw probes remain outside Git. No app installation or sensor activation
 was needed. Obfuscated library URLs differ only by case; use a case-sensitive output directory.
 
-`OttaiNetSecurity` implements the recovered codec. Each firmware worker owns a CN client
-with a snapshot of its signed-in identity. Only the OTA judge and advisory report use this
-transport; other driver/cloud flows retain their established contracts. Its keys live only in
-memory and are cleared when the worker exits, including after a gracefully drained report.
-No plaintext fallback is attempted.
+`OttaiNetSecurity` implements the recovered codec and `OttaiCnTransport` owns CN routing
+and common headers. All CN phone mobile requests use this transport, including anonymous
+API-token/SMS login, account device/binding lookup, validation, Active Auth, bind and unbind.
+The supplied activation screenshot shows `NET_SECURITY_PLAINTEXT_ROUTE_FORBIDDEN` after
+the earlier OTA-only migration left these calls on the legacy routes. The shared dispatcher
+now selects the secure prefix before making an HTTP request, retaining the existing business
+query/body and signed common timestamp. GET, POST and the existing unbind PUT are supported.
+Watch sessions, global/Syai mobile hosts and web APIs retain their existing transport.
+
+Each ordinary CN request owns an ephemeral exchange and clears its keys on return. A firmware
+worker owns its longer-lived OTA session, including the gracefully drained advisory report.
+No plaintext fallback is attempted. Decrypted business codes such as `AppDevice_Upgrade_Version`,
+`AppUser_AlreadyBinding` and `AuthFailed_TokenInvalid` remain available to the existing activation
+and account recovery logic. Failure responses never supply activation materials. An encrypted
+success must authenticate before its contents reach any existing parser.
 
 ## Recovered protocol
 
@@ -89,16 +99,28 @@ The offline fixture `ottai-net-security.json` is independently generated with Py
 by `scripts/ottai/net_security_vectors.py`. Its fixed scalars are public synthetic test inputs.
 Tests cover exact exchange/GET/POST vectors, sequence and nonce changes, response authentication,
 server signature, plaintext rejection, safe business diagnostics, expiry, close and clock correction.
+An independent synthetic HTTP server additionally exercises the actual common cloud dispatcher:
+account/validation GETs, login/bind/Active Auth POSTs, unbind PUT, encoded query values, preservation
+of the signed timestamp, decrypted business failures, token rejection and response tampering.
+Requests outside the CN phone mobile profile retain their original URLs.
 
 To reproduce the optional anonymous production-code probe, compile these files together with
 `kotlinc -cp <org.json.jar> -include-runtime -d <probe.jar>` from the repository root:
 
-- `OttaiNetSecurity.kt`, `OttaiBleAuth.kt`, and `OttaiCrypto.kt` from `drivers/ottai`;
+- `OttaiNetSecurity.kt`, `OttaiCnTransport.kt`, `OttaiConstants.kt`, `OttaiBleAuth.kt`, and
+  `OttaiCrypto.kt` from `drivers/ottai`;
 - `scripts/ottai/SecureCloudProbe.kt`.
 
 Run `java -cp <probe.jar>:<org.json.jar> tk.glucodata.drivers.ottai.SecureCloudProbeKt`.
 It performs real anonymous HTTP requests and prints only a pass message. It is not part of CI.
+The probe starts with the legacy API-token URL, uses the production CN route selector and
+transport to rewrite/encrypt it, then authenticates the live response.
 
 The authenticated OTA offer for the user's running sensor, firmware-host download, and physical
 transfer still require the phone test. Anonymous transport success does not establish that the
 cloud offers an image for that sensor or accepts an already-started sensor update.
+The supplied latest OTA screenshot displays **No firmware update offered** in Started sensor
+mode. This state means the authenticated offer returned both `requiredUpgrade=false` and
+`allowUpgrade=false`; the next trace also logs both flags and whether a download URL exists,
+without recording that URL. This does not test installation. Normal activation after the
+complete CN migration still needs the phone test.

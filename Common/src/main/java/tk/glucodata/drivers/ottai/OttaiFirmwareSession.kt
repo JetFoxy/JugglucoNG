@@ -297,6 +297,7 @@ internal class OttaiFirmwareSession private constructor(
     override fun prepareImage(version: String, done: (Result<OttaiFirmwareImage?>) -> Unit) {
         work({
             val offer = otaCloud.value.judgeOta(sensorId, version)
+            log("offer required=${offer.required} allowed=${offer.allowed} image=${offer.downloadUrl != null}")
             if (!offer.required && !offer.allowed) null
             else {
                 val url = offer.downloadUrl ?: throw IllegalArgumentException("download_missing")
