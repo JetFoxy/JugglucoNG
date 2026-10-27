@@ -103,32 +103,40 @@ H1 and H2 are both consistent with everything above. Nothing in this trace lets 
    self-sustaining: no history read ⇒ no new records ⇒ the tail still "covers" the counter. A stale
    counter should force a tail re-read (counter or counter − 3) after N failed reconnects.
 
-## 7. Next steps (no product code yet)
+## 8. Resolution: the sensor never recovered; the driver fabricated the recovery
 
-1. Cheap, no build: capture `0x2AA9` / `F6` / one tail history request today, hours after the
-   incident. Frozen counter ⇒ H1/H2 (sensor dead or wedged); advanced ⇒ H3.
+A second capture (`juggluco-trace-20261027-114127.log`, 11:41) settles the question left open above.
+The sensor stopped at 11:05:34 and produced nothing for the next 35 minutes: `0x2AA9` stayed at
+**9516** at 11:06:11, 11:13:51, 11:18:29, 11:26:17 and 11:40:10.
+
+The apparent recovery was an artefact. Every ~11 minutes the driver dropped the persisted covered
+edge ("too old"), re-anchored it to the counter-read time and re-read the tail from `seq=9507`:
+
+```
+W/ICanHealth Dropping persisted covered edge …: persisted seq=9516 time=1793088334127
+  reconstructed anchor=1793088334127 current=9516 now=1793089109171 …
+I/ICanHealth Parsed SN glucose history batch base=9507 records=4 imported=4
+```
+
+Those four records are the same frozen tail (10:56:34–11:05:34, values 3.4/3.6/3.7/3.9), re-stamped
+and stored again at 11:09:29–11:18:29, 11:20:17–11:29:17 and 11:31:10–11:40:10, and uploaded to
+Nightscout (`2026-10-27T08:09:29.000Z, svg 67`). So H3 is ruled out: the sensor really was silent,
+and the driver manufactured a live-looking curve from its own stale tail. Filed as #746, fixed in
+#747.
+
+What remains for this issue (#744) is only the causal question H1 vs H2, and it is now narrower
+than before: the last record is 11:05:34, the three `F2` chunks go out at 11:05:36–11:05:37, and the
+first missing record was due at 11:08:34. The sensor never came back, which fits an uncommitted
+mid-session parameter write putting the measurement session on hold at least as well as it fits a
+coincidental hardware stop.
+
+## 9. Next steps (no product code yet)
+
+1. A fresh log from a *known-good* sensor: does `0x2AA9` advance normally, and does the driver still
+   log `Distrusting session timeline` (the bogus 722-minute drift)?
 2. Ask what happened physically at ~11:14 (sensor removed? re-seated? phone away?).
-3. If we decide to harden the write path: gate on `launcherState == 0`, send `F7`, never interleave
-   with an active RACP transfer, and default `CORRECT_CODE_WRITE_DRY_RUN` back to `true` until a
-   fresh-sensor write has been validated on hardware.
-
-## 8. Update: the sensor recovered
-
-Reported after the analysis: the sensor started working again on its own (no driver change between
-the trace and the recovery). That removes the "permanently dead sensor" reading of H1 and weakens
-the "write bricked it" reading of H2. What is left:
-
-| Reading | Meaning | Test |
-|---|---|---|
-| H1-transient | sampling paused for a while (placement, electrode, firmware pause) and resumed | history contains a **gap** over the blackout window |
-| H2-transient | the uncommitted `F2` write put the measurement session on hold until the sensor restarted/rolled over | same gap; ordering vs. a repeat on another fresh sensor decides |
-| H3 | the sensor recorded the whole time, our driver simply never fetched it (`Skipping glucose-history read … tailSeq == current`, no live notify) | history is **continuous** across 11:05–recovery |
-
-H3 is now the cheapest to rule in or out: look at the graph/DB for the window 11:05 → recovery
-(`0x2AA9` was still `9516` at 11:13:51; a healthy sensor should show records there).
-
-If H3 holds, the frozen counter was not "the sensor refusing to measure" but the driver's own
-stale-tail trap: no history read because the tail equals the counter, no live notification on
-iCGM-t3, and no timer forcing a re-read. That would make the correctCode write an innocent
-bystander and move the priority to §6.2.
+3. Hardening the write path is now in PR #745: gate on the activation window (`launcherState == 0`
+   or this connection's own `1A`), never on sensors that are already running. Still open there:
+   `F7` (commit) is never sent, and the write can overlap an active RACP transfer on an activation
+   that also pulls history.
 
