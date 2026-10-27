@@ -15,6 +15,7 @@ class TempBasalSegmentsTests {
         atMinute: Int,
         durationMinutes: Int?,
         type: JournalEntryType = JournalEntryType.TEMP_BASAL,
+        sourceRecordId: String? = null,
     ) = JournalEntry(
         id = id,
         timestamp = minutes(atMinute),
@@ -31,7 +32,7 @@ class TempBasalSegmentsTests {
         proteinGrams = null,
         fatGrams = null,
         source = JournalEntrySource.AAPS,
-        sourceRecordId = null,
+        sourceRecordId = sourceRecordId,
         createdAt = 0L,
         updatedAt = 0L,
     )
@@ -70,5 +71,39 @@ class TempBasalSegmentsTests {
         assertFalse(1L in ends)
         assertFalse(2L in ends)
         assertEquals(minutes(32), ends[3])
+    }
+
+    private fun statusLine(id: Long, atMinute: Int, durationMinutes: Int) =
+        entry(id, atMinute, durationMinutes, sourceRecordId = AapsStatusLine.SOURCE_RECORD_PREFIX + minutes(atMinute))
+
+    /**
+     * The status line runs 10:00–11:00 as one row; Nightscout has the same basal as a
+     * 10:05–10:35 treatment. The copy must not cut the status line row at 10:05.
+     */
+    @Test
+    fun aNightscoutCopyOverlappingAStatusLineSegmentIsLeftOut() {
+        val ends = tempBasalEndsMillis(
+            listOf(
+                statusLine(1, atMinute = 0, durationMinutes = 60),
+                entry(2, atMinute = 5, durationMinutes = 30),
+            )
+        )
+        assertEquals(minutes(60), ends[1])
+        assertFalse(2L in ends)
+    }
+
+    /** Before the status line started, Nightscout is all there is; it ends where that starts. */
+    @Test
+    fun nightscoutStillFillsTimeTheStatusLineDoesNotCover() {
+        val ends = tempBasalEndsMillis(
+            listOf(
+                entry(1, atMinute = 0, durationMinutes = 30),
+                statusLine(2, atMinute = 30, durationMinutes = 20),
+                entry(3, atMinute = 60, durationMinutes = 30),
+            )
+        )
+        assertEquals(minutes(30), ends[1])
+        assertEquals(minutes(50), ends[2])
+        assertEquals(minutes(90), ends[3])
     }
 }

@@ -8,17 +8,32 @@ package tk.glucodata.data.journal
  * Works over every temp basal, not just the ones in view: a replacement scrolled out of the
  * chart window still cuts the segment it replaced. Keyed by entry id; temp basals without a
  * duration are left out.
+ *
+ * The same basal can arrive twice: from the local AAPS status line, kept as one row per run,
+ * and from Nightscout, as one row per treatment. Where the status line has a segment, it
+ * wins: a Nightscout copy overlapping it is left out, so it can neither cut the status line
+ * segment short nor draw a second bar over it.
  */
 fun tempBasalEndsMillis(entries: List<JournalEntry>): Map<Long, Long> {
-    val tempBasals = entries
-        .filter { it.type == JournalEntryType.TEMP_BASAL }
+    val all = entries.filter { it.type == JournalEntryType.TEMP_BASAL }
+    val statusLine = all.filter { AapsStatusLine.isStatusLineRecord(it.sourceRecordId) }
+    val tempBasals = all
+        .filter { entry ->
+            AapsStatusLine.isStatusLineRecord(entry.sourceRecordId) ||
+                statusLine.none { it.overlaps(entry) }
+        }
         .sortedWith(compareBy({ it.timestamp }, { it.id }))
     return buildMap {
         tempBasals.forEachIndexed { index, entry ->
-            val durationMinutes = entry.durationMinutes ?: return@forEachIndexed
-            val ownEnd = entry.timestamp + durationMinutes.coerceAtLeast(1) * 60_000L
+            if (entry.durationMinutes == null) return@forEachIndexed
             val nextStart = tempBasals.getOrNull(index + 1)?.timestamp ?: Long.MAX_VALUE
-            put(entry.id, minOf(ownEnd, nextStart))
+            put(entry.id, minOf(entry.ownEndMillis(), nextStart))
         }
     }
 }
+
+private fun JournalEntry.ownEndMillis(): Long =
+    timestamp + (durationMinutes ?: 0).coerceAtLeast(1) * 60_000L
+
+private fun JournalEntry.overlaps(other: JournalEntry): Boolean =
+    timestamp < other.ownEndMillis() && other.timestamp < ownEndMillis()

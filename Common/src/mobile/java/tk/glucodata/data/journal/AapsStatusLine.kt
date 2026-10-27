@@ -33,6 +33,11 @@ object AapsStatusLine {
     /** [closed] is the previous segment with its final end; [current] is what runs now. */
     data class Step(val closed: Segment?, val current: Segment?)
 
+    const val SOURCE_RECORD_PREFIX = "aaps:statusline:tbr:"
+
+    fun isStatusLineRecord(sourceRecordId: String?): Boolean =
+        sourceRecordId?.startsWith(SOURCE_RECORD_PREFIX) == true
+
     // AAPS loops every 5 minutes; past this nothing says the rate ran through the gap.
     private const val MAX_GAP_MILLIS = 15 * 60_000L
     private const val MINUTE_MILLIS = 60_000L

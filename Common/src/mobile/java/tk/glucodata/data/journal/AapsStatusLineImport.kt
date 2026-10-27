@@ -16,7 +16,6 @@ object AapsStatusLineImport {
     private const val KEY_START = "aaps_status_tbr_start"
     private const val KEY_RATE = "aaps_status_tbr_rate"
     private const val KEY_LAST_SEEN = "aaps_status_tbr_last_seen"
-    private const val SOURCE_RECORD_PREFIX = "aaps:statusline:tbr:"
 
     private val lock = Mutex()
 
@@ -60,6 +59,6 @@ object AapsStatusLineImport {
         amount = unitsPerHour,
         durationMinutes = durationMinutes,
         source = JournalEntrySource.AAPS,
-        sourceRecordId = SOURCE_RECORD_PREFIX + startMillis,
+        sourceRecordId = AapsStatusLine.SOURCE_RECORD_PREFIX + startMillis,
     )
 }
