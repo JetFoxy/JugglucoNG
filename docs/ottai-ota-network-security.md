@@ -1,0 +1,90 @@
+# CN OTA network security
+
+The supplied `juggluco-trace-20261027-023359.log` reaches authenticated command state 3,
+records the baseline, and receives HTTP 403 from `/cgm/app/server/ota/upgradeVersion/judge`:
+`NET_SECURITY_PLAINTEXT_ROUTE_FORBIDDEN`. The old API route is forbidden even over HTTPS.
+This is distinct from the earlier BLE discovery and software-revision parser failures.
+
+## Source and scope
+
+The current CN client was downloaded from the [Tencent distribution listing](https://sj.qq.com/appdetail/com.ottai.tag):
+`com.ottai.tag` 1.63.0 / 264122, 222,946,835 bytes, listing MD5
+`14011893CC93D43D7B0B6A179CD984A7` (verified). Its ARM64 Dart snapshot is
+`1ce86630892e2dca9a8543fdb8ed8e22`, compatible with the existing Blutter Dart 3.10.9 tool.
+APK, disassembly and raw probes remain outside Git. No app installation or sensor activation
+was needed. Obfuscated library URLs differ only by case; use a case-sensitive output directory.
+
+`OttaiNetSecurity` implements the recovered codec. Each firmware worker owns a CN client
+with a snapshot of its signed-in identity. Only the OTA judge and advisory report use this
+transport; other driver/cloud flows retain their established contracts. Its keys live only in
+memory and are cleared when the worker exits, including after a gracefully drained report.
+No plaintext fallback is attempted.
+
+## Recovered protocol
+
+All routes below are relative to `https://api.ottai.com/cgm/security/app/server`.
+
+1. Generate a fresh P-256 key pair. `POST /security/exchangeKey` sends Base64-encoded,
+   32-byte big-endian `clientPubKeyX`/`clientPubKeyY`, epoch-millisecond `clientTimestamp`,
+   and lowercase hex `clientSignature = SHA256(deviceId + publicX + publicY + timestamp)`.
+2. The response supplies `serverPubKeyX`, `serverPubKeyY`, `serverTimestamp`,
+   `serverSignature`, `expireTime`, `secretId`, `ciphertext`, `iv`, and `authTag`.
+   Verify the server signature using the same concatenation with the server fields.
+3. Derive the 32-byte P-256 ECDH X coordinate. HKDF-SHA256 emits 64 bytes, with
+   salt `UTF8(secretId)` and info `UTF8(deviceId + "#" + expireTime + "#" + secretId)`.
+   The first 32 bytes are the AES key; the last 32 are the HMAC key. `expireTime`, not
+   `serverTimestamp`, belongs in the HKDF context.
+4. Authenticate the exchange ciphertext using AES-256-GCM, decoded Base64 IV/tag,
+   and AAD `UTF8(deviceId + "|" + secretId)`. The resulting plaintext must equal the
+   concatenated Base64 server coordinates. No application request is sent before this succeeds.
+5. Every request carries headers `cipherNonceId` (positive decimal Snowflake ID),
+   `cipherTimeNow` (epoch ms), `cipherSecretId`, `cipherUserId` (the common **device ID**),
+   and `cipherSeq` (incrementing per secret). The account user ID is not substituted here.
+6. Serialize original query/body data as UTF-8 JSON, and encrypt each independently with
+   AES-256-GCM, a fresh 12-byte random nonce, the same AAD, and a 16-byte tag. The query
+   becomes `cipherParamText`, `cipherParamMac`, `cipherParamNonce`, `cipherParamSignature`;
+   POST JSON uses the corresponding `cipherBody…` fields. Ciphertext, tag and nonce are Base64.
+7. Each signature is **Base64** HMAC-SHA256 over UTF-8 concatenation
+   `nonceId + sequence + timeNow + ciphertextBase64`. It is not the hex encoding used
+   for the exchange signature. Common cipher metadata is in headers, not query/body JSON.
+8. A successful response contains `cipherSecretId`, `cipherText`, `cipherMac`, and
+   `cipherNonce`. Require the matching secret and authenticate/decrypt before parsing the
+   original business response, including the firmware offer. A plaintext success or changed
+   authentication tag cannot authorize installation. Bounded known business codes survive
+   diagnostics; raw messages, tokens, encrypted payloads and signed download URLs do not.
+
+The client corrects an explicit `CLIENT_CLOCK_OFFSET` response once during exchange.
+Expired secrets require a fresh exchange. Application requests are not silently retried on
+network/security failure; reopen the check to retry. BLE transfer retry rules remain unchanged.
+
+Static anchors in this APK: network prefix at pool offset `0xa7a0`; key exchange at
+`0x121ba7c`; exchange request/signature builder at `0x121d8a4`; server verification and
+key derivation at `0x121bc98`; HKDF at `0x121ca40`; AAD builder at `0x68c10c`; request
+envelope at `0x121eb80`; encryption at `0x121f488`; response decryption at `0x69944c`.
+
+## Verification and limits
+
+The reconstructed exchange and encrypted GET were verified against the live service using
+a fresh synthetic identity and the anonymous `/user/apiToken` endpoint. Server signature,
+authenticated exchange plaintext, encrypted query signature and authenticated response all
+passed. The same round trip also passed using the **production Kotlin codec**, compiled with
+`SecureCloudProbe.kt`. Returned tokens and ephemeral keys were neither printed nor retained.
+No account token, sensor MAC, account mutation or OTA report was used in those probes.
+
+The offline fixture `ottai-net-security.json` is independently generated with PyCryptodome
+by `scripts/ottai/net_security_vectors.py`. Its fixed scalars are public synthetic test inputs.
+Tests cover exact exchange/GET/POST vectors, sequence and nonce changes, response authentication,
+server signature, plaintext rejection, safe business diagnostics, expiry, close and clock correction.
+
+To reproduce the optional anonymous production-code probe, compile these files together with
+`kotlinc -cp <org.json.jar> -include-runtime -d <probe.jar>` from the repository root:
+
+- `OttaiNetSecurity.kt`, `OttaiBleAuth.kt`, and `OttaiCrypto.kt` from `drivers/ottai`;
+- `scripts/ottai/SecureCloudProbe.kt`.
+
+Run `java -cp <probe.jar>:<org.json.jar> tk.glucodata.drivers.ottai.SecureCloudProbeKt`.
+It performs real anonymous HTTP requests and prints only a pass message. It is not part of CI.
+
+The authenticated OTA offer for the user's running sensor, firmware-host download, and physical
+transfer still require the phone test. Anonymous transport success does not establish that the
+cloud offers an image for that sensor or accepts an already-started sensor update.

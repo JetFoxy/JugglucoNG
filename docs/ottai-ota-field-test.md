@@ -21,6 +21,9 @@ OTA experiment. Both require the sensor to be disconnected from managed monitori
 4. The check uses the actual BLE revision in the CN `/ota/upgradeVersion/judge` request.
    If an update is offered it downloads the package and displays the source/target versions,
    file size and SHA-256. **The check does not start a firmware transfer.**
+   The judge and advisory report use the current CN encrypted API prefix
+   `/cgm/security/app/server`; the old plaintext route is rejected by the server even over
+   HTTPS. [Protocol, provenance and transport verification](ottai-ota-network-security.md).
 5. Choose one explicit experiment:
    - **Write factory parameters only** refreshes cloud materials for the read revision,
      writes supported factory parameters, and leaves the firmware as it was.

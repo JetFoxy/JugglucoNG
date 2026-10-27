@@ -38,7 +38,13 @@ internal class OttaiFirmwareSession private constructor(
     private val thread = HandlerThread("OttaiFirmware").also { it.start() }
     private val handler = Handler(thread.looper)
     private val main = Handler(Looper.getMainLooper())
-    private val worker = Executors.newSingleThreadExecutor()
+    private val otaCloud = lazy { OttaiCloudClient.CnOtaClient(context) }
+    private val worker = Executors.newSingleThreadExecutor { task ->
+        Thread({
+            try { task.run() }
+            finally { if (otaCloud.isInitialized()) otaCloud.value.close() }
+        }, "OttaiFirmwareCloud")
+    }
     private var closed = false
     private var generation = 0
     private var gatt: BluetoothGatt? = null
@@ -280,7 +286,8 @@ internal class OttaiFirmwareSession private constructor(
                             "download_size", "download_redirects", "redirect", "gbl_size", "gbl_header", "gbl_truncated",
                             "gbl_tag", "gbl_header_duplicate", "gbl_length", "gbl_end", "gbl_crc", "materials_refresh",
                             "materials_identity", "materials_decrypt", "cancelled")
-                        Result.failure(IllegalStateException(error.message?.takeIf { it in safe } ?: "cloud_or_package"))
+                        Result.failure(IllegalStateException(if (error is OttaiOtaCloudException) error.diagnostic
+                            else error.message?.takeIf { it in safe } ?: "cloud_or_package"))
                     }))
                 }
             }
@@ -289,7 +296,7 @@ internal class OttaiFirmwareSession private constructor(
 
     override fun prepareImage(version: String, done: (Result<OttaiFirmwareImage?>) -> Unit) {
         work({
-            val offer = OttaiCloudClient.judgeOta(context, sensorId, version)
+            val offer = otaCloud.value.judgeOta(sensorId, version)
             if (!offer.required && !offer.allowed) null
             else {
                 val url = offer.downloadUrl ?: throw IllegalArgumentException("download_missing")
@@ -369,7 +376,7 @@ internal class OttaiFirmwareSession private constructor(
 
     override fun reportVerified(image: OttaiFirmwareImage) {
         worker.execute {
-            runCatching { OttaiCloudClient.reportOtaSuccess(context, sensorId, image.source, image.target) }
+            runCatching { otaCloud.value.reportOtaSuccess(sensorId, image.source, image.target) }
                 .onFailure { log("report_failed") }
         }
     }

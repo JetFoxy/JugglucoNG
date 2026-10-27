@@ -1030,33 +1030,46 @@ object OttaiCloudClient {
         return OtaOffer(url, data.getBoolean("requiredUpgrade"), data.getBoolean("allowUpgrade"))
     }
 
-    /** Explicit CN field test only. No firmware request runs from the managed driver. */
-    internal fun judgeOta(ctx: Context, mac: String, firmware: String): OtaOffer {
-        require(loadCnOtaSession(ctx)) { "cn_session" }
-        val result = httpGetWithResult(
-            base(ctx) + OttaiConstants.EP_OTA_JUDGE,
-            mapOf("mac" to mac, "deviceVersion" to firmware, "deviceType" to "cgm"),
-            headers(ctx, now(), base(ctx)),
-        )
-        require(result.failure == null) { "ota_judge" }
-        return parseOtaOffer(result.body ?: throw IllegalArgumentException("ota_response"))
+    /** A wizard's worker owns its secure CN session; no request runs from the managed driver. */
+    internal class CnOtaClient(ctx: Context) {
+        private val deviceId = requestDeviceId(ctx, OttaiRegistry.SessionProfile.CN_PHONE)
+        private val accessToken = OttaiRegistry.loadAccessToken(ctx)
+        init { require(loadCnOtaSession(ctx)) { "cn_session" } }
+        private val transport = OttaiNetSecurity(deviceId,
+            exchange = { body -> raw("POST", "/security/exchangeKey", emptyMap(), emptyMap(), body.toString()) },
+            send = { method, path, cipherHeaders, query, body -> raw(method, path, cipherHeaders, query, body) })
+
+        private fun raw(method: String, path: String, cipherHeaders: Map<String, String>,
+            query: Map<String, String>, body: String?): OttaiNetSecurity.Reply {
+            val qs = query.entries.joinToString("&") { "${enc(it.key)}=${enc(it.value)}" }
+            val url = OttaiConstants.API_BASE + OttaiConstants.OTA_SECURE_PREFIX + path + if (qs.isEmpty()) "" else "?$qs"
+            val requestHeaders = cnPhoneHeaders(deviceId, accessToken, now(), UUID.randomUUID().toString()) +
+                mapOf("versionName" to "1.63.0", "versionCode" to "264122") + cipherHeaders +
+                if (body == null) emptyMap() else mapOf("Content-Type" to "application/json;charset=UTF-8")
+            val result = requestWithResult(method, url, body, requestHeaders,
+                openConnection = { target -> (URL(target).openConnection() as HttpURLConnection).apply { instanceFollowRedirects = false } })
+            return OttaiNetSecurity.Reply(result.failure?.httpStatus ?: 200, result.body)
+        }
+
+        fun judgeOta(mac: String, firmware: String): OtaOffer = parseOtaOffer(transport.request("GET",
+            OttaiConstants.EP_OTA_JUDGE, mapOf("mac" to mac, "deviceVersion" to firmware, "deviceType" to "cgm")))
+
+        fun reportOtaSuccess(mac: String, source: String, target: String) {
+            transport.request("POST", OttaiConstants.EP_OTA_REPORT, body = JSONObject().apply {
+                put("mac", mac)
+                put("sourceVersion", source)
+                put("targetVersion", target)
+                put("upgradeStatus", 1)
+                put("remark", "JugglucoNG experimental; version readback verified")
+            }.toString())
+        }
+        fun close() { transport.close() }
     }
 
     internal fun loadCnOtaSession(ctx: Context): Boolean =
         base(ctx) == OttaiConstants.API_BASE &&
             OttaiRegistry.loadSessionProfile(ctx) == OttaiRegistry.SessionProfile.CN_PHONE &&
             OttaiRegistry.loadAccessToken(ctx).isNotBlank()
-
-    internal fun reportOtaSuccess(ctx: Context, mac: String, source: String, target: String) {
-        require(loadCnOtaSession(ctx)) { "cn_session" }
-        httpPostJson(base(ctx) + OttaiConstants.EP_OTA_REPORT, JSONObject().apply {
-            put("mac", mac)
-            put("sourceVersion", source)
-            put("targetVersion", target)
-            put("upgradeStatus", 1)
-            put("remark", "JugglucoNG experimental; version readback verified")
-        }.toString(), headers(ctx, now(), base(ctx)))
-    }
 
     private fun JSONObject.optionalFiniteDouble(key: String): Double? =
         if (!has(key) || isNull(key)) null else optDouble(key, Double.NaN).takeIf { it.isFinite() }
