@@ -222,6 +222,12 @@ class ICanHealthBleManager(
     private var correctCodePendingChunk: ByteArray? = null
     private var correctCodeRecheckRunnable: Runnable? = null
     @Volatile private var lastSensorInfoMarker: Int? = null
+    private var correctCodeRepairChain = false
+    @Volatile private var repairAttempts = 0
+    @Volatile private var lastProvisioningWriteAtMs = 0L
+    @Volatile private var lastCounterAdvanceAtMs = 0L
+    private var repairSensorId: String? = null
+    private var repairExhaustedLogged = false
     private var correctCodeFactorySerial: String? = null
     private var correctCodeChallenge: ByteArray? = null
     private var gattWriteInFlight: GattOp.Write? = null
@@ -1633,6 +1639,8 @@ class ICanHealthBleManager(
                         TAG,
                         "CGM status offset=$observedSequence launcherState=0x${"%02X".format(launcherState)}"
                     )
+                    trackCounterProgress(previousSequence, observedSequence)
+                    maybeRepairUnresponsiveProvisioning()
                 }
                 if (awaitingFreshStatusForHistoryBackfill) {
                     continuePendingHistoryBackfill("after fresh status read")
@@ -2507,14 +2515,16 @@ class ICanHealthBleManager(
      * from the cloud-fetched cache ([maybeFetchVendorCalibrationCode] warms it on the
      * `F6 = 0xFFFF` marker). Dry-run arms nothing and only logs the packets.
      */
-    private fun scheduleCorrectCodeWrite() {
+    private fun scheduleCorrectCodeWrite(repair: Boolean = false) {
         if (correctCodeChainActive || !isAuthenticated) return
         val context = Applic.app ?: return
         val sn = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
         when (ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, sn)) {
             ICanHealthProvisioningPolicy.Eligibility.INSTALLED_TABLE -> {
-                ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
-                return
+                if (!repair) {
+                    ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
+                    return
+                }
             }
             ICanHealthProvisioningPolicy.Eligibility.INVALID_FACTORY_SERIAL -> {
                 Log.w(TAG, "CorrectCode needs the full 13-character factory serial; legacy connection identity is insufficient")
@@ -2568,6 +2578,7 @@ class ICanHealthBleManager(
         // pending notice.
         ICanHealthCloudStatusNotifier.clearServerUnavailable(context)
         correctCodeChainActive = true
+        correctCodeRepairChain = repair
         correctCodeFactorySerial = sn
         correctCodeChallenge = challenge.copyOf()
         correctCodeChunks = chunks
@@ -2599,8 +2610,10 @@ class ICanHealthBleManager(
 
     private fun sendCorrectCodeChunk(index: Int) {
         val serial = ICanHealthConstants.normalizeOnboardingDeviceSn(onboardingDeviceSn)
-        if (stop || uiPaused || !isAuthenticated ||
-            ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, serial) != ICanHealthProvisioningPolicy.Eligibility.FRESH ||
+        val eligibility = ICanHealthProvisioningPolicy.eligibility(lastSensorInfoMarker, serial)
+        val eligibilityAllowed = eligibility == ICanHealthProvisioningPolicy.Eligibility.FRESH ||
+            (correctCodeRepairChain && eligibility == ICanHealthProvisioningPolicy.Eligibility.INSTALLED_TABLE)
+        if (stop || uiPaused || !isAuthenticated || !eligibilityAllowed ||
             serial != correctCodeFactorySerial || lastAuthChallenge?.contentEquals(correctCodeChallenge ?: byteArrayOf()) != true) {
             resetCorrectCodeState()
             return
@@ -2640,7 +2653,12 @@ class ICanHealthBleManager(
         val chunks = correctCodeChunks ?: return
         val next = correctCodeNextChunk + 1
         if (next >= chunks.size) {
-            Log.i(TAG, "CorrectCode write complete: ${chunks.size}/${chunks.size} chunks acked")
+            lastProvisioningWriteAtMs = System.currentTimeMillis()
+            Log.i(
+                TAG,
+                "CorrectCode write complete: ${chunks.size}/${chunks.size} chunks acked" +
+                    if (correctCodeRepairChain) " (repair attempt $repairAttempts/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS})" else ""
+            )
             resetCorrectCodeState()
             return
         }
@@ -2671,6 +2689,89 @@ class ICanHealthBleManager(
         correctCodeChallenge = null
         correctCodeNextChunk = 0
         correctCodeChainActive = false
+        correctCodeRepairChain = false
+    }
+
+    /** Repair counters are per sensor: a different sensor starts with a full budget. */
+    private fun resetRepairStateForNewSensor() {
+        val sensorId = SerialNumber
+        if (sensorId == repairSensorId) return
+        repairSensorId = sensorId
+        repairAttempts = 0
+        lastProvisioningWriteAtMs = 0L
+        lastCounterAdvanceAtMs = 0L
+        repairExhaustedLogged = false
+    }
+
+    /**
+     * Tracks whether the sensor is still producing records. `0x2AA9` only moves when a new record
+     * exists, so a standing counter is the driver's only sensor-side liveness signal.
+     */
+    private fun trackCounterProgress(previousSequence: Int, observedSequence: Int) {
+        resetRepairStateForNewSensor()
+        val now = System.currentTimeMillis()
+        if (previousSequence >= 0 && observedSequence != previousSequence) {
+            lastCounterAdvanceAtMs = now
+            if (repairAttempts > 0) {
+                Log.i(
+                    TAG,
+                    "CorrectCode repair worked: counter advanced $previousSequence->$observedSequence " +
+                        "after $repairAttempts attempt(s)"
+                )
+                repairAttempts = 0
+                repairExhaustedLogged = false
+            }
+        } else if (lastCounterAdvanceAtMs <= 0L) {
+            // Baseline for this process: silence is measured from here, not from app start.
+            lastCounterAdvanceAtMs = now
+        }
+    }
+
+    /**
+     * Unprovisioned iCan sensors stop producing after about a week, and writing the table into a
+     * stalled one has been observed to bring it back. A single write can also miss, and since our
+     * own write sets `F6` to a non-`0xFFFF` value the eligibility check would refuse every further
+     * attempt — one ineffective write would close the rescue path for good. Retry it a bounded
+     * number of times while the counter stays silent.
+     */
+    private fun maybeRepairUnresponsiveProvisioning() {
+        if (correctCodeChainActive || !isAuthenticated) return
+        if (lastCounterAdvanceAtMs <= 0L) return
+        if (currentSequenceNumber < readingIntervalMinutes()) return
+        val now = System.currentTimeMillis()
+        when (ICanHealthProvisioningPolicy.repairDecision(
+            installedMarker = lastSensorInfoMarker,
+            sensorSilentMs = now - lastCounterAdvanceAtMs,
+            sinceLastWriteMs = if (lastProvisioningWriteAtMs > 0L) {
+                now - lastProvisioningWriteAtMs
+            } else {
+                Long.MAX_VALUE
+            },
+            attempts = repairAttempts,
+        )) {
+            ICanHealthProvisioningPolicy.RepairDecision.RETRY -> {
+                repairAttempts++
+                Log.i(
+                    TAG,
+                    "CorrectCode repair $repairAttempts/${ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS}: " +
+                        "counter silent for ${(now - lastCounterAdvanceAtMs) / 60_000L}min " +
+                        "(seq=$currentSequenceNumber, F6=0x${"%04X".format(lastSensorInfoMarker ?: 0)}); " +
+                        "rewriting the table"
+                )
+                scheduleCorrectCodeWrite(repair = true)
+            }
+            ICanHealthProvisioningPolicy.RepairDecision.EXHAUSTED -> {
+                if (!repairExhaustedLogged) {
+                    repairExhaustedLogged = true
+                    Log.w(
+                        TAG,
+                        "CorrectCode repair exhausted after $repairAttempts attempt(s); " +
+                            "counter still at seq=$currentSequenceNumber — the sensor is not producing"
+                    )
+                }
+            }
+            ICanHealthProvisioningPolicy.RepairDecision.NONE -> Unit
+        }
     }
 
     private fun enqueuePreAuthReads() {

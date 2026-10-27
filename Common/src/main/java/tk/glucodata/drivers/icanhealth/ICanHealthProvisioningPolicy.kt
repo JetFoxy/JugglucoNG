@@ -17,6 +17,48 @@ internal object ICanHealthProvisioningPolicy {
         else -> Eligibility.FRESH
     }
 
+    /** Follow-up writes allowed when a table landed but the sensor stayed silent. */
+    const val MAX_REPAIR_ATTEMPTS = 3
+
+    /**
+     * A sensor with a table installed that has produced nothing for this long is treated as
+     * stalled. Its records arrive every three minutes, so ten minutes is three missed slots.
+     */
+    const val REPAIR_STALL_MS = 10 * 60 * 1000L
+
+    /** Minimum gap between repair writes, so an 8-second reconnect loop cannot hammer the sensor. */
+    const val REPAIR_COOLDOWN_MS = 20 * 60 * 1000L
+
+    enum class RepairDecision { NONE, RETRY, EXHAUSTED }
+
+    /**
+     * Decides whether a table that is already installed should be written again.
+     *
+     * Unprovisioned iCan sensors stop producing after roughly a week, and writing the table into
+     * a stalled one has been observed to bring it back. Our own write can also land without that
+     * effect, and once `F6` is no longer `0xFFFF` the normal eligibility check refuses every
+     * further attempt — one ineffective write would close the rescue path for good.
+     *
+     * @param installedMarker last `F6` value; anything but `0xFFFF` means a table is installed
+     * @param sensorSilentMs how long the `0x2AA9` counter has been standing still
+     * @param sinceLastWriteMs time since the last completed table write, or [Long.MAX_VALUE]
+     * @param attempts repair writes already made for this sensor in this process
+     */
+    fun repairDecision(
+        installedMarker: Int?,
+        sensorSilentMs: Long,
+        sinceLastWriteMs: Long,
+        attempts: Int,
+        stallMs: Long = REPAIR_STALL_MS,
+        cooldownMs: Long = REPAIR_COOLDOWN_MS,
+    ): RepairDecision = when {
+        installedMarker == null || installedMarker == 0xffff -> RepairDecision.NONE
+        attempts >= MAX_REPAIR_ATTEMPTS -> RepairDecision.EXHAUSTED
+        sensorSilentMs < stallMs -> RepairDecision.NONE
+        sinceLastWriteMs < cooldownMs -> RepairDecision.NONE
+        else -> RepairDecision.RETRY
+    }
+
     // Known server fallback for unknown identities. It is reference data, never provisioning data.
     val defaultTable: Map<String, Float> = mapOf(
         "x1" to 0.015f,

@@ -77,6 +77,62 @@ class ICanHealthProvisioningPolicyTests {
         assertEquals(1, commits)
     }
 
+    @Test fun repairWritesAreBoundedAndOnlyFollowASilentInstalledSensor() {
+        val installed = 0x0190
+        // No table, or an unknown marker: the normal FRESH path owns those sensors.
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.NONE,
+            policy.repairDecision(0xffff, sensorSilentMs = 60 * 60_000L, sinceLastWriteMs = Long.MAX_VALUE, attempts = 0),
+        )
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.NONE,
+            policy.repairDecision(null, sensorSilentMs = 60 * 60_000L, sinceLastWriteMs = Long.MAX_VALUE, attempts = 0),
+        )
+        // Still producing, or written moments ago: leave it alone.
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.NONE,
+            policy.repairDecision(installed, sensorSilentMs = 5 * 60_000L, sinceLastWriteMs = 60 * 60_000L, attempts = 0),
+        )
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.NONE,
+            policy.repairDecision(installed, sensorSilentMs = 60 * 60_000L, sinceLastWriteMs = 60_000L, attempts = 0),
+        )
+        // Silent well past the cooldown with budget left: rewrite.
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.RETRY,
+            policy.repairDecision(installed, sensorSilentMs = 15 * 60_000L, sinceLastWriteMs = 30 * 60_000L, attempts = 1),
+        )
+        // Budget exhausted: stop, and say so once.
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.EXHAUSTED,
+            policy.repairDecision(
+                installed,
+                sensorSilentMs = 60 * 60_000L,
+                sinceLastWriteMs = 60 * 60_000L,
+                attempts = ICanHealthProvisioningPolicy.MAX_REPAIR_ATTEMPTS,
+            ),
+        )
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.EXHAUSTED,
+            policy.repairDecision(installed, sensorSilentMs = 60 * 60_000L, sinceLastWriteMs = 60 * 60_000L, attempts = 9),
+        )
+    }
+
+    @Test fun repairWritesAfterTheFirstOneDoNotNeedAPendingFetch() {
+        // A stalled sensor whose first write landed: the follow-up copy still needs a real table,
+        // and the per-SN cache is the only source allowed here.
+        val installed = 0x0190
+        assertEquals(
+            ICanHealthProvisioningPolicy.RepairDecision.RETRY,
+            policy.repairDecision(
+                installedMarker = installed,
+                sensorSilentMs = ICanHealthProvisioningPolicy.REPAIR_STALL_MS,
+                sinceLastWriteMs = ICanHealthProvisioningPolicy.REPAIR_COOLDOWN_MS,
+                attempts = 0,
+            ),
+        )
+    }
+
     @Test fun negativeF2RepliesAreRecognizedImmediately() {
         assertEquals(1, ICanHealthParser.parseCorrectCodeResult(byteArrayOf(0x1c, 0xf2.toByte(), 1)))
         assertEquals(2, ICanHealthParser.parseCorrectCodeResult(byteArrayOf(0x1c, 0xf2.toByte(), 2)))
