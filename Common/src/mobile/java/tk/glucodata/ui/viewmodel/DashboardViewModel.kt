@@ -634,11 +634,13 @@ class DashboardViewModel(
     private fun ensureJournalEntriesObserved() {
         if (journalEntriesJob?.isActive == true) return
         journalEntriesJob = viewModelScope.launch {
-            journalRepository.observeEntriesWithTempBasal().collect { entries ->
-                val (tempBasals, rows) = entries.partition { it.type == JournalEntryType.TEMP_BASAL }
-                _journalEntries.value = rows
-                _journalTempBasals.value = tempBasals
-            }
+            journalRepository.observeEntriesWithTempBasal()
+                .map { entries -> entries.partition { it.type == JournalEntryType.TEMP_BASAL } }
+                .flowOn(Dispatchers.Default)
+                .collect { (tempBasals, rows) ->
+                    _journalEntries.value = rows
+                    _journalTempBasals.value = tempBasals
+                }
         }
     }
 

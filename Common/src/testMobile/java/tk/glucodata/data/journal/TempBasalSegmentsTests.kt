@@ -108,6 +108,22 @@ class TempBasalSegmentsTests {
         assertEquals(minutes(11), ends[2])
     }
 
+    /**
+     * A status line row 10:00–11:00 and a stray one 10:10–10:15 inside it. A Nightscout copy
+     * at 10:20 is past the later row but still inside the earlier, longer one, so it is out.
+     */
+    @Test
+    fun aNightscoutCopyInsideAnEarlierLongerStatusLineSegmentIsLeftOut() {
+        val ends = tempBasalEndsMillis(
+            listOf(
+                statusLine(1, atMinute = 0, durationMinutes = 60),
+                statusLine(2, atMinute = 10, durationMinutes = 5),
+                entry(3, atMinute = 20, durationMinutes = 30),
+            )
+        )
+        assertFalse(3L in ends)
+    }
+
     /** Before the status line started, Nightscout is all there is; it ends where that starts. */
     @Test
     fun nightscoutStillFillsTimeTheStatusLineDoesNotCover() {

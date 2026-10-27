@@ -17,11 +17,37 @@ package tk.glucodata.data.journal
  */
 fun tempBasalEndsMillis(entries: List<JournalEntry>): Map<Long, Long> {
     val all = entries.filter { it.type == JournalEntryType.TEMP_BASAL }
-    val statusLine = all.filter { AapsStatusLine.isStatusLineRecord(it.sourceRecordId) }
+    val statusLine = all
+        .filter { AapsStatusLine.isStatusLineRecord(it.sourceRecordId) }
+        .sortedBy { it.timestamp }
+    // Both sources keep their whole history, so the coverage test is a binary search, not a
+    // scan of every status line segment per Nightscout row. statusLineReach[i] is the latest
+    // end among the first i + 1 segments: a time is covered when the last segment starting at
+    // or before it, or any earlier one, still runs.
+    val statusLineStarts = LongArray(statusLine.size) { statusLine[it].timestamp }
+    val statusLineReach = LongArray(statusLine.size)
+    statusLine.forEachIndexed { index, segment ->
+        val end = segment.ownEndMillis()
+        statusLineReach[index] = if (index == 0) end else maxOf(statusLineReach[index - 1], end)
+    }
+    fun coveredByStatusLine(timestamp: Long): Boolean {
+        var low = 0
+        var high = statusLineStarts.size - 1
+        var last = -1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            if (statusLineStarts[mid] <= timestamp) {
+                last = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return last >= 0 && timestamp < statusLineReach[last]
+    }
     val tempBasals = all
         .filter { entry ->
-            AapsStatusLine.isStatusLineRecord(entry.sourceRecordId) ||
-                statusLine.none { entry.timestamp in it.timestamp until it.ownEndMillis() }
+            AapsStatusLine.isStatusLineRecord(entry.sourceRecordId) || !coveredByStatusLine(entry.timestamp)
         }
         .sortedWith(compareBy({ it.timestamp }, { it.id }))
     return buildMap {

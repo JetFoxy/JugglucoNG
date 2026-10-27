@@ -150,6 +150,7 @@ import tk.glucodata.R
 import tk.glucodata.MainActivity
 import tk.glucodata.UiRefreshBus
 import android.widget.Toast
+import tk.glucodata.data.journal.JournalChartMarker
 import tk.glucodata.data.journal.JournalDashboardVisibility
 import tk.glucodata.data.journal.JournalEntry
 import tk.glucodata.data.journal.JournalEntryType
@@ -185,7 +186,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.ui.platform.LocalUriHandler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.File
 import androidx.compose.material.icons.filled.ShowChart
@@ -471,20 +474,24 @@ fun DashboardScreen(
     // Deliberately not keyed on glucoseHistory: the markers do not depend on it,
     // and keying on it rebuilt the list — and so recomposed the chart — on every
     // new reading, once a minute, for an identical result.
-    val journalChartMarkers = remember(
-        journalEnabled,
-        dashboardJournalEntries,
-        dashboardTempBasals,
-        journalPresetsById,
-        journalFoodsById,
-        unit
-    ) {
-        val chartEntries = dashboardJournalEntries + dashboardTempBasals
-        if (!journalEnabled || chartEntries.isEmpty()) {
+    val journalRowMarkers = remember(journalEnabled, dashboardJournalEntries, journalPresetsById, journalFoodsById, unit) {
+        if (!journalEnabled || dashboardJournalEntries.isEmpty()) {
             emptyList()
         } else {
-            buildJournalChartMarkers(chartEntries, journalPresetsById, unit, journalFoodsById)
+            buildJournalChartMarkers(dashboardJournalEntries, journalPresetsById, unit, journalFoodsById)
         }
+    }
+    // Temp basals pile up from AAPS every few minutes and are never pruned, so their
+    // markers are built off the main thread. The previous markers stay up meanwhile.
+    val tempBasalMarkers by produceState(initialValue = emptyList<JournalChartMarker>(), dashboardTempBasals, unit) {
+        value = if (dashboardTempBasals.isEmpty()) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.Default) { buildJournalChartMarkers(dashboardTempBasals, emptyMap(), unit) }
+        }
+    }
+    val journalChartMarkers = remember(journalRowMarkers, tempBasalMarkers) {
+        if (tempBasalMarkers.isEmpty()) journalRowMarkers else journalRowMarkers + tempBasalMarkers
     }
     val localInsulinSummary = remember(journalEnabled, scopedJournalEntries, journalPresetsById, journalNow) {
         if (!journalEnabled || scopedJournalEntries.isEmpty()) {
