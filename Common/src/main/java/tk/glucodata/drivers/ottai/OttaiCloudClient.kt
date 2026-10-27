@@ -1031,11 +1031,22 @@ object OttaiCloudClient {
     }
 
     /** A wizard's worker owns its secure CN session; no request runs from the managed driver. */
-    internal class CnOtaClient(ctx: Context) {
-        private val deviceId = requestDeviceId(ctx, OttaiRegistry.SessionProfile.CN_PHONE)
-        private val accessToken = OttaiRegistry.loadAccessToken(ctx)
-        init { require(loadCnOtaSession(ctx)) { "cn_session" } }
-        private val transport = OttaiNetSecurity(deviceId,
+    internal class CnOtaClient(
+        deviceIdSuffix: String,
+        accessToken: String,
+        private val openConnection: (String) -> HttpURLConnection = { target ->
+            (URL(target).openConnection() as HttpURLConnection).apply { instanceFollowRedirects = false }
+        },
+    ) {
+        constructor(ctx: Context) : this(
+            requestDeviceId(ctx, OttaiRegistry.SessionProfile.CN_PHONE),
+            OttaiRegistry.loadAccessToken(ctx),
+        ) { require(loadCnOtaSession(ctx)) { "cn_session" } }
+        // Registry stores n:/g: suffixes. Every crypto context must instead use the
+        // complete identity sent in the common HTTP header, including ottai:a:.
+        private val identityHeaders = cnPhoneHeaders(deviceIdSuffix, accessToken, 0L, "") +
+            mapOf("versionName" to "1.63.0", "versionCode" to "264122")
+        private val transport = OttaiNetSecurity(identityHeaders.getValue("deviceId"),
             exchange = { body -> raw("POST", "/security/exchangeKey", emptyMap(), emptyMap(), body.toString()) },
             send = { method, path, cipherHeaders, query, body -> raw(method, path, cipherHeaders, query, body) })
 
@@ -1043,11 +1054,11 @@ object OttaiCloudClient {
             query: Map<String, String>, body: String?): OttaiNetSecurity.Reply {
             val qs = query.entries.joinToString("&") { "${enc(it.key)}=${enc(it.value)}" }
             val url = OttaiConstants.API_BASE + OttaiConstants.OTA_SECURE_PREFIX + path + if (qs.isEmpty()) "" else "?$qs"
-            val requestHeaders = cnPhoneHeaders(deviceId, accessToken, now(), UUID.randomUUID().toString()) +
-                mapOf("versionName" to "1.63.0", "versionCode" to "264122") + cipherHeaders +
+            val requestHeaders = identityHeaders +
+                mapOf("timestamp" to now().toString(), "traceId" to UUID.randomUUID().toString()) + cipherHeaders +
                 if (body == null) emptyMap() else mapOf("Content-Type" to "application/json;charset=UTF-8")
             val result = requestWithResult(method, url, body, requestHeaders,
-                openConnection = { target -> (URL(target).openConnection() as HttpURLConnection).apply { instanceFollowRedirects = false } })
+                openConnection = openConnection)
             return OttaiNetSecurity.Reply(result.failure?.httpStatus ?: 200, result.body)
         }
 

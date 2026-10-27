@@ -5,6 +5,13 @@ records the baseline, and receives HTTP 403 from `/cgm/app/server/ota/upgradeVer
 `NET_SECURITY_PLAINTEXT_ROUTE_FORBIDDEN`. The old API route is forbidden even over HTTPS.
 This is distinct from the earlier BLE discovery and software-revision parser failures.
 
+The subsequent `juggluco-trace-20261027-031949.log` reaches the secure key exchange, but
+receives HTTP 200 with business code `Error` and `签名校验失败` (signature verification
+failed). The first integration signed the registry's `n:…`/`g:…` suffix while the common
+HTTP header sent `ottai:a:n:…`/`ottai:a:g:…`. The transport now takes its complete crypto
+identity directly from the same header snapshot used by every outgoing request. This applies
+to exchange signatures, server verification, HKDF, AAD and `cipherUserId` together.
+
 ## Source and scope
 
 The current CN client was downloaded from the [Tencent distribution listing](https://sj.qq.com/appdetail/com.ottai.tag):
@@ -70,6 +77,13 @@ authenticated exchange plaintext, encrypted query signature and authenticated re
 passed. The same round trip also passed using the **production Kotlin codec**, compiled with
 `SecureCloudProbe.kt`. Returned tokens and ephemeral keys were neither printed nor retained.
 No account token, sensor MAC, account mutation or OTA report was used in those probes.
+
+An anonymous negative probe signing the stored suffix while sending the complete header ID
+reproduced `ota_exchange_http=200`; the matching full identity passed the secure round trip.
+The earlier standalone probe supplied the full ID directly and therefore missed the app's
+header-builder integration defect. A regression now captures the actual `CnOtaClient` HTTP
+exchange and independently verifies its signature against its outgoing header, for both native
+and generated ID suffixes. It fails with the old integration and passes with the shared identity.
 
 The offline fixture `ottai-net-security.json` is independently generated with PyCryptodome
 by `scripts/ottai/net_security_vectors.py`. Its fixed scalars are public synthetic test inputs.
