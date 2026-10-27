@@ -361,6 +361,17 @@ object ICanHealthConstants {
         if (name.isEmpty()) {
             return false
         }
+        // Provisional ICN- names carry a concrete (short) serial even though it is
+        // shorter than the 16-char token regex. Treat a non-matching provisional name
+        // as a conflict so we never connect+reject+rescan it in a loop (observed:
+        // ~354 connect/reject cycles for one wrong ICN- device).
+        if (isProvisionalSensorId(name)) {
+            val suffix = name.substringAfter('-', "").trim()
+            if (suffix.isNotEmpty()) {
+                return !matchesOnboardingIdentity(onboardingDeviceSn, suffix) &&
+                    !matchesOnboardingIdentity(onboardingDeviceSn, name)
+            }
+        }
         val serialToken = ADVERTISED_SERIAL_TOKEN.find(name)?.value ?: return false
         return !matchesOnboardingIdentity(onboardingDeviceSn, serialToken) &&
             !matchesOnboardingIdentity(onboardingDeviceSn, name)

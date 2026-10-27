@@ -1179,6 +1179,15 @@ class ICanHealthBleManager(
         if (knownAddress != null) {
             return address != null && address.equals(knownAddress, ignoreCase = true)
         }
+        if (ICanHealthConstants.advertisedNameConflictsWithOnboarding(onboardingDeviceSn, trimmedName)) {
+            Log.w(
+                TAG,
+                "Skipping candidate address=${candidateAddress ?: "unknown"}: advertised serial in " +
+                    "'$trimmedName' does not match onboarding " +
+                    ICanHealthConstants.onboardingIdentityPrefix(onboardingDeviceSn)
+            )
+            return false
+        }
         return notePickedByOnboardingScan(
             candidateAddress,
             matchesUnaddressedName(trimmedName),
@@ -1218,55 +1227,20 @@ class ICanHealthBleManager(
         if (knownAddress != null) {
             return address != null && address.equals(knownAddress, ignoreCase = true)
         }
-        // Onboarding guard: latch onto iCan/Sinocare devices first. A candidate whose
-        // advertised name is not a known iCan device (and carries no serial matching the
-        // onboarding identity) is rejected up front, so we do not connect to an unrelated
-        // CGM peripheral that merely advertises the CGM service. Only if no matching
-        // candidate is found do the looser fallbacks (post-connection identity check,
-        // rejected-address retry) come into play.
-        val onboardingSn = onboardingDeviceSn
-        if (onboardingSn != null) {
-            val deviceName = result.device?.name?.trim()
-            if (!deviceName.isNullOrEmpty()) {
-                val serialToken = Regex("[0-9A-Za-z]{16,32}").find(deviceName)?.value
-                val isKnownICanName = ICanHealthConstants.isICanHealthDevice(deviceName)
-                val isProvisionalName = ICanHealthConstants.isProvisionalSensorId(deviceName)
-                val serialMatches = serialToken != null &&
-                    !ICanHealthConstants.isProvisionalSensorId(serialToken) &&
-                    (ICanHealthConstants.matchesOnboardingIdentity(onboardingSn, serialToken) ||
-                        ICanHealthConstants.matchesOnboardingIdentity(onboardingSn, deviceName))
-                val provisionalMatches = isProvisionalName &&
-                    ICanHealthConstants.matchesOnboardingIdentity(onboardingSn, deviceName)
-                if (!isKnownICanName && !serialMatches) {
-                    Log.w(
-                        TAG,
-                        "Skipping non-iCan candidate address=${address ?: "unknown"}: " +
-                            "name='$deviceName' is not a known iCan device"
-                    )
-                    return false
-                }
-                // Provisional ICN- names carry a concrete serial: reject them at scan time when
-                // they do not match the onboarding identity, so we never connect+reject+rescan
-                // in a loop (observed: 354 connect/reject cycles for one wrong ICN- device).
-                if (isProvisionalName && !provisionalMatches) {
-                    Log.w(
-                        TAG,
-                        "Skipping iCan candidate address=${address ?: "unknown"}: " +
-                            "provisional name '$deviceName' does not match onboarding " +
-                            ICanHealthConstants.onboardingIdentityPrefix(onboardingSn)
-                    )
-                    return false
-                }
-                if (serialToken != null && !ICanHealthConstants.isProvisionalSensorId(serialToken) && !serialMatches) {
-                    Log.w(
-                        TAG,
-                        "Skipping iCan candidate address=${address ?: "unknown"}: " +
-                            "advertised serial $serialToken does not match onboarding " +
-                            ICanHealthConstants.onboardingIdentityPrefix(onboardingSn)
-                    )
-                    return false
-                }
-            }
+        // Onboarding guard: skip a candidate whose advertised name carries another sensor's
+        // serial, so we do not connect to a nearby iCan first and only reject it afterwards.
+        // A name without a serial stays eligible: name matching is deliberately broad for
+        // unknown rebrands, and the post-connection identity gate remains the safeguard.
+        val advertisedName = result.scanRecord?.deviceName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: result.device?.name?.trim()
+        if (ICanHealthConstants.advertisedNameConflictsWithOnboarding(onboardingDeviceSn, advertisedName)) {
+            Log.w(
+                TAG,
+                "Skipping candidate address=${address ?: "unknown"}: advertised serial in " +
+                    "'$advertisedName' does not match onboarding " +
+                    ICanHealthConstants.onboardingIdentityPrefix(onboardingDeviceSn)
+            )
+            return false
         }
         val record = result.scanRecord ?: return false
         val advertisesCgmService = record.serviceUuids
