@@ -81,7 +81,7 @@ object OttaiConstants {
     const val EP_DEVICE_LIST = "$PREFIX/deviceBind/list"  // account's bound + past sensors (paged)
     const val EP_DOWNLOAD_GLUCOSE = "$PREFIX/search/downloadGlucose"
     const val OTA_SECURE_PREFIX = "/cgm/security/app/server"
-    // Relative to OTA_SECURE_PREFIX; these routes require the CN network-security envelope.
+    // Relative to OTA_SECURE_PREFIX; these routes require the regional network-security envelope.
     const val EP_OTA_JUDGE = "/ota/upgradeVersion/judge"
     const val EP_OTA_REPORT = "/device/ota/upgrade"
 

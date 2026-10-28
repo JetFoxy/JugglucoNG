@@ -3126,9 +3126,9 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="settings_search_no_results">Geen instellingen gevonden voor ‘%1$s’</string>
     <string name="settings_search_clear">Zoekopdracht wissen</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Experimentele firmwaretest</string>
-    <string name="ottai_ota_warning">Alleen CN-sensoren. Een mislukte update kan de sensor onbruikbaar maken. Houd dit scherm open en de telefoon dicht bij de sensor.</string>
+    <string name="ottai_ota_warning">Een mislukte update kan de sensor onbruikbaar maken. Houd dit scherm open en de telefoon dicht bij de sensor.</string>
     <string name="ottai_ota_connecting">Verbinden zonder activering…</string>
     <string name="ottai_ota_authenticating">Sensoridentiteit controleren…</string>
     <string name="ottai_ota_checking">Firmware controleren en downloaden…</string>

@@ -3155,9 +3155,9 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="settings_search_no_results">Nincs a(z) „%1$s” keresésnek megfelelő beállítás</string>
     <string name="settings_search_clear">Keresés törlése</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Kísérleti firmware-teszt</string>
-    <string name="ottai_ota_warning">Csak CN érzékelőkhöz. A sikertelen frissítés használhatatlanná teheti az érzékelőt. Tartsa nyitva ezt a képernyőt, és a telefont az érzékelő közelében.</string>
+    <string name="ottai_ota_warning">A sikertelen frissítés használhatatlanná teheti az érzékelőt. Tartsa nyitva ezt a képernyőt, és a telefont az érzékelő közelében.</string>
     <string name="ottai_ota_connecting">Csatlakozás aktiválás nélkül…</string>
     <string name="ottai_ota_authenticating">Az érzékelő azonosságának ellenőrzése…</string>
     <string name="ottai_ota_checking">Firmware ellenőrzése és letöltése…</string>

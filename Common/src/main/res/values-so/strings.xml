@@ -3265,9 +3265,9 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="settings_search_no_results">Ma jiro dejin u dhiganta “%1$s”</string>
     <string name="settings_search_clear">Tirtir raadinta</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Tijaabada firmware-ka</string>
-    <string name="ottai_ota_warning">Kaliya dareemayaasha CN. Cusboonaysiin fashilanta waxay dareemaha ka dhigi kartaa mid aan shaqayn. Shaashaddan fur oo taleefanka u dhowee dareemaha.</string>
+    <string name="ottai_ota_warning">Cusboonaysiin fashilanta waxay dareemaha ka dhigi kartaa mid aan shaqayn. Shaashaddan fur oo taleefanka u dhowee dareemaha.</string>
     <string name="ottai_ota_connecting">Isku xidhid aan hawlgelin lahayn…</string>
     <string name="ottai_ota_authenticating">Xaqiijinta aqoonsiga dareemaha…</string>
     <string name="ottai_ota_checking">Hubinta iyo soo dejinta firmware-ka…</string>

@@ -10,12 +10,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OttaiOtaIdentityTests {
+    @Test fun signedInGlobalAndSyaiAccountsAreEligibleAlongsideCnPhoneAccounts() {
+        for (base in listOf(OttaiConstants.API_BASE_GLOBAL, OttaiConstants.API_BASE_SYAI)) {
+            assertTrue(OttaiCloudClient.supportsOtaSession(base, OttaiRegistry.SessionProfile.WATCH, true))
+            assertFalse(OttaiCloudClient.supportsOtaSession(base, OttaiRegistry.SessionProfile.WATCH, false))
+        }
+        assertTrue(OttaiCloudClient.supportsOtaSession(OttaiConstants.API_BASE, OttaiRegistry.SessionProfile.CN_PHONE, true))
+        assertFalse(OttaiCloudClient.supportsOtaSession(OttaiConstants.API_BASE, OttaiRegistry.SessionProfile.WATCH, true))
+        assertFalse(OttaiCloudClient.supportsOtaSession("https://example.invalid", OttaiRegistry.SessionProfile.WATCH, true))
+    }
+
     @Test fun exchangeSignsTheCompleteOutgoingHeaderIdentityForNativeAndFallbackIds() {
         for (suffix in listOf("n:00000000-1111-2222-3333-444444444444", "g:" + "a".repeat(32))) {
             var exchanges = 0
             lateinit var connection: HttpURLConnection
             lateinit var request: JSONObject
-            val client = OttaiCloudClient.CnOtaClient(suffix, "synthetic-account-token", openConnection = { url ->
+            val client = OttaiCloudClient.OtaClient(OttaiConstants.API_BASE, OttaiCloudClient.cnPhoneHeaders(
+                suffix, "synthetic-account-token", 0L, "synthetic-trace"), openConnection = { url ->
                 object : HttpURLConnection(URL(url)) {
                     private val body = ByteArrayOutputStream()
                     override fun connect() = Unit

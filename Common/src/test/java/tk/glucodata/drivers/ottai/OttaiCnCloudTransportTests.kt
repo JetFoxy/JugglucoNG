@@ -216,10 +216,8 @@ class OttaiCnCloudTransportTests {
         assertEquals(200, result.failure.httpStatus)
     }
 
-    @Test fun globalSyaiWatchWebAndAlreadySecureRequestsRetainTheirOriginalTransport() {
+    @Test fun watchCnWebAndAlreadySecureRequestsRetainTheirOriginalTransport() {
         val requests = listOf(
-            OttaiConstants.API_BASE_GLOBAL + OttaiConstants.EP_GET_BIND_DEVICE to headers,
-            OttaiConstants.API_BASE_SYAI + OttaiConstants.EP_GET_BIND_DEVICE to headers,
             OttaiConstants.API_BASE + OttaiConstants.EP_GET_BIND_DEVICE to (headers + ("appName" to "ottai-watch")),
             OttaiConstants.WEB_BASE_OTTAI + "/user/getUser" to headers,
             OttaiConstants.API_BASE + OttaiConstants.OTA_SECURE_PREFIX + "/user/apiToken" to headers,

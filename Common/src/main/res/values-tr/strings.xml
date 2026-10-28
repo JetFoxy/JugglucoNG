@@ -3111,9 +3111,9 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="settings_search_no_results">“%1$s” ile eşleşen ayar yok</string>
     <string name="settings_search_clear">Aramayı temizle</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Deneysel ürün yazılımı testi</string>
-    <string name="ottai_ota_warning">Yalnızca CN sensörleri. Başarısız bir güncelleme sensörü kullanılamaz hâle getirebilir. Bu ekranı açık tutun ve telefonu sensöre yakın tutun.</string>
+    <string name="ottai_ota_warning">Başarısız bir güncelleme sensörü kullanılamaz hâle getirebilir. Bu ekranı açık tutun ve telefonu sensöre yakın tutun.</string>
     <string name="ottai_ota_connecting">Etkinleştirmeden bağlanılıyor…</string>
     <string name="ottai_ota_authenticating">Sensör kimliği doğrulanıyor…</string>
     <string name="ottai_ota_checking">Ürün yazılımı denetleniyor ve indiriliyor…</string>

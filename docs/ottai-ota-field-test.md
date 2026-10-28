@@ -1,16 +1,34 @@
-# Direct CN Ottai firmware field test
+# Ottai and Syai firmware field test
 
 This implements an experimental alternative to the official-app capture proposed in
 [PR #727](https://github.com/ctqvva/JugglucoNG/pull/727). No official app is required on
-the test phone. Saved credentials and a signed-in CN phone account are required. Choose
+the test phone. Saved sensor credentials and a signed-in account on the matching backend are required.
+CN phone, Ottai Global and Syai accounts can run the experiment. Checks and reports use
+that account's backend and issuing identity; firmware is never fetched from another region
+as a fallback. Choose
 **Fresh sensor** for the preactivation experiment or **Started sensor** for a running-sensor
 OTA experiment. Both require the sensor to be disconnected from managed monitoring first.
+
+## Regions and verification
+
+The OTA action is on the selected sensor card in the current search page. It is available
+for signed-in CN phone, Ottai Global and Syai sessions with saved sensor auth keys and a
+selected BLE address. The wizard pauses its scanner and NFC capture while the dialog owns BLE.
+A failed API call or `AppDevice_Upgrade_Version` response is not itself a firmware offer:
+that code can indicate an app/API compatibility mismatch. Installation requires a successfully
+authenticated offer with an actual downloadable package.
+
+The regional transport is verified separately through anonymous encrypted requests. Real
+account firmware offers, downloads, activation and physical OTA still need phone testing.
+The BLE sequence was recovered from CN evidence; its global/Syai compatibility is a field-test
+assumption, not hardware proof. Use Fresh sensor or Started sensor as appropriate; installation
+and parameter writes remain separate explicit actions.
 
 ## Test on the phone
 
 1. Enable Android Bluetooth HCI snoop logging if available. This records **our own** traffic;
    it is diagnostic evidence, not an independent official-protocol reference.
-2. Open Sensors → add Ottai. Sign in to the CN account, enter/scan the sensor code, and
+2. Open Sensors → add Ottai. Sign in to the matching CN, Ottai Global or Syai account, enter/scan the sensor code, and
    select its actual Bluetooth advertisement. NFC wake may be needed. Let the existing
    credential fetch/bootstrap finish, then export the credentials JSON for recovery.
 3. **Do not press the normal Connect/activate button yet.** Choose **Check firmware
@@ -54,7 +72,7 @@ If the check stops with `firmware_profile`, the dialog displays the reported sof
 length and first 64 bytes in hex, including padding. This diagnoses unexpected revision formats;
 empty, non-ASCII and control-containing values still stop the check. Software revisions are
 vendor strings, not semantic versions: the exact field response
-`E1.1.4(V1.7.S2530.1),STDRD` is retained for the CN API, display and recovery journal, with only
+`E1.1.4(V1.7.S2530.1),STDRD` is retained for the account API, display and recovery journal, with only
 surrounding padding removed. Unfamiliar printable vendor strings can reach the cloud check.
 When understood, the embedded application profile (`V1.7` here) supplies numeric upgrade
 ordering and factory-parameter gates; the leading `E1.1.4` does not supply those gates.
@@ -82,7 +100,7 @@ It cannot isolate the effect of firmware from factory provisioning on early read
 3. The baseline displays command status, provisioned lifetime in seconds, latest decoded
    live-record number and RTC seconds. Missing/undecodable optional fields show `—`.
    These are observations, not prerequisites that the update must preserve.
-4. Review the offered target/version/digest and choose **Install firmware**. The CN cloud
+4. Review the offered target/version/digest and choose **Install firmware**. The account backend
    must offer an actual newer package for this sensor; there is no guessed image, downgrade
    or bypass of a cloud refusal.
 5. After reboot the target firmware must match `2a28` and the sensor must reauthenticate.
@@ -125,7 +143,7 @@ its separate provisioning flow.
 - When the old application still boots on the saved source revision, the validated journal
   package is reused without another firmware offer or download. In Fresh sensor mode the
   authenticated parameter-only action remains available, including after a firmware-download
-  failure. It still needs the CN API to refresh materials and successful factory-write ACKs;
+  failure. It still needs the account API to refresh materials and successful factory-write ACKs;
   bootloader-only recovery cannot run that action.
 - An OTA success report is attempted only after matching BLE version readback and a fresh
   authenticated status allowed by the selected mode. Report failure does not substitute for sensor evidence.

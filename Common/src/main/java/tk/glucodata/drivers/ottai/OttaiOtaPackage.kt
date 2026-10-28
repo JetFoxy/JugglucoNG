@@ -57,7 +57,7 @@ internal object OttaiOtaProtocol {
     // Recovered CN 1.44 sequence in PR #727, deliberately not the standard SiLabs 0x03 finish.
     const val FINISH: Byte = 0x06
     const val WRITE_DELAY_MS = 60L
-    // 2a28 is a vendor string, not a semantic version. The CN API and journal need it intact.
+    // 2a28 is a vendor string, not a semantic version. The cloud API and journal need it intact.
     // 512 bytes is the BLE attribute limit; only empty/control/non-ASCII values are rejected.
     fun version(value: String): String? = value.trim { it.isWhitespace() || it == '\u0000' }
         .takeIf { it.length in 1..512 && it.all { ch -> ch in ' '..'~' } }
@@ -117,7 +117,7 @@ internal object OttaiOtaProtocol {
         if (sameVersion(source, target)) return false
         val from = application(source)
         val to = application(target)
-        // An unfamiliar vendor spelling must reach the authoritative CN offer, not a local
+        // An unfamiliar vendor spelling must reach the authoritative cloud offer, not a local
         // compatibility whitelist. Numeric downgrade checks apply when both are understood.
         if (from == null || to == null) return true
         val order = compareVersions(from, to)

@@ -783,8 +783,8 @@ fun OttaiSetupWizard(
     // leaves that at WOKE and would not re-run this.
     // Once nothing here needs a wake (signed in to Ottai Global, or Global picked), setup must
     // let go of NFC: a held capture swallows the next Libre or pen tap.
-    LaunchedEffect(step, nfcWakeListening, nfcScanRestartKey) {
-        if (!nfcWakeListening) {
+    LaunchedEffect(step, nfcWakeListening, nfcScanRestartKey, showFirmwareTest) {
+        if (!nfcWakeListening || showFirmwareTest) {
             OttaiNfc.disarmSetup()
         } else if (step == OttaiSetupStep.SEARCH) {
             OttaiNfc.armForSetup()
@@ -1385,7 +1385,7 @@ fun OttaiSetupWizard(
                 }
             },
             onImport = launchImport,
-            onFirmware = if (signedIn && region == OttaiRegion.CN && hasMaterials &&
+            onFirmware = if (signedIn && OttaiCloudClient.loadOtaSession(context) && hasMaterials &&
                 OttaiConstants.normalizeBleAddress(bleAddress) != null) ({
                 OttaiSetupScanHold.stopPanelScans()
                 showFirmwareTest = true
@@ -1471,6 +1471,7 @@ fun OttaiSetupWizard(
                         ui = ui,
                         restartKey = nfcScanRestartKey,
                         enabled = !busy && !materialLoading && !showFirmwareTest,
+                        scanPaused = showFirmwareTest,
                         selectedSensor = selectedSensor,
                         scrollRequest = searchScrollRequest,
                         focusSelectedSensor = focusSelectedSensor,
@@ -1654,6 +1655,7 @@ private fun OttaiSearchStep(
     ui: WizardUiMetrics,
     restartKey: Int,
     enabled: Boolean,
+    scanPaused: Boolean,
     selectedSensor: (@Composable () -> Unit)?,
     scrollRequest: Int,
     focusSelectedSensor: Boolean,
@@ -1720,8 +1722,8 @@ private fun OttaiSearchStep(
         }
     }
 
-    DisposableEffect(scanPermissionGranted, bluetoothEnabled, scanRetryKey, restartKey) {
-        if (!scanPermissionGranted || !bluetoothEnabled) {
+    DisposableEffect(scanPermissionGranted, bluetoothEnabled, scanRetryKey, restartKey, scanPaused) {
+        if (scanPaused || !scanPermissionGranted || !bluetoothEnabled) {
             scanner.stopScan()
             scanStats = emptyMap()
             scanActive = false

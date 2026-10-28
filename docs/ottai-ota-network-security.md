@@ -1,4 +1,4 @@
-# CN OTA network security
+# OTA cloud transport
 
 The supplied `juggluco-trace-20261027-023359.log` reaches authenticated command state 3,
 records the baseline, and receives HTTP 403 from `/cgm/app/server/ota/upgradeVersion/judge`:
@@ -21,21 +21,26 @@ The current CN client was downloaded from the [Tencent distribution listing](htt
 APK, disassembly and raw probes remain outside Git. No app installation or sensor activation
 was needed. Obfuscated library URLs differ only by case; use a case-sensitive output directory.
 
-`OttaiNetSecurity` implements the recovered codec and `OttaiCnTransport` owns CN routing
-and common headers. All CN phone mobile requests use this transport, including anonymous
-API-token/SMS login, account device/binding lookup, validation, Active Auth, bind and unbind.
-The supplied activation screenshot shows `NET_SECURITY_PLAINTEXT_ROUTE_FORBIDDEN` after
-the earlier OTA-only migration left these calls on the legacy routes. The shared dispatcher
-now selects the secure prefix before making an HTTP request, retaining the existing business
-query/body and signed common timestamp. GET, POST and the existing unbind PUT are supported.
-Watch sessions, global/Syai mobile hosts and web APIs retain their existing transport.
+`OttaiNetSecurity` implements the recovered codec. The rebased branch uses main's
+`OttaiRegionalTransport` for both ordinary cloud calls and OTA. CN phone mobile requests
+retain the 1.63 identity/version and `cipherUserId`; Ottai Global and Syai retain their
+issuing watch identity, `webDeviceId` and secure compatibility version `10000000`. CN
+forwarded-IP headers are never added to global/Syai requests. Main's Syai web/login and
+box-serial resolution behavior is preserved. See [regional protocol provenance and live
+verification](ottai-login-network-security.md).
 
-Each ordinary CN request owns an ephemeral exchange and clears its keys on return. A firmware
-worker owns its longer-lived OTA session, including the gracefully drained advisory report.
-No plaintext fallback is attempted. Decrypted business codes such as `AppDevice_Upgrade_Version`,
-`AppUser_AlreadyBinding` and `AuthFailed_TokenInvalid` remain available to the existing activation
-and account recovery logic. Failure responses never supply activation materials. An encrypted
-success must authenticate before its contents reach any existing parser.
+All ordinary CN phone mobile calls also select the secure route, including API-token/SMS
+login, account device/binding lookup, validation, Active Auth, bind and unbind. The supplied
+activation screenshot showed `NET_SECURITY_PLAINTEXT_ROUTE_FORBIDDEN` after the initial
+OTA-only migration left these calls on old routes. Business query/body values and their
+signed common timestamp remain unchanged. GET, POST and the existing unbind PUT are supported.
+
+The OTA worker snapshots the account's backend and headers. Its judge GET and advisory
+report POST use that backend exclusively. Each HTTP operation clears its ephemeral keys
+on return, including errors and reports. Successful worker shutdown still drains reporting
+without retaining BLE. No plaintext or cross-region fallback is attempted. Decrypted
+business codes retain the existing activation and account recovery behavior; failed,
+empty or unauthenticated responses cannot supply credentials or firmware offers.
 
 ## Recovered protocol
 
@@ -91,7 +96,7 @@ No account token, sensor MAC, account mutation or OTA report was used in those p
 An anonymous negative probe signing the stored suffix while sending the complete header ID
 reproduced `ota_exchange_http=200`; the matching full identity passed the secure round trip.
 The earlier standalone probe supplied the full ID directly and therefore missed the app's
-header-builder integration defect. A regression now captures the actual `CnOtaClient` HTTP
+header-builder integration defect. A regression now captures the actual `OtaClient` HTTP
 exchange and independently verifies its signature against its outgoing header, for both native
 and generated ID suffixes. It fails with the old integration and passes with the shared identity.
 
@@ -107,7 +112,7 @@ Requests outside the CN phone mobile profile retain their original URLs.
 To reproduce the optional anonymous production-code probe, compile these files together with
 `kotlinc -cp <org.json.jar> -include-runtime -d <probe.jar>` from the repository root:
 
-- `OttaiNetSecurity.kt`, `OttaiCnTransport.kt`, `OttaiConstants.kt`, `OttaiBleAuth.kt`, and
+- `OttaiNetSecurity.kt`, `OttaiRegionalTransport.kt`, `OttaiConstants.kt`, `OttaiBleAuth.kt`, and
   `OttaiCrypto.kt` from `drivers/ottai`;
 - `scripts/ottai/SecureCloudProbe.kt`.
 
@@ -124,3 +129,17 @@ mode. This state means the authenticated offer returned both `requiredUpgrade=fa
 `allowUpgrade=false`; the next trace also logs both flags and whether a download URL exists,
 without recording that URL. This does not test installation. Normal activation after the
 complete CN migration still needs the phone test.
+
+## Global and Syai field-test extension
+
+The OTA entry point now accepts all three supported account backends and is integrated into
+main's refactored sensor card. CN-only UI restrictions and warning text were removed in all
+16 locales. The selected BLE sensor must still authenticate with its saved keys. Fresh and
+Started modes, journaling, target verification and explicit installation are shared across
+regions; BLE packet/finish behavior for global and Syai remains physically untested.
+
+Synthetic server tests invoke the actual OTA client on every backend, decrypt its judge
+parameters and verified-success report, and check the destination, authorization and issuing
+identity. They cover required offers with `allowUpgrade=false`, app-version business rejection,
+closed clients, plaintext success and changed authentication tags. Regional API transport success
+alone is not evidence that a particular sensor has an available or required firmware image.

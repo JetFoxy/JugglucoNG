@@ -3090,9 +3090,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_no_results">Aucun paramètre ne correspond à « %1$s »</string>
     <string name="settings_search_clear">Effacer la recherche</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Test expérimental du micrologiciel</string>
-    <string name="ottai_ota_warning">Capteurs CN uniquement. Un échec peut rendre le capteur inutilisable. Gardez cet écran ouvert et le téléphone près du capteur.</string>
+    <string name="ottai_ota_warning">Un échec peut rendre le capteur inutilisable. Gardez cet écran ouvert et le téléphone près du capteur.</string>
     <string name="ottai_ota_connecting">Connexion sans activation…</string>
     <string name="ottai_ota_authenticating">Vérification de l’identité du capteur…</string>
     <string name="ottai_ota_checking">Vérification et téléchargement du micrologiciel…</string>

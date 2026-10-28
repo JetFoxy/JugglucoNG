@@ -3129,9 +3129,9 @@
     <string name="settings_search_no_results">Brak ustawień pasujących do „%1$s”</string>
     <string name="settings_search_clear">Wyczyść wyszukiwanie</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Eksperymentalny test oprogramowania</string>
-    <string name="ottai_ota_warning">Tylko sensory CN. Nieudana aktualizacja może uszkodzić sensor. Pozostaw ten ekran otwarty i trzymaj telefon blisko sensora.</string>
+    <string name="ottai_ota_warning">Nieudana aktualizacja może uszkodzić sensor. Pozostaw ten ekran otwarty i trzymaj telefon blisko sensora.</string>
     <string name="ottai_ota_connecting">Łączenie bez aktywacji…</string>
     <string name="ottai_ota_authenticating">Weryfikacja tożsamości sensora…</string>
     <string name="ottai_ota_checking">Sprawdzanie i pobieranie oprogramowania…</string>

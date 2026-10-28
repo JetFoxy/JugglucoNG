@@ -35,8 +35,9 @@ The secure version and route must change together.
 Every regional mobile request uses this dispatcher, including API-token issuance,
 login, profile lookup, account devices, validation, binding and unbinding. Account
 identity, authorization and signed common timestamp remain the same. No CN
-forwarded-IP headers are added. Ottai website and CN requests retain their existing
-transport. There is no retry through a plaintext route.
+forwarded-IP headers are added. Ottai website requests retain their existing transport. The OTA branch adds CN phone
+mobile requests to this same dispatcher with their own cipher identity/version contract; see
+[OTA cloud transport](ottai-ota-network-security.md). There is no retry through a plaintext route.
 
 The codec reuses the authenticated P-256/SHA-256 exchange, HKDF-SHA256 key
 derivation, AES-256-GCM query/body encryption, and HMAC-SHA256 request signatures

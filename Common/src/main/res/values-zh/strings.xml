@@ -3096,9 +3096,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_no_results">没有与“%1$s”匹配的设置</string>
     <string name="settings_search_clear">清除搜索</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">实验性固件测试</string>
-    <string name="ottai_ota_warning">仅限中国版传感器。更新失败可能导致传感器无法使用。请保持此屏幕打开，并将手机放在传感器附近。</string>
+    <string name="ottai_ota_warning">更新失败可能导致传感器无法使用。请保持此屏幕打开，并将手机放在传感器附近。</string>
     <string name="ottai_ota_connecting">正在连接，不激活传感器…</string>
     <string name="ottai_ota_authenticating">正在验证传感器身份…</string>
     <string name="ottai_ota_checking">正在检查并下载固件…</string>

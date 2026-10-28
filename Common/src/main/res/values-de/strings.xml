@@ -3196,9 +3196,9 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="settings_search_no_results">Keine Einstellung passt zu „%1$s“</string>
     <string name="settings_search_clear">Suche löschen</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Experimenteller Firmwaretest</string>
-    <string name="ottai_ota_warning">Nur für CN-Sensoren. Ein fehlgeschlagenes Update kann den Sensor unbrauchbar machen. Diesen Bildschirm geöffnet und das Telefon nahe am Sensor halten.</string>
+    <string name="ottai_ota_warning">Ein fehlgeschlagenes Update kann den Sensor unbrauchbar machen. Diesen Bildschirm geöffnet und das Telefon nahe am Sensor halten.</string>
     <string name="ottai_ota_connecting">Verbindung ohne Aktivierung…</string>
     <string name="ottai_ota_authenticating">Sensoridentität wird geprüft…</string>
     <string name="ottai_ota_checking">Firmware wird geprüft und heruntergeladen…</string>

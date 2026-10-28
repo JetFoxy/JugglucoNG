@@ -38,7 +38,7 @@ internal class OttaiFirmwareSession private constructor(
     private val thread = HandlerThread("OttaiFirmware").also { it.start() }
     private val handler = Handler(thread.looper)
     private val main = Handler(Looper.getMainLooper())
-    private val otaCloud = lazy { OttaiCloudClient.CnOtaClient(context) }
+    private val otaCloud = lazy { OttaiCloudClient.OtaClient(context) }
     private val worker = Executors.newSingleThreadExecutor { task ->
         Thread({
             try { task.run() }
@@ -88,7 +88,7 @@ internal class OttaiFirmwareSession private constructor(
             publish: (OttaiFirmwareState) -> Unit): OttaiFirmwareSession? {
             val id = OttaiConstants.canonicalSensorId(sensorId)
             val ble = OttaiConstants.normalizeBleAddress(address) ?: return null
-            if (!OttaiConstants.looksLikeMac(id) || !OttaiCloudClient.loadCnOtaSession(context)) return null
+            if (!OttaiConstants.looksLikeMac(id) || !OttaiCloudClient.loadOtaSession(context)) return null
             // A managed owner could reconnect and consume activation intent in parallel.
             if (OttaiRegistry.findRecord(context, id) != null || SensorBluetooth.mygatts().any { callback ->
                     callback is OttaiDriver && callback.matchesManagedSensorId(id)
@@ -281,7 +281,7 @@ internal class OttaiFirmwareSession private constructor(
                 if (!closed && owner == generation) {
                     // Never expose exception messages from HTTP (they may contain signed URLs).
                     done(result.fold({ Result.success(it) }, { error ->
-                        val safe = setOf("cn_session", "ota_judge", "ota_response", "ota_flags", "download_missing",
+                        val safe = setOf("ota_session", "ota_judge", "ota_response", "ota_flags", "download_missing",
                             "download_url", "download_filename", "target_version", "not_an_upgrade", "download_status",
                             "download_size", "download_redirects", "redirect", "gbl_size", "gbl_header", "gbl_truncated",
                             "gbl_tag", "gbl_header_duplicate", "gbl_length", "gbl_end", "gbl_crc", "materials_refresh",
@@ -344,7 +344,7 @@ internal class OttaiFirmwareSession private constructor(
 
     override fun refreshMaterials(version: String, done: (Result<OttaiRegistry.DeviceMaterials>) -> Unit) {
         work({
-            require(OttaiCloudClient.loadCnOtaSession(context)) { "cn_session" }
+            require(OttaiCloudClient.loadOtaSession(context)) { "ota_session" }
             val resp = OttaiCloudClient.bindV3(context, sensorId, version) ?: error("materials_refresh")
             require(OttaiConstants.canonicalSensorId(resp.mac) == sensorId && resp.deviceVersion == version) { "materials_identity" }
             OttaiCloudClient.toMaterials(context, sensorId, resp)?.takeIf { it.authKeys != null } ?: error("materials_decrypt")

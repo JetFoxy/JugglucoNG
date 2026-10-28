@@ -3135,9 +3135,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_no_results">Нет настроек, подходящих под «%1$s»</string>
     <string name="settings_search_clear">Очистить поиск</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Экспериментальное обновление</string>
-    <string name="ottai_ota_warning">Только для китайских сенсоров. Сбой обновления может вывести сенсор из строя. Оставьте этот экран открытым и держите телефон рядом с сенсором.</string>
+    <string name="ottai_ota_warning">Сбой обновления может вывести сенсор из строя. Оставьте этот экран открытым и держите телефон рядом с сенсором.</string>
     <string name="ottai_ota_connecting">Подключение без активации…</string>
     <string name="ottai_ota_authenticating">Проверка подлинности сенсора…</string>
     <string name="ottai_ota_checking">Проверка и загрузка прошивки…</string>

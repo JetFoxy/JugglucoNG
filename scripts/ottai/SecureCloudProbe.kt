@@ -34,14 +34,12 @@ fun main() {
             OttaiNetSecurity.Reply(status, stream?.bufferedReader()?.use { JSONObject(it.readText()) })
         } finally { connection.disconnect() }
     }
-    val client = OttaiCnTransport(headers, send = ::raw)
-    try {
-        val signature = OttaiCrypto.bytesToHex(MessageDigest.getInstance("MD5")
-            .digest("ottai$deviceId$timestamp$seed".toByteArray()))
-        val route = requireNotNull(OttaiCnTransport.route(OttaiConstants.API_BASE + OttaiConstants.EP_API_TOKEN +
-            "?signature=" + URLEncoder.encode(signature, "UTF-8"), headers))
-        val response = requireNotNull(client.requestReply("GET", route, null).json)
-        check(response.getString("code") == "OK" && response.optString("data").isNotBlank())
-        println("Production CN router: secure exchange, encrypted GET and authenticated response passed (anonymous identity).")
-    } finally { client.close() }
+    val signature = OttaiCrypto.bytesToHex(MessageDigest.getInstance("MD5")
+        .digest("ottai$deviceId$timestamp$seed".toByteArray()))
+    val route = requireNotNull(OttaiRegionalTransport.route(OttaiConstants.API_BASE + OttaiConstants.EP_API_TOKEN +
+        "?signature=" + URLEncoder.encode(signature, "UTF-8"), headers))
+    val client = OttaiRegionalTransport(route, headers, send = ::raw)
+    val response = try { client.requestChecked("GET", null) } finally { client.close() }
+    check(response.getString("code") == "OK" && response.optString("data").isNotBlank())
+    println("Production CN router: secure exchange, encrypted GET and authenticated response passed (anonymous identity).")
 }

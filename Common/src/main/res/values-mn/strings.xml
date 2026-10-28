@@ -3181,9 +3181,9 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="settings_search_no_results">“%1$s”-тэй тохирох тохиргоо алга</string>
     <string name="settings_search_clear">Хайлтыг арилгах</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Туршилтын програм хангамж</string>
-    <string name="ottai_ota_warning">Зөвхөн Хятадын мэдрэгчид. Шинэчлэлт амжилтгүй болбол мэдрэгч ашиглах боломжгүй болж болно. Энэ дэлгэцийг нээлттэй байлгаж, утсаа мэдрэгчийн ойролцоо байлгана уу.</string>
+    <string name="ottai_ota_warning">Шинэчлэлт амжилтгүй болбол мэдрэгч ашиглах боломжгүй болж болно. Энэ дэлгэцийг нээлттэй байлгаж, утсаа мэдрэгчийн ойролцоо байлгана уу.</string>
     <string name="ottai_ota_connecting">Идэвхжүүлэхгүйгээр холбогдож байна…</string>
     <string name="ottai_ota_authenticating">Мэдрэгчийн таних мэдээллийг шалгаж байна…</string>
     <string name="ottai_ota_checking">Програм хангамж шалгаж, татаж байна…</string>

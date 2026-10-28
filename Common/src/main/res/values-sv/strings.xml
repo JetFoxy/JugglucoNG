@@ -3083,9 +3083,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_no_results">Inga inställningar matchar ”%1$s”</string>
     <string name="settings_search_clear">Rensa sökning</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Experimentellt firmwaretest</string>
-    <string name="ottai_ota_warning">Endast CN-sensorer. En misslyckad uppdatering kan göra sensorn obrukbar. Håll skärmen öppen och telefonen nära sensorn.</string>
+    <string name="ottai_ota_warning">En misslyckad uppdatering kan göra sensorn obrukbar. Håll skärmen öppen och telefonen nära sensorn.</string>
     <string name="ottai_ota_connecting">Ansluter utan aktivering…</string>
     <string name="ottai_ota_authenticating">Verifierar sensorns identitet…</string>
     <string name="ottai_ota_checking">Kontrollerar och hämtar firmware…</string>

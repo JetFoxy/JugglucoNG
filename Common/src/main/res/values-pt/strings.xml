@@ -3085,9 +3085,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_search_no_results">Nenhuma definição corresponde a “%1$s”</string>
     <string name="settings_search_clear">Limpar pesquisa</string>
 
-    <!-- Explicit CN preactivation firmware field test. -->
+    <!-- Explicit firmware field test. -->
     <string name="ottai_ota_title">Teste experimental de firmware</string>
-    <string name="ottai_ota_warning">Apenas sensores CN. Uma falha na atualização pode inutilizar o sensor. Mantenha este ecrã aberto e o telefone perto do sensor.</string>
+    <string name="ottai_ota_warning">Uma falha na atualização pode inutilizar o sensor. Mantenha este ecrã aberto e o telefone perto do sensor.</string>
     <string name="ottai_ota_connecting">A ligar sem ativar…</string>
     <string name="ottai_ota_authenticating">A verificar a identidade do sensor…</string>
     <string name="ottai_ota_checking">A verificar e descarregar o firmware…</string>
