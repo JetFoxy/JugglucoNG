@@ -3170,4 +3170,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_observation">%1$s · состояние %2$d · срок %3$s с · последняя запись %4$s · RTC %5$s с</string>
     <string name="ottai_ota_before">До</string>
     <string name="ottai_ota_after">После</string>
+
+    <string name="ottai_ota_discard">Отменить тест прошивки</string>
+    <string name="ottai_ota_discard_confirm">Удалить сохранённый пакет и разрешить подключение? Это не восстановит прежнюю прошивку или настройки. После прерванной записи может потребоваться восстановление.</string>
+    <string name="ottai_ota_pending">Незавершённый тест прошивки блокирует подключение. Откройте восстановление прошивки, чтобы продолжить или отменить тест.</string>
+    <string name="ottai_ota_finish_preparation">Прошивка проверена. Подтвердите запись заводских параметров для завершения настройки.</string>
+    <string name="ottai_ota_discard_failed">Не удалось отменить тест прошивки. Повторите попытку.</string>
 </resources>

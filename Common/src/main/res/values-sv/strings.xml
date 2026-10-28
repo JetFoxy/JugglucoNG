@@ -3118,4 +3118,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_observation">%1$s · status %2$d · livslängd %3$s s · senaste post %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Före</string>
     <string name="ottai_ota_after">Efter</string>
+
+    <string name="ottai_ota_discard">Kasta firmwaretest</string>
+    <string name="ottai_ota_discard_confirm">Ta bort det sparade paketet och tillåta anslutning? Detta återställer inte tidigare firmware eller inställningar. En avbruten skrivning kan fortfarande kräva återställning.</string>
+    <string name="ottai_ota_pending">Ett oavslutat firmwaretest blockerar anslutningen. Öppna firmwareåterställning för att återuppta eller kasta testet.</string>
+    <string name="ottai_ota_finish_preparation">Firmware verifierad. Bekräfta fabriksparametrarna för att slutföra inställningen.</string>
+    <string name="ottai_ota_discard_failed">Firmwaretestet kunde inte kastas. Försök igen.</string>
 </resources>

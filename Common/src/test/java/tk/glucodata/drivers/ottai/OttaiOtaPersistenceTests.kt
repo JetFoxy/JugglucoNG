@@ -2,6 +2,7 @@ package tk.glucodata.drivers.ottai
 
 import android.content.Context
 import java.io.File
+import java.io.DataOutputStream
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
@@ -75,6 +76,29 @@ class OttaiOtaPersistenceTests {
         assertThrows(IllegalArgumentException::class.java) {
             OttaiCloudClient.parseOtaOffer(JSONObject("""{"data":{"requiredUpgrade":false}}"""))
         }
+    }
+
+    @Test fun discardClearsAtomicRecoveryFilesButKeepsCredentialsAndOtherSensors() {
+        val material = OttaiRegistry.DeviceMaterials("00".repeat(96), "V0", "1,2", 0, "V1.7.0", 1)
+        assertTrue(OttaiRegistry.saveMaterials(context, id, material))
+        val base = File(context.filesDir, "ottai-ota/$id.bin")
+        base.parentFile!!.mkdirs()
+        val backup = File(base.path + ".bak")
+        val other = File(base.parentFile, "001122334455.bin").also { it.writeBytes(byteArrayOf(42)) }
+        DataOutputStream(backup.outputStream()).use {
+            OttaiFirmwareJournal.write(it, id, "AA:BB:CC:DD:EE:FF",
+                OttaiFirmwareImage("V1.7.0", "V1.8.0", OttaiOtaPackage.parse(testGbl()), OttaiFirmwareMode.STARTED_SENSOR))
+        }
+        try {
+            assertEquals(OttaiFirmwareMode.STARTED_SENSOR, OttaiFirmwareSession.pendingMode(context, id))
+            assertTrue(OttaiFirmwareSession.hasPendingTransfer(context, id))
+            OttaiFirmwareSession.discardPendingTransfer(context, id)
+            assertFalse(base.exists())
+            assertFalse(backup.exists())
+            assertFalse(OttaiFirmwareSession.hasPendingTransfer(context, id))
+            assertEquals(material.keyAHex, OttaiRegistry.loadMaterials(context, id).keyAHex)
+            assertArrayEquals(byteArrayOf(42), other.readBytes())
+        } finally { base.delete(); backup.delete(); other.delete() }
     }
 
     @Test fun recoveryLedgerSurvivesInterruptedAtomicWriteAndBlocksForcedActivation() {

@@ -3146,4 +3146,10 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="ottai_ota_observation">%1$s · durum %2$d · ömür %3$s sn · son kayıt %4$s · RTC %5$s sn</string>
     <string name="ottai_ota_before">Önce</string>
     <string name="ottai_ota_after">Sonra</string>
+
+    <string name="ottai_ota_discard">Firmware testini iptal et</string>
+    <string name="ottai_ota_discard_confirm">Kayıtlı paket silinsin ve bağlantı açılsın mı? Bu, önceki firmware veya ayarları geri yüklemez. Kesilen yazma işlemi hâlâ kurtarma gerektirebilir.</string>
+    <string name="ottai_ota_pending">Tamamlanmamış bir firmware testi bağlantıyı engelliyor. Sürdürmek veya iptal etmek için firmware kurtarmayı açın.</string>
+    <string name="ottai_ota_finish_preparation">Firmware doğrulandı. Kurulumu bitirmek için fabrika parametrelerini onaylayın.</string>
+    <string name="ottai_ota_discard_failed">Firmware testi iptal edilemedi. Tekrar deneyin.</string>
 </resources>

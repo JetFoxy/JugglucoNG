@@ -3190,4 +3190,10 @@ Az OK megnyomása létrehoz egy kapcsolatot ezen a telefonon, és megjelenít eg
     <string name="ottai_ota_observation">%1$s · állapot %2$d · élettartam %3$s s · utolsó rekord %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Előtte</string>
     <string name="ottai_ota_after">Utána</string>
+
+    <string name="ottai_ota_discard">Firmware-teszt elvetése</string>
+    <string name="ottai_ota_discard_confirm">Törli a mentett csomagot és engedélyezi a kapcsolódást? Ez nem állítja vissza a korábbi firmware-t vagy beállításokat. A megszakadt írás még helyreállítást igényelhet.</string>
+    <string name="ottai_ota_pending">Egy befejezetlen firmware-teszt blokkolja a kapcsolódást. A folytatáshoz vagy elvetéshez nyissa meg a firmware helyreállítását.</string>
+    <string name="ottai_ota_finish_preparation">A firmware ellenőrizve. A beállítás befejezéséhez erősítse meg a gyári paraméterek írását.</string>
+    <string name="ottai_ota_discard_failed">A firmware-teszt nem vethető el. Próbálja újra.</string>
 </resources>

@@ -25,9 +25,16 @@ internal object OttaiFirmwareJournal {
         output.flush()
     }
 
-    fun read(input: DataInputStream, sensorId: String, address: String): OttaiFirmwareImage {
+    fun read(input: DataInputStream, sensorId: String, address: String): OttaiFirmwareImage =
+        readImage(input, sensorId, address)
+
+    fun mode(input: DataInputStream, sensorId: String): OttaiFirmwareMode = readImage(input, sensorId, null).mode
+
+    private fun readImage(input: DataInputStream, sensorId: String, address: String?): OttaiFirmwareImage {
         val format = input.readInt()
-        require(format in 1..2 && input.readUTF() == sensorId && input.readUTF() == address) { "recovery_identity" }
+        require(format in 1..2 && input.readUTF() == sensorId) { "recovery_identity" }
+        val storedAddress = input.readUTF()
+        require(address == null || address == storedAddress) { "recovery_identity" }
         val source = OttaiOtaProtocol.version(input.readUTF()) ?: error("source")
         val target = OttaiOtaProtocol.version(input.readUTF()) ?: error("target")
         val sha = input.readUTF()

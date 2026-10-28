@@ -3161,4 +3161,10 @@ Als je op OK drukt, wordt er een verbinding gemaakt op deze telefoon en wordt er
     <string name="ottai_ota_observation">%1$s · status %2$d · levensduur %3$s s · laatste record %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Voor</string>
     <string name="ottai_ota_after">Na</string>
+
+    <string name="ottai_ota_discard">Firmwaretest verwijderen</string>
+    <string name="ottai_ota_discard_confirm">Opgeslagen pakket verwijderen en verbinding vrijgeven? Dit herstelt de vorige firmware of instellingen niet. Na een onderbroken update kan herstel nog nodig zijn.</string>
+    <string name="ottai_ota_pending">Een onvoltooide firmwaretest blokkeert de verbinding. Open firmwareherstel om de test te hervatten of te verwijderen.</string>
+    <string name="ottai_ota_finish_preparation">Firmware gecontroleerd. Bevestig de fabrieksparameters om de installatie af te ronden.</string>
+    <string name="ottai_ota_discard_failed">Firmwaretest kon niet worden verwijderd. Probeer opnieuw.</string>
 </resources>

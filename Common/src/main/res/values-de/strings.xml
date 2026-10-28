@@ -3231,4 +3231,10 @@ Durch Drücken von „OK“ wird eine Verbindung auf diesem Telefon hergestellt 
     <string name="ottai_ota_observation">%1$s · Status %2$d · Laufzeit %3$s s · letzter Datensatz %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Vorher</string>
     <string name="ottai_ota_after">Nachher</string>
+
+    <string name="ottai_ota_discard">Firmwaretest verwerfen</string>
+    <string name="ottai_ota_discard_confirm">Gespeichertes Paket löschen und Verbindung freigeben? Die vorherige Firmware oder Einstellungen werden nicht wiederhergestellt. Nach einem abgebrochenen Flash kann eine Wiederherstellung nötig sein.</string>
+    <string name="ottai_ota_pending">Ein unvollständiger Firmwaretest blockiert die Verbindung. Firmwarewiederherstellung öffnen, um fortzufahren oder den Test zu verwerfen.</string>
+    <string name="ottai_ota_finish_preparation">Firmware geprüft. Werksparameter bestätigen, um die Einrichtung abzuschließen.</string>
+    <string name="ottai_ota_discard_failed">Firmwaretest konnte nicht verworfen werden. Erneut versuchen.</string>
 </resources>

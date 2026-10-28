@@ -273,6 +273,15 @@ private fun ottaiMaterialFailureMessage(
  * Add + connect a sensor whose materials are already saved. This is called only from
  * the explicit setup action; [activate] arms the irreversible first-use sequence.
  */
+internal fun ottaiFirmwareEntryAvailable(debug: Boolean, signedIn: Boolean, sessionReady: Boolean,
+    hasMaterials: Boolean, hasAddress: Boolean, pending: Boolean): Boolean =
+    pending || (debug && signedIn && sessionReady && hasMaterials && hasAddress)
+
+internal fun ottaiConnectFailureMessage(context: Context, sensorId: String): String = context.getString(
+    if (OttaiFirmwareSession.hasPendingTransfer(context, sensorId)) R.string.ottai_ota_pending
+    else R.string.ottai_connect_failed,
+)
+
 private fun connectOttaiSensor(
     context: Context,
     mac: String,
@@ -1030,6 +1039,10 @@ fun OttaiSetupWizard(
         if (busy || materialLoading) return
         val canonical = OttaiConstants.canonicalSensorId(mac)
         cloudId = canonical
+        if (OttaiFirmwareSession.hasPendingTransfer(context, canonical)) {
+            showStatus(context.getString(R.string.ottai_ota_pending), error = true)
+            return
+        }
         busy = true
         showStatus("")
         materialLoading = false
@@ -1131,7 +1144,7 @@ fun OttaiSetupWizard(
                                     showStatus("")
                                     step = OttaiSetupStep.CONNECTING
                                 } else {
-                                    showStatus(context.getString(R.string.ottai_connect_failed), error = true)
+                                    showStatus(ottaiConnectFailureMessage(context, canonical), error = true)
                                     nfcScanRestartKey += 1
                                 }
                             }
@@ -1148,7 +1161,7 @@ fun OttaiSetupWizard(
                 if (credentialBootstrap == null) {
                     busy = false
                     materialLoading = false
-                    showStatus(context.getString(R.string.ottai_connect_failed), error = true)
+                    showStatus(ottaiConnectFailureMessage(context, canonical), error = true)
                 }
                 return@launch
             }
@@ -1197,7 +1210,7 @@ fun OttaiSetupWizard(
                     savedRefresh += 1
                     step = OttaiSetupStep.CONNECTING
                 } else {
-                    showStatus(context.getString(R.string.ottai_connect_failed), error = true)
+                    showStatus(ottaiConnectFailureMessage(context, canonical), error = true)
                     nfcScanRestartKey += 1
                 }
             } else if (materials != null) {
@@ -1205,7 +1218,7 @@ fun OttaiSetupWizard(
                 // Materials in hand and the connect still refused: that is a local
                 // registry failure, so the fetch message's offline routes would
                 // not help.
-                showStatus(context.getString(R.string.ottai_connect_failed), error = true)
+                showStatus(ottaiConnectFailureMessage(context, canonical), error = true)
             } else {
                 busy = false
                 showStatus(ottaiMaterialFailureMessage(context, fetched?.failure), error = true)
@@ -1385,8 +1398,10 @@ fun OttaiSetupWizard(
                 }
             },
             onImport = launchImport,
-            onFirmware = if (signedIn && OttaiCloudClient.loadOtaSession(context) && hasMaterials &&
-                OttaiConstants.normalizeBleAddress(bleAddress) != null) ({
+            onFirmware = if (ottaiFirmwareEntryAvailable(tk.glucodata.BuildConfig.DEBUG, signedIn,
+                OttaiCloudClient.loadOtaSession(context), hasMaterials,
+                OttaiConstants.normalizeBleAddress(bleAddress) != null,
+                OttaiFirmwareSession.hasPendingTransfer(context, cloudId))) ({
                 OttaiSetupScanHold.stopPanelScans()
                 showFirmwareTest = true
             }) else null,

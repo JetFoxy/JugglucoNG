@@ -65,6 +65,16 @@ class OttaiOtaTests {
         assertArrayEquals(image.bytes(), bytes.toByteArray())
     }
 
+    @Test fun provisioningAcceptsOmittedMetadataButRejectsConflictingBuildsAndVariants() {
+        assertTrue(OttaiOtaProtocol.materialsVersionMatches(TEST_OTTAI_COMPOSITE_REVISION, "E1.1.4(V1.7.S2530.1)"))
+        assertTrue(OttaiOtaProtocol.materialsVersionMatches(TEST_OTTAI_COMPOSITE_REVISION, "V1.7.S2530.1"))
+        assertTrue(OttaiOtaProtocol.materialsVersionMatches(TEST_OTTAI_COMPOSITE_REVISION, "V1.7"))
+        assertFalse(OttaiOtaProtocol.materialsVersionMatches(TEST_OTTAI_COMPOSITE_REVISION, "V1.7.S2530.2"))
+        assertFalse(OttaiOtaProtocol.materialsVersionMatches(TEST_OTTAI_COMPOSITE_REVISION, "E1.1.4(V1.7.S2530.1),OTHER"))
+        assertFalse(OttaiOtaProtocol.materialsVersionMatches(TEST_OTTAI_COMPOSITE_REVISION, "E1.1.5(V1.7.S2530.1)"))
+        assertFalse(OttaiOtaProtocol.materialsVersionMatches(TEST_OTTAI_COMPOSITE_REVISION, "V1.8"))
+    }
+
     @Test fun coefficientPacketMatchesIndependentModbusVector() {
         // 09 02 + LE float(1) + LE float(2). Verify the full packet with a bit-at-a-time oracle.
         val packet = OttaiOtaProtocol.coefficientPacket("1,2")
@@ -231,7 +241,7 @@ class OttaiFirmwareControllerTests {
         override fun savedImage() = journal
         override fun markTransferStarted(image: OttaiFirmwareImage) { saved = true; journal = image }
         override fun reportVerified(image: OttaiFirmwareImage) { reported = true }
-        override fun clearRecovery() { cleared = true }
+        override fun clearRecovery() { cleared = true; journal = null }
         override fun log(message: String) { logs += message }
         override fun disconnect() {}
         override fun close(completed: Boolean) { closed = true; closedSuccessfully = completed }
@@ -401,7 +411,7 @@ class OttaiFirmwareControllerTests {
             it.journal = image.copy(mode = OttaiFirmwareMode.STARTED_SENSOR)
         }
         assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
-        assertTrue(io.reported)
+        assertFalse(io.reported) // Reopening verifies, but does not resend an advisory report.
         assertTrue(io.cleared)
         assertEquals(0, io.offerRequests)
         assertEquals(2, io.writes.size)
@@ -675,6 +685,70 @@ class OttaiFirmwareControllerTests {
         assertFalse(io.reported)
     }
 
+    @Test fun reopenedFreshTargetWaitsForExplicitPreparationAndNeverResendsReport() {
+        repeat(2) {
+            val (controller, io) = normal(version = "V1.8.0") { it.journal = image }
+            assertEquals(OttaiFirmwareStage.PREPARATION_READY, controller.state.stage)
+            assertFalse(io.reported)
+            assertFalse(io.cleared)
+            assertNull(io.refresh)
+            assertEquals(2, io.writes.size)
+            assertTrue(io.scheduled.isEmpty())
+            if (it == 0) controller.close()
+            else {
+                io.fresh = materials.copy(deviceVersion = "V1.8", calibrationValueK = 1.0, calibrationValueB = 0.0)
+                controller.prepareOnly()
+                repeat(2) { io.tick(); io.acknowledge() }
+                assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+                assertTrue(io.cleared)
+            }
+        }
+    }
+
+    @Test fun failedPreparationCanBeDiscardedWithoutLateWritesOrJournalRecreation() {
+        val (controller, io) = normal { it.journal = image }
+        controller.prepareOnly()
+        val late = requireNotNull(io.refresh)
+        assertFalse(controller.discardRecovery()) // A factory write transaction is still owned.
+        controller.fail("materials_refresh")
+        assertTrue(controller.discardRecovery())
+        assertTrue(io.cleared)
+        assertNull(io.journal)
+        late(Result.success(materials))
+        controller.install()
+        assertEquals(2, io.writes.size)
+        assertTrue(io.scheduled.isEmpty())
+    }
+
+    @Test fun failedIdentityAndMissingCalibrationRecoveryCanBeDiscarded() {
+        val (identity, first) = normal(version = "V1.8.0", badSignature = true) { it.journal = image }
+        assertEquals(OttaiFirmwareStage.FAILED, identity.state.stage)
+        assertTrue(identity.discardRecovery())
+        assertTrue(first.cleared)
+        assertTrue(first.writes.isEmpty())
+        val (calibration, second) = normal(version = "V1.8.0") {
+            it.journal = image
+            it.fresh = materials.copy(deviceVersion = "V1.8")
+        }
+        calibration.prepareOnly()
+        assertEquals("calibration_missing", calibration.state.errorCode)
+        assertTrue(calibration.discardRecovery())
+        assertTrue(second.cleared)
+        assertEquals(2, second.writes.size)
+    }
+
+    @Test fun transferCannotBeDiscardedUntilItStops() {
+        val (controller, io) = recovery()
+        controller.install()
+        assertFalse(controller.discardRecovery())
+        assertNotNull(io.journal)
+        io.tick()
+        io.acknowledge(Result.failure(IllegalStateException("att_128")))
+        assertTrue(controller.discardRecovery())
+        assertNull(io.journal)
+        assertEquals(1, io.writes.size)
+    }
+
     @Test fun missingV18CalibrationStopsBeforeEitherFactoryWrite() {
         val (controller, io) = normal(version = "V1.8.0")
         io.fresh = materials.copy(deviceVersion = "V1.8.0")
@@ -712,6 +786,10 @@ class OttaiFirmwareControllerTests {
         repeat(2) { io.tick(); io.acknowledge() }
         assertTrue(io.reported)
         assertFalse(io.cleared)
+        assertEquals(OttaiFirmwareStage.PREPARATION_READY, controller.state.stage)
+        assertNull(io.refresh)
+        assertFalse(io.writes.any { it.first == OttaiConstants.CHAR_DESTRUCTIVE })
+        controller.prepareOnly() // A second, explicit confirmation is required after verification.
         assertEquals(OttaiFirmwareStage.PREPARING, controller.state.stage)
         io.tick(); io.acknowledge()
         assertFalse(io.cleared)

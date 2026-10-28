@@ -1037,9 +1037,10 @@ object OttaiCloudClient {
         private val openConnection: (String) -> HttpURLConnection = { target ->
             (URL(target).openConnection() as HttpURLConnection).apply { instanceFollowRedirects = false }
         },
+        private val userId: String = "",
     ) {
         constructor(ctx: Context) : this(
-            base(ctx), headers(ctx, now(), base(ctx)),
+            base(ctx), headers(ctx, now(), base(ctx)), userId = OttaiRegistry.loadUserId(ctx),
         ) { require(loadOtaSession(ctx)) { "ota_session" } }
         private var closed = false
         init {
@@ -1071,6 +1072,14 @@ object OttaiCloudClient {
                 put("upgradeStatus", 1)
                 put("remark", "JugglucoNG experimental; version readback verified")
             }.toString())
+        }
+
+        /** Explicit firmware preparation uses this client's account, without changing normal CN dispatch. */
+        fun bindMaterials(mac: String, firmware: String): DeviceResp {
+            if (userId.isBlank()) throw OttaiOtaCloudException("ota_session")
+            val body = bindRequestBody(mac, firmware, userId, now() / 1_000L, BindContract.V3)
+            return parseDeviceResp(request("POST", OttaiConstants.EP_BIND_V3.removePrefix(OttaiConstants.PREFIX),
+                body = body.toString())) ?: throw IllegalArgumentException("materials_refresh")
         }
         fun close() { closed = true }
     }
@@ -1446,7 +1455,7 @@ object OttaiCloudClient {
     ): CloudRequestResult {
         var legacyConnection: HttpURLConnection? = null
         return try {
-            val route = OttaiRegionalTransport.route(url, headers)
+            val route = OttaiRegionalTransport.route(url)
             val reply = if (route != null) {
                 val transport = OttaiRegionalTransport(route, headers) { verb, target, payload, common ->
                     rawRequest(verb, target, payload, common, timeoutMs, openConnection)

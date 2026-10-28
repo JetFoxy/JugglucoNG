@@ -3216,4 +3216,10 @@ OK дарснаар энэ утсан дээр холболт үүсч, өөр A
     <string name="ottai_ota_observation">%1$s · төлөв %2$d · хугацаа %3$s сек · сүүлийн бичлэг %4$s · RTC %5$s сек</string>
     <string name="ottai_ota_before">Өмнө</string>
     <string name="ottai_ota_after">Дараа</string>
+
+    <string name="ottai_ota_discard">Программын туршилтыг цуцлах</string>
+    <string name="ottai_ota_discard_confirm">Хадгалсан багцыг устгаж, холболтыг нээх үү? Энэ нь өмнөх программ эсвэл тохиргоог сэргээхгүй. Тасалдсан бичилтийн дараа сэргээх шаардлагатай байж болно.</string>
+    <string name="ottai_ota_pending">Дуусаагүй программын туршилт холболтыг хааж байна. Үргэлжлүүлэх эсвэл цуцлахын тулд программ сэргээх хэсгийг нээнэ үү.</string>
+    <string name="ottai_ota_finish_preparation">Программыг шалгалаа. Тохиргоог дуусгахын тулд үйлдвэрийн параметр бичихийг баталгаажуулна уу.</string>
+    <string name="ottai_ota_discard_failed">Программын туршилтыг цуцалж чадсангүй. Дахин оролдоно уу.</string>
 </resources>

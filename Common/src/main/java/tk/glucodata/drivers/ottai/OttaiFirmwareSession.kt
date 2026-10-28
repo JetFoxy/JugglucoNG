@@ -66,6 +66,18 @@ internal class OttaiFirmwareSession private constructor(
     fun prepareOnly() { handler.post { controller.prepareOnly() } }
     fun dispose() { handler.post { controller.close() } }
 
+    fun discardRecovery(done: (Result<Unit>) -> Unit) {
+        val discard = Runnable {
+            val result = runCatching { check(controller.discardRecovery()) { "transfer_in_progress" } }
+            main.post { done(result) }
+        }
+        // A failed session already retired its HandlerThread and cannot write another journal.
+        if (!handler.post(discard)) {
+            val result = runCatching { discardPendingTransfer(context, sensorId) }
+            main.post { done(result) }
+        }
+    }
+
     companion object {
         internal fun savePreparedMaterials(context: Context, sensorId: String,
             fresh: OttaiRegistry.DeviceMaterials): OttaiRegistry.DeviceMaterials {
@@ -81,6 +93,21 @@ internal class OttaiFirmwareSession private constructor(
             if (!OttaiConstants.looksLikeMac(id)) return false
             val file = File(context.filesDir, "ottai-ota/$id.bin")
             return file.exists() || File(file.path + ".bak").exists()
+        }
+
+        fun pendingMode(context: Context, sensorId: String): OttaiFirmwareMode? = runCatching {
+            val id = OttaiConstants.canonicalSensorId(sensorId)
+            require(OttaiConstants.looksLikeMac(id))
+            DataInputStream(AtomicFile(File(context.filesDir, "ottai-ota/$id.bin")).openRead()).use {
+                OttaiFirmwareJournal.mode(it, id)
+            }
+        }.getOrNull()
+
+        fun discardPendingTransfer(context: Context, sensorId: String) {
+            val id = OttaiConstants.canonicalSensorId(sensorId)
+            require(OttaiConstants.looksLikeMac(id))
+            AtomicFile(File(context.filesDir, "ottai-ota/$id.bin")).delete()
+            require(!hasPendingTransfer(context, id)) { "recovery_discard" }
         }
 
         fun start(context: Context, sensorId: String, address: String,
@@ -345,8 +372,9 @@ internal class OttaiFirmwareSession private constructor(
     override fun refreshMaterials(version: String, done: (Result<OttaiRegistry.DeviceMaterials>) -> Unit) {
         work({
             require(OttaiCloudClient.loadOtaSession(context)) { "ota_session" }
-            val resp = OttaiCloudClient.bindV3(context, sensorId, version) ?: error("materials_refresh")
-            require(OttaiConstants.canonicalSensorId(resp.mac) == sensorId && resp.deviceVersion == version) { "materials_identity" }
+            val resp = otaCloud.value.bindMaterials(sensorId, version)
+            require(OttaiConstants.canonicalSensorId(resp.mac) == sensorId &&
+                OttaiOtaProtocol.materialsVersionMatches(version, resp.deviceVersion)) { "materials_identity" }
             OttaiCloudClient.toMaterials(context, sensorId, resp)?.takeIf { it.authKeys != null } ?: error("materials_decrypt")
         }) { result ->
             done(result.mapCatching { fresh ->

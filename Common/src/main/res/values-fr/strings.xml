@@ -3125,4 +3125,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_observation">%1$s · état %2$d · durée %3$s s · dernier enregistrement %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Avant</string>
     <string name="ottai_ota_after">Après</string>
+
+    <string name="ottai_ota_discard">Abandonner le test du micrologiciel</string>
+    <string name="ottai_ota_discard_confirm">Supprimer le paquet enregistré et débloquer la connexion ? Cela ne restaure ni le micrologiciel ni les réglages précédents. Une écriture interrompue peut encore nécessiter une récupération.</string>
+    <string name="ottai_ota_pending">Un test de micrologiciel inachevé bloque la connexion. Ouvrez la récupération pour reprendre ou abandonner le test.</string>
+    <string name="ottai_ota_finish_preparation">Micrologiciel vérifié. Confirmez les paramètres usine pour terminer la configuration.</string>
+    <string name="ottai_ota_discard_failed">Impossible d’abandonner le test. Réessayez.</string>
 </resources>

@@ -3131,4 +3131,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_observation">%1$s · 状态 %2$d · 使用期限 %3$s 秒 · 最新记录 %4$s · RTC %5$s 秒</string>
     <string name="ottai_ota_before">更新前</string>
     <string name="ottai_ota_after">更新后</string>
+
+    <string name="ottai_ota_discard">放弃固件测试</string>
+    <string name="ottai_ota_discard_confirm">删除已保存的固件包并解除连接限制？这不会恢复之前的固件或设置。中断的写入可能仍需要恢复。</string>
+    <string name="ottai_ota_pending">未完成的固件测试阻止了连接。请打开固件恢复以继续或放弃测试。</string>
+    <string name="ottai_ota_finish_preparation">固件已验证。请确认写入出厂参数以完成设置。</string>
+    <string name="ottai_ota_discard_failed">无法放弃固件测试。请重试。</string>
 </resources>

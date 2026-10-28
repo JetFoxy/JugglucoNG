@@ -3300,4 +3300,10 @@ Marka la cadaadiyo OK waxay dhalin doontaa xidhiidh teleefankan oo waxa ay soo b
     <string name="ottai_ota_observation">%1$s · xaalad %2$d · muddada %3$s ilbiriqsi · diiwaankii u dambeeyey %4$s · RTC %5$s ilbiriqsi</string>
     <string name="ottai_ota_before">Ka hor</string>
     <string name="ottai_ota_after">Ka dib</string>
+
+    <string name="ottai_ota_discard">Ka tag tijaabada firmware</string>
+    <string name="ottai_ota_discard_confirm">Ma tirtirtaa xirmada kaydsan oo ma fasaxdaa xiriirka? Tani ma soo celinayso firmware-kii ama dejintii hore. Qoris go’day waxay weli u baahan kartaa soo kabasho.</string>
+    <string name="ottai_ota_pending">Tijaabo firmware oo aan dhammaan ayaa xannibaysa xiriirka. Fur soo kabashada firmware si aad u sii waddo ama uga tagto tijaabada.</string>
+    <string name="ottai_ota_finish_preparation">Firmware waa la hubiyey. Xaqiiji dejinta warshadda si loo dhammaystiro habaynta.</string>
+    <string name="ottai_ota_discard_failed">Lama joojin karin tijaabada firmware. Mar kale isku day.</string>
 </resources>

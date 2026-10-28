@@ -11,9 +11,11 @@ OTA experiment. Both require the sensor to be disconnected from managed monitori
 
 ## Regions and verification
 
-The OTA action is on the selected sensor card in the current search page. It is available
-for signed-in CN phone, Ottai Global and Syai sessions with saved sensor auth keys and a
-selected BLE address. The wizard pauses its scanner and NFC capture while the dialog owns BLE.
+New experiments are available only in debug builds, on the selected sensor card, for
+signed-in CN phone, Ottai Global and Syai sessions with saved keys and a BLE address.
+An existing unfinished journal remains accessible in release builds and without account
+credentials, so its recovery record can always be discarded. Reopening preselects the saved
+Fresh/Started mode. An unreadable journal can be discarded from the mode chooser. The wizard pauses its scanner and NFC capture while the dialog owns BLE.
 A failed API call or `AppDevice_Upgrade_Version` response is not itself a firmware offer:
 that code can indicate an app/API compatibility mismatch. Installation requires a successfully
 authenticated offer with an actual downloadable package.
@@ -54,8 +56,10 @@ update experiment. An existing journal is retained when an unsupported recovery 
      writes supported factory parameters, and leaves the firmware as it was.
    - **Install firmware** transfers the offered image. After a successful finish ACK it
      reconnects to the same Bluetooth address, requires the target revision from `2a28`,
-     reauthenticates and confirms the sensor is still unactivated. It then refreshes the
-     materials and writes the parameters supported by the installed revision.
+     reauthenticates and confirms the sensor is still unactivated. It then waits at
+     **Firmware verified**. Choose **Write factory parameters only** and confirm to refresh
+     materials and write parameters. Reopening at the saved target also waits for this action;
+     it does not write factory parameters or re-send a success report automatically.
 6. On **Preparation complete**, close the dialog and use the normal Connect action to
    activate. The existing `maxActive` negotiation still runs there. No firmware-test path
    writes RTC, `maxActive`, retain duration or `ACTIVATE_CMD`.
@@ -143,9 +147,14 @@ its separate provisioning flow.
   an explicit restart of that saved package **only on the recorded address**. It never
   scans neighbouring devices or picks a different image. Address changes and a corrupt or
   missing recovery package require investigation, rather than speculative writes.
-- An unfinished journal blocks normal and forced activation. It is cleared only after
-  successful version-appropriate preparation in Fresh sensor mode, or verified target
-  firmware/authentication/status observation in Started sensor mode. If the old application still boots, the
+- An unfinished journal blocks normal connection and activation with a specific recovery
+  message. It is cleared after successful Fresh preparation, verified Started completion,
+  or an explicit **Discard firmware test** confirmation. Discard first cancels the dialog's
+  BLE/worker callbacks, then deletes only that sensor's local package/journal. It is disabled
+  during transfer or factory writes. It keeps credentials, readings and other sensors intact.
+  It does not restore previous firmware/settings or repair a sensor stuck in the bootloader.
+  Failure, missing calibration, changed authentication and unreadable journals still expose
+  the discard path; clearing app data is not required. If the old application still boots, the
   separate parameter-only action can finish preparation without completing the update.
 - When the old application still boots on the saved source revision, the validated journal
   package is reused without another firmware offer or download. In Fresh sensor mode the
@@ -175,7 +184,8 @@ Factory provisioning follows #727's reported version gates:
 
 - V1.6+ coefficients: `09 | count | float32 LE values | CRC16-Modbus LE`.
 - V1.8 calibration: `0B | AES(session, float64 LE k | float64 LE b)`.
-- Missing/nonfinite values stop preparation. In V1.8 both packets are constructed and
+- Missing/nonfinite values stop preparation; no calibration defaults are invented. The
+  journal can then be explicitly discarded. In V1.8 both packets are constructed and
   validated before either factory write. No default calibration is invented.
 - Refreshed preactivation materials are saved with `activeTimeMs = 0`: the bind response's
   echoed request timestamp is not an activation time. Warmup starts from the later actual
@@ -202,3 +212,14 @@ References for the generic container/transport, not Ottai-specific opcode semant
 - [Silicon Labs OTA documentation](https://docs.silabs.com/mcu-bootloader/latest/using-gecko-bootloader-with-bluetooth-apps/03-bluetooth-ota-upgrade)
 
 Firmware files, credentials and raw captures must stay outside the repository.
+
+## Cloud scope
+
+Ordinary CN login, account lookup, binding and activation retain main's transport in this
+PR. Their general encrypted migration is isolated in [draft PR #755](https://github.com/ctqvva/JugglucoNG/pull/755),
+pending a signed-in CN account test. Only the explicit OTA client's check, report and preparation
+bind use the experiment's secure CN channel here. Global/Syai keep main's regional transport.
+
+Preparation tolerates cloud version metadata that omits the sensor's variant or supplies its
+application profile. A conflicting named build or variant is still rejected, and MAC/auth-key
+checks remain mandatory. Failure always leaves the explicit discard path available.

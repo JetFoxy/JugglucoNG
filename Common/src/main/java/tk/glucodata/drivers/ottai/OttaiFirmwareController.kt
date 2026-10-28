@@ -6,7 +6,7 @@ import java.util.UUID
 
 internal enum class OttaiFirmwareStage {
     CONNECTING, AUTHENTICATING, CHECKING, READY, NO_UPDATE, INSTALLING, RECONNECTING,
-    PREPARING, COMPLETE, FAILED, CLOSED,
+    PREPARATION_READY, PREPARING, COMPLETE, FAILED, CLOSED,
 }
 
 internal enum class OttaiFirmwareMode { PREACTIVATION, STARTED_SENSOR }
@@ -154,39 +154,39 @@ internal class OttaiFirmwareController(
                     require(!refreshed.bootloaderOnly) { "post_auth_services" }
                     mtu = refreshed.mtu
                     hasOta = refreshed.hasOta
-                    checkCommandStatus(version, afterInstall || resumed)
+                    checkCommandStatus(version, afterInstall || resumed, resumed)
                 })
             }
         }
     }
 
-    private fun checkCommandStatus(version: String, afterInstall: Boolean) {
+    private fun checkCommandStatus(version: String, afterInstall: Boolean, resumed: Boolean) {
         read(OttaiConstants.SERVICE_CGM, OttaiConstants.CHAR_COMMAND) { command ->
             val status = command.firstOrNull()?.toInt()?.and(255) ?: -1
             if (mode == OttaiFirmwareMode.PREACTIVATION) {
                 require(OttaiConstants.commandNeedsActivation(status)) { "sensor_already_active_or_ended" }
                 state = state.copy(canPrepareParameters = true)
-                continueAfterStatus(version, afterInstall)
+                continueAfterStatus(version, afterInstall, resumed)
             } else {
                 // A reset or ended state AFTER the transfer is an observation, not a failure.
                 require(if (afterInstall) status in 0..4 else status == 3) { "started_sensor_status" }
                 observe(status) { observation ->
                     io.log("observation=${if (afterInstall) "after" else "before"} $observation")
                     state = if (afterInstall) state.copy(after = observation) else state.copy(before = observation)
-                    continueAfterStatus(version, afterInstall)
+                    continueAfterStatus(version, afterInstall, resumed)
                 }
             }
         }
     }
 
-    private fun continueAfterStatus(version: String, afterInstall: Boolean) {
+    private fun continueAfterStatus(version: String, afterInstall: Boolean, resumed: Boolean) {
         if (afterInstall) {
-            io.reportVerified(requireNotNull(installed))
+            if (!resumed) io.reportVerified(requireNotNull(installed))
             if (mode == OttaiFirmwareMode.STARTED_SENSOR) {
                 io.clearRecovery()
                 update(OttaiFirmwareStage.COMPLETE)
                 retire()
-            } else prepareParameters()
+            } else update(OttaiFirmwareStage.PREPARATION_READY)
         } else {
             val saved = applicationRecovery
             if (saved != null && hasOta) {
@@ -323,7 +323,7 @@ internal class OttaiFirmwareController(
 
     fun prepareOnly() {
         if (retired || !state.canPrepareParameters ||
-            state.stage !in setOf(OttaiFirmwareStage.READY, OttaiFirmwareStage.NO_UPDATE)) return
+            state.stage !in setOf(OttaiFirmwareStage.READY, OttaiFirmwareStage.NO_UPDATE, OttaiFirmwareStage.PREPARATION_READY)) return
         runCatching { prepareParameters() }.onFailure { fail(it.message ?: "parameters") }
     }
 
@@ -332,7 +332,7 @@ internal class OttaiFirmwareController(
         require(minor >= 0) { "factory_parameter_profile" }
         update(OttaiFirmwareStage.PREPARING) { it.copy(errorCode = "") }
         io.refreshMaterials(state.firmware, completion { fresh ->
-            require(fresh.deviceVersion == state.firmware && fresh.authKeys != null) { "materials_version" }
+            require(OttaiOtaProtocol.materialsVersionMatches(state.firmware, fresh.deviceVersion) && fresh.authKeys != null) { "materials_version" }
             materials = fresh
             // Construct and validate BOTH packets before issuing either write.
             val coefficients = if (minor >= 6) OttaiOtaProtocol.coefficientPacket(fresh.coefficient) else null
@@ -380,5 +380,13 @@ internal class OttaiFirmwareController(
         if (retired) return
         update(OttaiFirmwareStage.CLOSED)
         retire()
+    }
+
+    /** Explicit abandonment releases the local setup block, never changes sensor state. */
+    fun discardRecovery(): Boolean {
+        if (state.transferring) return false
+        close() // Invalidate callbacks and stop BLE/worker before deleting durable state.
+        io.clearRecovery()
+        return true
     }
 }

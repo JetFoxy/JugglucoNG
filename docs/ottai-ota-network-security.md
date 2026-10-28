@@ -21,26 +21,23 @@ The current CN client was downloaded from the [Tencent distribution listing](htt
 APK, disassembly and raw probes remain outside Git. No app installation or sensor activation
 was needed. Obfuscated library URLs differ only by case; use a case-sensitive output directory.
 
-`OttaiNetSecurity` implements the recovered codec. The rebased branch uses main's
-`OttaiRegionalTransport` for both ordinary cloud calls and OTA. CN phone mobile requests
-retain the 1.63 identity/version and `cipherUserId`; Ottai Global and Syai retain their
-issuing watch identity, `webDeviceId` and secure compatibility version `10000000`. CN
-forwarded-IP headers are never added to global/Syai requests. Main's Syai web/login and
-box-serial resolution behavior is preserved. See [regional protocol provenance and live
-verification](ottai-login-network-security.md).
+`OttaiNetSecurity` implements the recovered codec. The explicit OTA client uses main's
+`OttaiRegionalTransport` with the experiment's captured backend/account headers. Its CN calls
+use the 1.63 identity/version and `cipherUserId`; global/Syai use main's regional compatibility
+version and `webDeviceId`. CN forwarded-IP headers are never added to global/Syai requests.
+Each operation clears its ephemeral keys. OTA check, report and user-confirmed preparation
+bind are scoped to this client.
 
-All ordinary CN phone mobile calls also select the secure route, including API-token/SMS
-login, account device/binding lookup, validation, Active Auth, bind and unbind. The supplied
-activation screenshot showed `NET_SECURITY_PLAINTEXT_ROUTE_FORBIDDEN` after the initial
-OTA-only migration left these calls on old routes. Business query/body values and their
-signed common timestamp remain unchanged. GET, POST and the existing unbind PUT are supported.
+Ordinary CN login, device lists, binding and activation retain main's transport. The broader
+CN migration previously included here is now isolated in [draft PR #755](https://github.com/ctqvva/JugglucoNG/pull/755),
+pending signed-in CN validation. The supplied plaintext-route rejection is evidence for that
+fix, but anonymous probes do not prove real account compatibility. No general CN dispatcher
+change is included in this OTA PR. Main's global/Syai login and serial lookup remain intact.
 
-The OTA worker snapshots the account's backend and headers. Its judge GET and advisory
-report POST use that backend exclusively. Each HTTP operation clears its ephemeral keys
-on return, including errors and reports. Successful worker shutdown still drains reporting
-without retaining BLE. No plaintext or cross-region fallback is attempted. Decrypted
-business codes retain the existing activation and account recovery behavior; failed,
-empty or unauthenticated responses cannot supply credentials or firmware offers.
+Successful worker shutdown drains advisory reporting without retaining BLE. Reopening a
+saved target only verifies it; it does not re-send reporting. Fresh factory preparation waits
+for a separate confirmation after both an original flash and a reopen. Failures can be
+explicitly discarded after the owner stops, without changing sensor firmware or credentials.
 
 ## Recovered protocol
 
@@ -104,22 +101,22 @@ The offline fixture `ottai-net-security.json` is independently generated with Py
 by `scripts/ottai/net_security_vectors.py`. Its fixed scalars are public synthetic test inputs.
 Tests cover exact exchange/GET/POST vectors, sequence and nonce changes, response authentication,
 server signature, plaintext rejection, safe business diagnostics, expiry, close and clock correction.
-An independent synthetic HTTP server additionally exercises the actual common cloud dispatcher:
-account/validation GETs, login/bind/Active Auth POSTs, unbind PUT, encoded query values, preservation
-of the signed timestamp, decrypted business failures, token rejection and response tampering.
-Requests outside the CN phone mobile profile retain their original URLs.
+Synthetic HTTP tests exercise the OTA client on all three account backends, including the
+preparation bind, authentication and failure handling. A separate regression verifies ordinary
+CN phone calls keep main's original URL/version and do not enter the experiment's encrypted
+channel. The app-wide CN dispatch tests live in the separate draft PR.
 
 To reproduce the optional anonymous production-code probe, compile these files together with
 `kotlinc -cp <org.json.jar> -include-runtime -d <probe.jar>` from the repository root:
 
 - `OttaiNetSecurity.kt`, `OttaiRegionalTransport.kt`, `OttaiConstants.kt`, `OttaiBleAuth.kt`, and
   `OttaiCrypto.kt` from `drivers/ottai`;
-- `scripts/ottai/SecureCloudProbe.kt`.
+- `scripts/ottai/RegionalLoginProbe.kt`.
 
-Run `java -cp <probe.jar>:<org.json.jar> tk.glucodata.drivers.ottai.SecureCloudProbeKt`.
-It performs real anonymous HTTP requests and prints only a pass message. It is not part of CI.
-The probe starts with the legacy API-token URL, uses the production CN route selector and
-transport to rewrite/encrypt it, then authenticates the live response.
+Run `java -cp <probe.jar>:<org.json.jar> tk.glucodata.drivers.ottai.RegionalLoginProbeKt`.
+It performs anonymous requests to the regional API-token endpoints and prints only pass messages.
+It is not part of CI. The separate CN production probe is retained in draft PR #755 rather
+than bundled with the experimental feature.
 
 The authenticated OTA offer for the user's running sensor, firmware-host download, and physical
 transfer still require the phone test. Anonymous transport success does not establish that the

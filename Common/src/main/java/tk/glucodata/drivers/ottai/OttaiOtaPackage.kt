@@ -101,6 +101,17 @@ internal object OttaiOtaProtocol {
             (expected.build.isEmpty() || actual.build == expected.build)
     }
 
+    /** Cloud metadata may omit the variant or give only the embedded application profile. */
+    fun materialsVersionMatches(sensor: String, cloud: String): Boolean {
+        if (sameVersion(sensor, cloud)) return true
+        val a = version(sensor) ?: return false
+        val b = version(cloud) ?: return false
+        if (application(a)?.composite == true && application(b)?.composite == true) {
+            return (',' !in a || ',' !in b) && a.substringBefore(',') == b.substringBefore(',')
+        }
+        return matchesTarget(a, b) || matchesTarget(b, a)
+    }
+
     private fun compareVersions(source: Revision, target: Revision): Int {
         val from = source.numbers
         val to = target.numbers

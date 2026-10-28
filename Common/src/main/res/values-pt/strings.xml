@@ -3120,4 +3120,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_observation">%1$s · estado %2$d · vida útil %3$s s · último registo %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Antes</string>
     <string name="ottai_ota_after">Depois</string>
+
+    <string name="ottai_ota_discard">Abandonar teste de firmware</string>
+    <string name="ottai_ota_discard_confirm">Eliminar o pacote guardado e desbloquear a ligação? Isto não restaura o firmware nem as definições anteriores. Uma gravação interrompida pode ainda precisar de recuperação.</string>
+    <string name="ottai_ota_pending">Um teste de firmware incompleto bloqueia a ligação. Abra a recuperação para retomar ou abandonar o teste.</string>
+    <string name="ottai_ota_finish_preparation">Firmware verificado. Confirme os parâmetros de fábrica para concluir a configuração.</string>
+    <string name="ottai_ota_discard_failed">Não foi possível abandonar o teste. Tente novamente.</string>
 </resources>

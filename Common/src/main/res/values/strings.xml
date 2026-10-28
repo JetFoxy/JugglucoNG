@@ -3375,4 +3375,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_observation">%1$s · status %2$d · lifetime %3$s s · latest record %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Before</string>
     <string name="ottai_ota_after">After</string>
+
+    <string name="ottai_ota_discard">Discard firmware test</string>
+    <string name="ottai_ota_discard_confirm">Discard the saved package and unblock connection? This does not restore the previous firmware or settings. An interrupted flash may still need recovery.</string>
+    <string name="ottai_ota_pending">An unfinished firmware test blocks connection. Open firmware recovery to resume or discard it.</string>
+    <string name="ottai_ota_finish_preparation">Firmware verified. Confirm factory preparation to finish setup.</string>
+    <string name="ottai_ota_discard_failed">Could not discard the firmware test. Try again.</string>
 </resources>

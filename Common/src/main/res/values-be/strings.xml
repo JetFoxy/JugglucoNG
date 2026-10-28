@@ -3194,4 +3194,10 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="ottai_ota_observation">%1$s · стан %2$d · тэрмін %3$s с · апошні запіс %4$s · RTC %5$s с</string>
     <string name="ottai_ota_before">Да</string>
     <string name="ottai_ota_after">Пасля</string>
+
+    <string name="ottai_ota_discard">Адмяніць тэст прашыўкі</string>
+    <string name="ottai_ota_discard_confirm">Выдаліць захаваны пакет і дазволіць падключэнне? Гэта не адновіць папярэднюю прашыўку ці налады. Пасля перарванай запісы можа спатрэбіцца аднаўленне.</string>
+    <string name="ottai_ota_pending">Незавершаны тэст прашыўкі блакуе падключэнне. Адкрыйце аднаўленне прашыўкі, каб працягнуць ці адмяніць тэст.</string>
+    <string name="ottai_ota_finish_preparation">Прашыўка праверана. Пацвердзіце запіс заводскіх параметраў для завяршэння наладкі.</string>
+    <string name="ottai_ota_discard_failed">Не ўдалося адмяніць тэст прашыўкі. Паўтарыце спробу.</string>
 </resources>

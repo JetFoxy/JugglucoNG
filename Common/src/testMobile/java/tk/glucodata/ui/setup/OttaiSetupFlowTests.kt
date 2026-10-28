@@ -9,6 +9,13 @@ import tk.glucodata.drivers.ottai.OttaiConstants
 import tk.glucodata.ui.components.CardPosition
 
 class OttaiSetupFlowTests {
+    @Test fun firmwareEntryIsDebugOnlyButPendingRecoveryAlwaysRemainsAccessible() {
+        assertEquals(false, ottaiFirmwareEntryAvailable(false, true, true, true, true, false))
+        assertEquals(true, ottaiFirmwareEntryAvailable(true, true, true, true, true, false))
+        assertEquals(true, ottaiFirmwareEntryAvailable(false, false, false, false, false, true))
+        assertEquals(false, ottaiFirmwareEntryAvailable(true, false, false, false, false, false))
+    }
+
     @Test
     fun `stored session region follows its backend`() {
         assertEquals(OttaiRegion.CN, ottaiRegionForApiBase(OttaiConstants.API_BASE))

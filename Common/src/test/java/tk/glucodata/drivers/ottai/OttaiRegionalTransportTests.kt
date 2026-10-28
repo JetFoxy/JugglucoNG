@@ -24,6 +24,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OttaiRegionalTransportTests {
+    @Test fun ordinaryCnPhoneCallsKeepMainsTransportOutsideTheOtaExperiment() {
+        val common = OttaiCloudClient.cnPhoneHeaders("n:synthetic-cn", "synthetic-token", 123L, "synthetic")
+        val url = OttaiConstants.API_BASE + OttaiConstants.EP_GET_BIND_DEVICE
+        val targets = mutableListOf<String>()
+        lateinit var connection: HttpURLConnection
+        val result = OttaiCloudClient.requestWithResult("GET", url, null, common, openConnection = { target ->
+            targets += target
+            object : HttpURLConnection(URL(target)) {
+                override fun connect() = Unit
+                override fun usingProxy() = false
+                override fun disconnect() = Unit
+                override fun getResponseCode() = 200
+                override fun getInputStream() = ByteArrayInputStream("""{"code":"OK","data":null}""".toByteArray())
+            }.also { connection = it }
+        })
+        assertNull(result.failure)
+        assertEquals(listOf(url), targets)
+        assertEquals(common["versionName"], connection.getRequestProperty("versionName"))
+        assertNull(connection.getRequestProperty("cipherUserId"))
+    }
+
     private val headers = mapOf("deviceId" to "ottai-watch:a:synthetic-install", "appName" to "ottai-watch",
         "packageName" to "com.ottai.tag.watch", "versionCode" to "244301", "versionName" to "1.1.0",
         "timestamp" to System.currentTimeMillis().toString(), "Authorization" to "synthetic-token",
@@ -346,6 +367,23 @@ class OttaiRegionalTransportTests {
                 val error = assertThrows(OttaiOtaCloudException::class.java) { client.judgeOta("001122334455", "V1.7") }
                 assertEquals(OttaiCloudClient.BIZ_UPGRADE_VERSION, error.businessCode)
                 assertEquals(2, server.calls.size)
+            } finally { client.close() }
+        }
+    }
+
+    @Test fun explicitPreparationBindsOnlyThroughTheExperimentsIssuingAccount() {
+        for (base in listOf(OttaiConstants.API_BASE, OttaiConstants.API_BASE_GLOBAL, OttaiConstants.API_BASE_SYAI)) {
+            val server = Server(base)
+            val common = if (base == OttaiConstants.API_BASE)
+                OttaiCloudClient.cnPhoneHeaders("n:synthetic-cn", "synthetic-token", 0L, "synthetic") else headers
+            server.business = JSONObject("""{"code":"OK","data":{"mac":"001122334455","keyA":"encrypted-key","deviceVersion":"V1.7"}}""")
+            val client = OttaiCloudClient.OtaClient(base, common, server::connection, userId = "synthetic-user")
+            try {
+                assertEquals("001122334455", client.bindMaterials("001122334455", "V1.7").mac)
+                assertEquals("$base/cgm/security/app/server/deviceBind/composite/bindV3", server.calls.last().url)
+                assertEquals("synthetic-user", server.clearBodies.single().getString("userId"))
+                assertEquals("V1.7", server.clearBodies.single().getString("deviceVersion"))
+                assertTrue(server.clearBodies.single().getLong("activeTime") > 0)
             } finally { client.close() }
         }
     }

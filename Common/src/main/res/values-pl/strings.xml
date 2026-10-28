@@ -3164,4 +3164,10 @@
     <string name="ottai_ota_observation">%1$s · stan %2$d · czas pracy %3$s s · ostatni rekord %4$s · RTC %5$s s</string>
     <string name="ottai_ota_before">Przed</string>
     <string name="ottai_ota_after">Po</string>
+
+    <string name="ottai_ota_discard">Porzuć test oprogramowania</string>
+    <string name="ottai_ota_discard_confirm">Usunąć zapisany pakiet i odblokować połączenie? Nie przywróci to poprzedniego oprogramowania ani ustawień. Przerwana aktualizacja może nadal wymagać odzyskiwania.</string>
+    <string name="ottai_ota_pending">Niedokończony test oprogramowania blokuje połączenie. Otwórz odzyskiwanie, aby wznowić lub porzucić test.</string>
+    <string name="ottai_ota_finish_preparation">Oprogramowanie zweryfikowane. Potwierdź parametry fabryczne, aby zakończyć konfigurację.</string>
+    <string name="ottai_ota_discard_failed">Nie udało się porzucić testu. Spróbuj ponownie.</string>
 </resources>
