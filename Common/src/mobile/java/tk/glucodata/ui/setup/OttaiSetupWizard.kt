@@ -273,9 +273,9 @@ private fun ottaiMaterialFailureMessage(
  * Add + connect a sensor whose materials are already saved. This is called only from
  * the explicit setup action; [activate] arms the irreversible first-use sequence.
  */
-internal fun ottaiFirmwareEntryAvailable(debug: Boolean, signedIn: Boolean, sessionReady: Boolean,
+internal fun ottaiFirmwareEntryAvailable(signedIn: Boolean, sessionReady: Boolean,
     hasMaterials: Boolean, hasAddress: Boolean, pending: Boolean): Boolean =
-    pending || (debug && signedIn && sessionReady && hasMaterials && hasAddress)
+    pending || (signedIn && sessionReady && hasMaterials && hasAddress)
 
 internal fun ottaiConnectFailureMessage(context: Context, sensorId: String): String = context.getString(
     if (OttaiFirmwareSession.hasPendingTransfer(context, sensorId)) R.string.ottai_ota_pending
@@ -1398,7 +1398,7 @@ fun OttaiSetupWizard(
                 }
             },
             onImport = launchImport,
-            onFirmware = if (ottaiFirmwareEntryAvailable(tk.glucodata.BuildConfig.DEBUG, signedIn,
+            onFirmware = if (ottaiFirmwareEntryAvailable(signedIn,
                 OttaiCloudClient.loadOtaSession(context), hasMaterials,
                 OttaiConstants.normalizeBleAddress(bleAddress) != null,
                 OttaiFirmwareSession.hasPendingTransfer(context, cloudId))) ({

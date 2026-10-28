@@ -11,9 +11,9 @@ OTA experiment. Both require the sensor to be disconnected from managed monitori
 
 ## Regions and verification
 
-New experiments are available only in debug builds, on the selected sensor card, for
+New experiments are available in debug and release builds, on the selected sensor card, for
 signed-in CN phone, Ottai Global and Syai sessions with saved keys and a BLE address.
-An existing unfinished journal remains accessible in release builds and without account
+An existing unfinished journal remains accessible without account
 credentials, so its recovery record can always be discarded. Reopening preselects the saved
 Fresh/Started mode. An unreadable journal can be discarded from the mode chooser. The wizard pauses its scanner and NFC capture while the dialog owns BLE.
 A failed API call or `AppDevice_Upgrade_Version` response is not itself a firmware offer:
