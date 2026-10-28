@@ -24,6 +24,13 @@ The BLE sequence was recovered from CN evidence; its global/Syai compatibility i
 assumption, not hardware proof. Use Fresh sensor or Started sensor as appropriate; installation
 and parameter writes remain separate explicit actions.
 
+Fresh sensor installation requires a target with a supported V1 factory-preparation profile.
+An unsupported target such as V2 is rejected with `factory_parameter_profile` before the
+journal is created and before any OTA write, including when retrying a saved recovery image.
+This prevents a successful flash from leaving activation blocked by an impossible preparation
+step. Started sensor mode does not perform factory preparation and keeps its cross-major
+update experiment. An existing journal is retained when an unsupported recovery is rejected.
+
 ## Test on the phone
 
 1. Enable Android Bluetooth HCI snoop logging if available. This records **our own** traffic;

@@ -283,6 +283,11 @@ internal class OttaiFirmwareController(
         runCatching {
             val image = requireNotNull(packageForInstall)
             require(hasOta) { "ota_service_missing" }
+            // Fresh mode must finish factory preparation after flashing. Check the offered
+            // target (also for saved recovery images) before creating a journal or any OTA write.
+            require(mode != OttaiFirmwareMode.PREACTIVATION || OttaiOtaProtocol.minor(image.target) >= 0) {
+                "factory_parameter_profile"
+            }
             // Durable before the first write. Recovery never downloads a different image.
             io.markTransferStarted(image)
             installed = image

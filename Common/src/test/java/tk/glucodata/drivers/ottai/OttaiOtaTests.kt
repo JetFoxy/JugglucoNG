@@ -432,6 +432,59 @@ class OttaiFirmwareControllerTests {
         assertEquals(2, io.writes.size)
     }
 
+    @Test fun freshInstallRejectsAnUnsupportedPreparationTargetBeforeJournalingOrOtaWrites() {
+        for (target in listOf("V2.0", "E2.0(V2.1.S2600.1),STDRD")) {
+            val (controller, io) = normal(target = target)
+            assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
+            controller.install()
+            assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+            assertEquals("factory_parameter_profile", controller.state.errorCode)
+            assertFalse(io.saved)
+            assertNull(io.journal)
+            assertNull(io.refresh)
+            assertEquals(2, io.writes.size) // Authentication only.
+            assertTrue(io.scheduled.isEmpty())
+        }
+    }
+
+    @Test fun freshRecoveryCannotBypassTheTargetPreparationCheck() {
+        for (bootloader in listOf(false, true)) {
+            val saved = image.copy(target = "V2.0")
+            val (controller, io) = if (bootloader) {
+                val io = FakeIo(saved).also { it.journal = saved }
+                val controller = OttaiFirmwareController("AABBCCDDEEFF", materials, io) {}
+                controller.start()
+                io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = true, hasOta = true)))
+                controller to io
+            } else normal { it.journal = saved }
+            val writesBeforeInstall = io.writes.size
+            controller.install()
+            assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+            assertEquals("factory_parameter_profile", controller.state.errorCode)
+            assertFalse(io.saved)
+            assertEquals(saved, io.journal) // An existing journal must not be deleted or replaced.
+            assertEquals(writesBeforeInstall, io.writes.size)
+            assertTrue(io.scheduled.isEmpty())
+        }
+    }
+
+    @Test fun startedModeCanInstallAnotherMajorWithoutFreshPreparation() {
+        val (controller, io) = normal(command = 3, mode = OttaiFirmwareMode.STARTED_SENSOR, target = "V2.0")
+        controller.install()
+        assertTrue(io.saved)
+        while (controller.state.stage == OttaiFirmwareStage.INSTALLING) { io.tick(); io.acknowledge() }
+        val previous = requireNotNull(io.readAnswer)
+        io.readAnswer = { ch -> if (ch == OttaiConstants.CHAR_SOFTWARE_VERSION) "V2.0".toByteArray() else previous(ch) }
+        io.tick()
+        io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
+        repeat(2) { io.tick(); io.acknowledge() }
+        assertEquals(OttaiFirmwareStage.COMPLETE, controller.state.stage)
+        assertTrue(io.reported)
+        assertTrue(io.cleared)
+        assertNull(io.refresh)
+        assertTrue(io.writes.none { it.first == OttaiConstants.CHAR_DESTRUCTIVE })
+    }
+
     @Test fun normalCheckStopsBeforeAnyFirmwareOrActivationWrite() {
         val (controller, io) = normal()
         assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
