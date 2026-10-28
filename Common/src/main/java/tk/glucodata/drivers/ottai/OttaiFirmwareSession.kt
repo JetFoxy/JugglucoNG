@@ -46,6 +46,8 @@ internal class OttaiFirmwareSession private constructor(
         }, "OttaiFirmwareCloud")
     }
     private var closed = false
+    private val discardLock = Any()
+    private val pendingDiscards = mutableListOf<(Result<Unit>) -> Unit>()
     private var generation = 0
     private var gatt: BluetoothGatt? = null
     private var mtu = 23
@@ -67,15 +69,27 @@ internal class OttaiFirmwareSession private constructor(
     fun dispose() { handler.post { controller.close() } }
 
     fun discardRecovery(done: (Result<Unit>) -> Unit) {
-        val discard = Runnable {
-            val result = runCatching { check(controller.discardRecovery()) { "transfer_in_progress" } }
-            main.post { done(result) }
+        synchronized(discardLock) {
+            if (closed) {
+                completeDiscards(listOf(done)) { discardPendingTransfer(context, sensorId) }
+                return
+            }
+            // Register before posting: close() can remove an accepted Handler message.
+            pendingDiscards += done
+            if (!handler.post {
+                val requests = synchronized(discardLock) { takePendingDiscards() }
+                completeDiscards(requests) { check(controller.discardRecovery()) { "transfer_in_progress" } }
+            }) close(completed = false)
         }
-        // A failed session already retired its HandlerThread and cannot write another journal.
-        if (!handler.post(discard)) {
-            val result = runCatching { discardPendingTransfer(context, sensorId) }
-            main.post { done(result) }
-        }
+    }
+
+    /** Caller holds discardLock; claiming requests prevents reentrant close() completing twice. */
+    private fun takePendingDiscards() = pendingDiscards.toList().also { pendingDiscards.clear() }
+
+    private fun completeDiscards(requests: List<(Result<Unit>) -> Unit>, discard: () -> Unit) {
+        if (requests.isEmpty()) return
+        val result = runCatching(discard)
+        main.post { requests.forEach { it(result) } }
     }
 
     companion object {
@@ -95,11 +109,12 @@ internal class OttaiFirmwareSession private constructor(
             return file.exists() || File(file.path + ".bak").exists()
         }
 
-        fun pendingMode(context: Context, sensorId: String): OttaiFirmwareMode? = runCatching {
+        fun pendingMode(context: Context, sensorId: String, address: String): OttaiFirmwareMode? = runCatching {
             val id = OttaiConstants.canonicalSensorId(sensorId)
             require(OttaiConstants.looksLikeMac(id))
+            val ble = requireNotNull(OttaiConstants.normalizeBleAddress(address))
             DataInputStream(AtomicFile(File(context.filesDir, "ottai-ota/$id.bin")).openRead()).use {
-                OttaiFirmwareJournal.mode(it, id)
+                OttaiFirmwareJournal.read(it, id, ble).mode
             }
         }.getOrNull()
 
@@ -384,13 +399,22 @@ internal class OttaiFirmwareSession private constructor(
         }
     }
 
-    override fun savedImage(): OttaiFirmwareImage? = runCatching {
-        DataInputStream(recovery.openRead()).use { input ->
-            OttaiFirmwareJournal.read(input, sensorId, address)
+    override fun savedImage(): OttaiFirmwareImage? {
+        if (!hasPendingTransfer(context, sensorId)) return null
+        // Invalid data/address is a recovery failure, never permission to fetch a new package.
+        return try {
+            DataInputStream(recovery.openRead()).use { input ->
+                OttaiFirmwareJournal.read(input, sensorId, address)
+            }
+        } catch (error: Exception) {
+            throw IllegalStateException("recovery_image", error)
         }
-    }.getOrNull()
+    }
 
     override fun markTransferStarted(image: OttaiFirmwareImage) {
+        val saved = savedImage()
+        require(saved == null || (saved.source == image.source && saved.target == image.target &&
+            saved.mode == image.mode && saved.image.sha256 == image.image.sha256)) { "recovery_package" }
         recovery.baseFile.parentFile?.mkdirs()
         val output = recovery.startWrite()
         try {
@@ -433,14 +457,20 @@ internal class OttaiFirmwareSession private constructor(
     }
 
     override fun close(completed: Boolean) {
-        if (closed) return
-        closed = true
-        disconnect()
-        handler.removeCallbacksAndMessages(null)
-        // Success has no pending material writes: only the best-effort OTA report may remain.
-        // Drain it with the usual HTTP timeouts, without waiting here or retaining the GATT.
-        // Cancellation/failure must still interrupt outstanding downloads/material requests.
-        if (completed) worker.shutdown() else worker.shutdownNow()
-        thread.quitSafely()
+        val requests = synchronized(discardLock) {
+            if (closed) return
+            closed = true
+            disconnect()
+            handler.removeCallbacksAndMessages(null)
+            // Success has no pending material writes: only the best-effort OTA report may remain.
+            // Drain it with the usual HTTP timeouts, without waiting here or retaining the GATT.
+            // Cancellation/failure must still interrupt outstanding downloads/material requests.
+            if (completed) worker.shutdown() else worker.shutdownNow()
+            thread.quitSafely()
+            takePendingDiscards()
+        }
+        // Retiring the owner cancels queued messages, including accepted discard requests.
+        // BLE and material callbacks are now stopped, so finish those requests directly.
+        completeDiscards(requests) { discardPendingTransfer(context, sensorId) }
     }
 }

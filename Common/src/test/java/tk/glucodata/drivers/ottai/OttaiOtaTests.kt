@@ -197,6 +197,7 @@ class OttaiFirmwareControllerTests {
         var reported = false
         var cleared = false
         var journal: OttaiFirmwareImage? = null
+        var journalFailure: String? = null
         var onWrite: (UUID, ByteArray) -> Unit = { _, _ -> }
         var commandStatus = 0
         var durationSeconds = 28L * 86_400
@@ -238,7 +239,10 @@ class OttaiFirmwareControllerTests {
             refresh = done
             fresh?.let { done(Result.success(it)) }
         }
-        override fun savedImage() = journal
+        override fun savedImage(): OttaiFirmwareImage? {
+            journalFailure?.let { error(it) }
+            return journal
+        }
         override fun markTransferStarted(image: OttaiFirmwareImage) { saved = true; journal = image }
         override fun reportVerified(image: OttaiFirmwareImage) { reported = true }
         override fun clearRecovery() { cleared = true; journal = null }
@@ -291,7 +295,7 @@ class OttaiFirmwareControllerTests {
         val controller = OttaiFirmwareController("AABBCCDDEEFF", materials.copy(deviceVersion = version), io, mode) {}
         controller.start()
         io.connected!!(Result.success(OttaiFirmwareGatt(247, bootloaderOnly = false, hasOta = true)))
-        if (!badSignature) repeat(2) { io.tick(); io.acknowledge() }
+        if (!badSignature && controller.state.stage == OttaiFirmwareStage.AUTHENTICATING) repeat(2) { io.tick(); io.acknowledge() }
         return controller to io
     }
 
@@ -404,6 +408,29 @@ class OttaiFirmwareControllerTests {
         assertEquals(OttaiFirmwareStage.READY, controller.state.stage)
         assertTrue(controller.state.recovery)
         assertEquals(0, io.offerRequests)
+    }
+
+    @Test fun unreadableJournalCannotBecomeAFreshOfferInTheNormalApplication() {
+        val (controller, io) = normal { it.journalFailure = "recovery_image" }
+        controller.install()
+        controller.prepareOnly()
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertEquals("recovery_image", controller.state.errorCode)
+        assertEquals(0, io.offerRequests)
+        assertTrue(io.writes.isEmpty())
+        assertFalse(io.saved)
+        assertFalse(io.cleared)
+    }
+
+    @Test fun savedPackageCannotBeReplacedWhenTheRunningRevisionMatchesNeitherSourceNorTarget() {
+        val (controller, io) = normal(version = "V1.9.0") { it.journal = image }
+        controller.install()
+        assertEquals(OttaiFirmwareStage.FAILED, controller.state.stage)
+        assertEquals("recovery_version", controller.state.errorCode)
+        assertEquals(0, io.offerRequests)
+        assertTrue(io.writes.isEmpty())
+        assertSame(image, io.journal)
+        assertFalse(io.saved)
     }
 
     @Test fun verifiedTargetRecoveryAcceptsEquivalentReadbackSpelling() {

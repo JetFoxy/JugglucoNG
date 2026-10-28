@@ -15,7 +15,10 @@ New experiments are available in debug and release builds, on the selected senso
 signed-in CN phone, Ottai Global and Syai sessions with saved keys and a BLE address.
 An existing unfinished journal remains accessible without account
 credentials, so its recovery record can always be discarded. Reopening preselects the saved
-Fresh/Started mode. An unreadable journal can be discarded from the mode chooser. The wizard pauses its scanner and NFC capture while the dialog owns BLE.
+Fresh/Started mode. An unreadable journal or a different BLE address exposes only discard
+and close, without offering a new experiment. Recovery uses the validated saved package;
+it never replaces it with a new cloud offer. Discard finishes even if BLE disconnects while
+confirmation is queued. The wizard pauses its scanner and NFC capture while the dialog owns BLE.
 A failed API call or `AppDevice_Upgrade_Version` response is not itself a firmware offer:
 that code can indicate an app/API compatibility mismatch. Installation requires a successfully
 authenticated offer with an actual downloadable package.

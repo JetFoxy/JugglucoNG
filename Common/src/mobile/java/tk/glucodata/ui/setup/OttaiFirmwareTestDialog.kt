@@ -46,7 +46,7 @@ internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismis
     var mode by remember(sensorId, address) { mutableStateOf<OttaiFirmwareMode?>(null) }
     var loading by remember(sensorId, address) { mutableStateOf(true) }
     LaunchedEffect(sensorId, address) {
-        mode = withContext(Dispatchers.IO) { OttaiFirmwareSession.pendingMode(context, sensorId) }
+        mode = withContext(Dispatchers.IO) { OttaiFirmwareSession.pendingMode(context, sensorId, address) }
         loading = false
     }
     if (loading) return
@@ -54,29 +54,38 @@ internal fun OttaiFirmwareTestDialog(sensorId: String, address: String, onDismis
     if (selected != null) {
         OttaiFirmwareSessionDialog(sensorId, address, selected, onDismiss)
     } else {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.ottai_ota_title)) },
-            text = { Text(stringResource(R.string.ottai_ota_mode_hint)) },
-            confirmButton = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { mode = OttaiFirmwareMode.PREACTIVATION },
+        OttaiFirmwareModeDialog(OttaiFirmwareSession.hasPendingTransfer(context, sensorId),
+            onMode = { mode = it },
+            onDiscard = { done -> scope.launch {
+                done(withContext(Dispatchers.IO) { runCatching { OttaiFirmwareSession.discardPendingTransfer(context, sensorId) } })
+            } }, onDismiss = onDismiss)
+    }
+}
+
+@Composable
+internal fun OttaiFirmwareModeDialog(pending: Boolean, onMode: (OttaiFirmwareMode) -> Unit,
+    onDiscard: ((Result<Unit>) -> Unit) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.ottai_ota_title)) },
+        text = { Text(stringResource(if (pending) R.string.ottai_ota_failed else R.string.ottai_ota_mode_hint)) },
+        confirmButton = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!pending) {
+                    Button(onClick = { onMode(OttaiFirmwareMode.PREACTIVATION) },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shapes = ButtonDefaults.shapes()) {
                         Text(stringResource(R.string.ottai_ota_fresh_mode))
                     }
-                    OutlinedButton(onClick = { mode = OttaiFirmwareMode.STARTED_SENSOR },
+                    OutlinedButton(onClick = { onMode(OttaiFirmwareMode.STARTED_SENSOR) },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shapes = ButtonDefaults.shapes()) {
                         Text(stringResource(R.string.ottai_ota_started_mode))
                     }
-                    FirmwareDiscardAction(OttaiFirmwareSession.hasPendingTransfer(context, sensorId), true,
-                        onDiscard = { done -> scope.launch {
-                            done(withContext(Dispatchers.IO) { runCatching { OttaiFirmwareSession.discardPendingTransfer(context, sensorId) } })
-                        } }, onDiscarded = onDismiss)
-                    TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.cancel)) }
                 }
-            },
-        )
-    }
+                FirmwareDiscardAction(pending, true, onDiscard, onDismiss)
+                TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.cancel)) }
+            }
+        },
+    )
 }
 
 @Composable

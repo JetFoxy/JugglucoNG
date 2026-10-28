@@ -90,7 +90,8 @@ class OttaiOtaPersistenceTests {
                 OttaiFirmwareImage("V1.7.0", "V1.8.0", OttaiOtaPackage.parse(testGbl()), OttaiFirmwareMode.STARTED_SENSOR))
         }
         try {
-            assertEquals(OttaiFirmwareMode.STARTED_SENSOR, OttaiFirmwareSession.pendingMode(context, id))
+            assertEquals(OttaiFirmwareMode.STARTED_SENSOR, OttaiFirmwareSession.pendingMode(context, id, "AA:BB:CC:DD:EE:FF"))
+            assertNull(OttaiFirmwareSession.pendingMode(context, id, "00:11:22:33:44:55"))
             assertTrue(OttaiFirmwareSession.hasPendingTransfer(context, id))
             OttaiFirmwareSession.discardPendingTransfer(context, id)
             assertFalse(base.exists())

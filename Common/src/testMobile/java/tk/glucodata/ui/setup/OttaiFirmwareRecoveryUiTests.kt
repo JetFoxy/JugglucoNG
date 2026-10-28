@@ -86,13 +86,43 @@ class OttaiFirmwareRecoveryUiTests {
         compose.runOnIdle { assertEquals(1, prepared) }
     }
 
+    @Test fun unreadableRecoveryOffersOnlyConfirmedDiscardAndClose() {
+        var discarded = 0
+        var dismissed = 0
+        compose.setContent {
+            MaterialTheme {
+                OttaiFirmwareModeDialog(true, onMode = { error("No new experiment with a pending journal") },
+                    onDiscard = { done -> discarded++; done(Result.success(Unit)) }, onDismiss = { dismissed++ })
+            }
+        }
+        compose.onNodeWithText(text(R.string.ottai_ota_fresh_mode)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.ottai_ota_started_mode)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.ottai_ota_discard)).performClick()
+        assertEquals(0, discarded)
+        compose.onAllNodesWithText(text(R.string.ottai_ota_discard)).onLast().performClick()
+        compose.runOnIdle { assertEquals(1, discarded); assertEquals(1, dismissed) }
+    }
+
+    @Test fun freshExperimentsRemainAvailableWithoutAPendingJournal() {
+        var selected: OttaiFirmwareMode? = null
+        compose.setContent {
+            MaterialTheme {
+                OttaiFirmwareModeDialog(false, onMode = { selected = it }, onDiscard = { error("No recovery") }, onDismiss = {})
+            }
+        }
+        compose.onNodeWithText(text(R.string.ottai_ota_fresh_mode)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.ottai_ota_started_mode)).performClick()
+        compose.runOnIdle { assertEquals(OttaiFirmwareMode.STARTED_SENSOR, selected) }
+        compose.onNodeWithText(text(R.string.ottai_ota_discard)).assertDoesNotExist()
+    }
+
     @Test fun blockedConnectionExplainsRecoveryAndDiscardReleasesOnlyThatBlock() {
         val id = "AABBCCDDEEFF"
         val file = File(context.filesDir, "ottai-ota/$id.bin.bak")
         file.parentFile!!.mkdirs()
         file.writeBytes(byteArrayOf(1)) // Even an unreadable journal must be discardable.
         assertEquals(text(R.string.ottai_ota_pending), ottaiConnectFailureMessage(context, id))
-        assertNull(OttaiFirmwareSession.pendingMode(context, id))
+        assertNull(OttaiFirmwareSession.pendingMode(context, id, "AA:BB:CC:DD:EE:FF"))
         OttaiFirmwareSession.discardPendingTransfer(context, id)
         assertEquals(text(R.string.ottai_connect_failed), ottaiConnectFailureMessage(context, id))
     }

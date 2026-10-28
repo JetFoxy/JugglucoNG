@@ -141,6 +141,7 @@ internal class OttaiFirmwareController(
             require(saved == null || saved.mode == mode) { "recovery_mode" }
             val resumed = !afterInstall && saved != null && OttaiOtaProtocol.matchesTarget(version, saved.target)
             applicationRecovery = saved?.takeIf { !afterInstall && !resumed && OttaiOtaProtocol.sameVersion(it.source, version) }
+            require(afterInstall || saved == null || resumed || applicationRecovery != null) { "recovery_version" }
             if (resumed) {
                 installed = saved
                 state = state.copy(before = saved.before, target = version, recovery = true)
@@ -189,13 +190,14 @@ internal class OttaiFirmwareController(
             } else update(OttaiFirmwareStage.PREPARATION_READY)
         } else {
             val saved = applicationRecovery
-            if (saved != null && hasOta) {
+            if (saved != null) {
                 // The journal already owns this exact package. The old application still boots;
                 // expose both explicit retry and authenticated parameter-only recovery offline
                 // from the firmware host, without requiring a new offer/download.
                 packageForInstall = saved
                 io.log("normal_application_recovery_using_saved_package")
-                update(OttaiFirmwareStage.READY) {
+                require(hasOta || state.canPrepareParameters) { "ota_service_missing" }
+                update(if (hasOta) OttaiFirmwareStage.READY else OttaiFirmwareStage.NO_UPDATE) {
                     it.copy(target = saved.target, totalBytes = saved.image.size, sha256 = saved.image.sha256,
                         recovery = true, before = saved.before ?: it.before)
                 }
