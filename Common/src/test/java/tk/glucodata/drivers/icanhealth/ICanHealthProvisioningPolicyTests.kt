@@ -37,8 +37,9 @@ class ICanHealthProvisioningPolicyTests {
     }
 
     @Test fun realBoxLabelsGiveTheirFactoryScale() {
-        // 84F01FF13594A is the only one with a confirmed F6: the sensor read back 0x024E (590)
-        // and the vendor SDK log shows x13 = 0.59. The rest follow the same rule, unconfirmed.
+        // Pins only what we write. 84F01FF13594A read back F6 0x024E (590) and the vendor SDK log
+        // shows x13 = 0.59, but that sensor's readings still ran about twice too high, so this
+        // does not show the rule yields correct glucose. The other labels are unconfirmed.
         val labels = mapOf(
             "84F01FF13594A" to 590,
             "937001AEB546A" to 540,
