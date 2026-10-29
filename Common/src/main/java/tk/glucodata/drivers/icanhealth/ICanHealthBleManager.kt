@@ -206,6 +206,7 @@ class ICanHealthBleManager(
     @Volatile private var lastConnectionStartedAtMs = 0L
     @Volatile private var receivedGlucoseThisConnection = false
     @Volatile private var lastGlucoseReceiptRealtimeMs = 0L
+    private val createdAtMs = System.currentTimeMillis()
     @Volatile private var sessionStartEpochMs = 0L
     @Volatile private var loggedSessionTimelineDriftMs = 0L
     @Volatile private var currentSequenceNumber = -1
@@ -1183,7 +1184,21 @@ class ICanHealthBleManager(
         }
         val knownAddress = mActiveDeviceAddress?.takeIf { it.isNotBlank() }
         if (knownAddress != null) {
-            return address != null && address.equals(knownAddress, ignoreCase = true)
+            if (address != null && address.equals(knownAddress, ignoreCase = true)) {
+                return true
+            }
+            val rebind = ICanHealthConstants.shouldRebindStaleAddress(
+                knownAddress = knownAddress,
+                candidateAddress = address,
+                advertisedName = trimmedName,
+                sensorIds = listOf(SerialNumber, serialFromDevice, rawSerialFromDevice),
+                lastActivityMs = maxOf(lastGlucoseReceiptRealtimeMs, createdAtMs),
+                nowMs = System.currentTimeMillis(),
+            )
+            if (rebind) {
+                Log.w(TAG, "Rebinding $SerialNumber from stale address $knownAddress to $address (advertised '$trimmedName')")
+            }
+            return rebind
         }
         if (ICanHealthConstants.advertisedNameConflictsWithOnboarding(onboardingDeviceSn, trimmedName)) {
             Log.w(
