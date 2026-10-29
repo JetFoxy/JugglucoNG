@@ -9,6 +9,8 @@ import tk.glucodata.JournalBridge
 import tk.glucodata.Log
 import tk.glucodata.NotificationHistorySource
 import tk.glucodata.WearJournalSync
+import tk.glucodata.data.prediction.PredictionModelProfile
+import tk.glucodata.data.prediction.PredictionModelProfileStore
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
@@ -30,6 +32,8 @@ object WearJournalBridge : JournalBridge {
     private const val MAX_ENTRIES = 60
     private const val MAX_TITLE_BYTES = 40
     private const val MAX_CURVE_POINTS = 24
+
+    private const val MAX_ABSORPTION_MINUTES = 0xFFFF
 
     private fun prefs() = Applic.app?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -159,6 +163,7 @@ object WearJournalBridge : JournalBridge {
     internal fun encode(
         entries: List<JournalEntry>,
         presets: List<JournalInsulinPreset>,
+        carbAbsorptionGramsPerHourAt: (timestampMillis: Long) -> Float = phoneCarbAbsorptionRate(),
     ): ByteArray {
         val presetsById = presets.associateBy { it.id }
         val encodedEntries = entries.map { entry ->
@@ -194,12 +199,16 @@ object WearJournalBridge : JournalBridge {
                 ?: ByteArray(0)
             raw
         }
+        // Appended after the identities, read only by a build that knows it: the minutes the phone's
+        // own COB absorbs each carb entry over, so the watch needs no rate of its own.
+        val absorption = encodedEntries.map { absorptionMinutesFor(it.entry, carbAbsorptionGramsPerHourAt) }
         val size = 1 + 1 + 2 +
             encodedEntries.sumOf { 8 + 8 + 1 + 4 + 1 + it.title.size + 8 + 1 + it.curve.size * 6 } +
             2 + encodedPresets.sumOf {
                 8 + 4 + 1 + it.second.size + 1 + curvePointsOf(it.first).size * 6
             } +
-            2 + identities.sumOf { 1 + it.size }
+            2 + identities.sumOf { 1 + it.size } +
+            2 + absorption.size * 2
         val buffer = ByteBuffer.allocate(size)
         buffer.put(WearJournalSync.VERSION.toByte())
         buffer.put(1)
@@ -237,7 +246,43 @@ object WearJournalBridge : JournalBridge {
             buffer.put(identity.size.toByte())
             buffer.put(identity)
         }
+        buffer.putShort(absorption.size.toShort())
+        absorption.forEach { buffer.putShort(it.toShort()) }
         return buffer.array()
+    }
+
+    /**
+     * The minutes `JournalIobMath.activeCarbsGrams` would absorb [entry] over at this instant, or 0
+     * (absent) for anything it does not count as carbs. Same rule as the phone's COB: an explicit
+     * duration wins (the maths floors it at one minute), otherwise grams / the rate at the entry's
+     * own timestamp, clamped to 30..360. Pure, and it never throws on a hostile value.
+     */
+    internal fun absorptionMinutesFor(
+        entry: JournalEntry,
+        rateAt: (timestampMillis: Long) -> Float,
+    ): Int {
+        if (entry.type != JournalEntryType.CARBS) return 0
+        val grams = entry.amount?.takeIf { it.isFinite() && it > 0f } ?: return 0
+        entry.durationMinutes?.let { return it.coerceIn(1, MAX_ABSORPTION_MINUTES) }
+        val resolved = (grams / rateAt(entry.timestamp) * 60f).coerceIn(30f, 360f)
+        // NaN survives coerceIn; it has no honest minutes, so it is absent rather than a guess.
+        return if (resolved.isNaN()) 0 else Math.round(resolved)
+    }
+
+    /**
+     * The phone's absorption rate by time of day, the same source `OutboundApiJournalSnapshot`
+     * feeds its COB from. The profile is read once per encode, and only if a carb needs it.
+     */
+    private fun phoneCarbAbsorptionRate(): (Long) -> Float {
+        val profile: PredictionModelProfile? by lazy {
+            runCatching {
+                PredictionModelProfileStore.load(requireNotNull(prefs()) { "no application context" })
+            }.onFailure { Log.stack(LOG_ID, "absorption profile", it) }.getOrNull()
+        }
+        return { timestamp ->
+            profile?.parametersAt(timestamp)?.carbAbsorptionGramsPerHour
+                ?: PredictionModelProfile.DEFAULT_CARB_ABSORPTION_GRAMS_PER_HOUR
+        }
     }
 
     private data class EncodedEntry(
