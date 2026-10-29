@@ -1,6 +1,7 @@
 package tk.glucodata.data.journal
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import tk.glucodata.WearJournalSync
@@ -196,6 +197,130 @@ class WearIobAgreementTests {
             "and the watch cannot, because the curve is not on the wire — see #500",
             0f,
             WearJournalIob.compute(watch(entries, listOf(archived), at), at).iobUnits,
+            0f
+        )
+    }
+
+    // ---- COB ----------------------------------------------------------------------------------
+
+    private fun carb(
+        grams: Float?,
+        durationMinutes: Int? = null,
+        timestamp: Long = doseTime
+    ) = model(amount = grams, presetId = null, timestamp = timestamp).copy(
+        type = JournalEntryType.CARBS,
+        durationMinutes = durationMinutes
+    )
+
+    private val rateGramsPerHour = 35f
+
+    /**
+     * The phone's COB for the same entries: `OutboundApiJournalSnapshot.activeCarbsGrams` is private
+     * and reads prefs, so this repeats its (three-line) mapping over the same shared function, with
+     * the entry's own `durationMinutes` and the per-timestamp rate. The watch must match this, not a
+     * value recomputed from the wire.
+     */
+    private fun phoneCob(entries: List<JournalEntry>, atMillis: Long, rate: Float = rateGramsPerHour): Float =
+        JournalIobMath.activeCarbsGrams(
+            entries.mapNotNull { entry ->
+                if (entry.type != JournalEntryType.CARBS) return@mapNotNull null
+                val grams = entry.amount?.takeIf { it.isFinite() && it > 0f } ?: return@mapNotNull null
+                CarbEntry(entry.timestamp, grams, entry.durationMinutes?.toFloat())
+            },
+            atMillis
+        ) { rate }
+
+    private fun watchCob(entries: List<JournalEntry>, atMillis: Long, rate: Float = rateGramsPerHour): Float? =
+        WearJournalIob.cobGrams(
+            WearJournalSync.decode(WearJournalBridge.encode(entries, emptyList()) { rate }),
+            atMillis
+        )
+
+    /**
+     * Resolved minutes are rounded to whole minutes on the wire, so an entry with no explicit
+     * duration can differ from the phone by up to grams * 0.5 / duration (largest as the carb
+     * runs out): 40 g over 68.6 min is 0.25 g at +68 min. An explicit duration is exact.
+     */
+    private val cobTolerance = 0.3f
+
+    @Test
+    fun cobAgreesWithThePhoneForAnExplicitDuration() {
+        val entries = listOf(carb(40f, durationMinutes = 90))
+        for (offset in listOf(0L, 10, 45, 89, 90, 200)) {
+            val at = doseTime + minutes(offset)
+            assertEquals("+$offset min", phoneCob(entries, at), watchCob(entries, at)!!, 1e-4f)
+        }
+        assertTrue(watchCob(entries, doseTime + minutes(45))!! > 0f)
+    }
+
+    @Test
+    fun cobAgreesWhenThePhoneHadToResolveTheDuration() {
+        // 40 g at 35 g/h is 68.57 min: the wire carries 69, so the answers differ slightly.
+        val entries = listOf(carb(40f))
+        for (offset in listOf(0L, 20, 34, 68, 69, 120)) {
+            val at = doseTime + minutes(offset)
+            assertEquals("+$offset min", phoneCob(entries, at), watchCob(entries, at)!!, cobTolerance)
+        }
+        assertTrue(watchCob(entries, doseTime + minutes(20))!! > 0f)
+    }
+
+    @Test
+    fun cobAgreesOnTwoCarbs() {
+        val entries = listOf(
+            carb(40f, durationMinutes = 120, timestamp = doseTime - minutes(60)),
+            carb(25f, timestamp = doseTime - minutes(15))
+        )
+        assertEquals(phoneCob(entries, doseTime), watchCob(entries, doseTime)!!, cobTolerance)
+    }
+
+    @Test
+    fun aFullyAbsorbedCarbIsZeroOnBothSides() {
+        val entries = listOf(carb(40f, durationMinutes = 60))
+        val at = doseTime + minutes(600)
+        assertEquals(0f, phoneCob(entries, at), 0f)
+        assertEquals(0f, watchCob(entries, at)!!, 0f)
+    }
+
+    @Test
+    fun unusableCarbAmountsContributeNothingAndDoNotMakeCobUnavailable() {
+        val at = doseTime + minutes(10)
+        for (grams in listOf(0f, -5f, Float.NaN, Float.POSITIVE_INFINITY, null)) {
+            val entries = listOf(carb(grams, durationMinutes = 90), carb(30f, durationMinutes = 90))
+            assertEquals("grams=$grams", phoneCob(entries, at), watchCob(entries, at)!!, 1e-4f)
+        }
+    }
+
+    @Test
+    fun cobIsUnavailableWhenACarbEntryHasNoMinutes() {
+        // An old phone's payload: the encoder minus the absorption section. A number built from the
+        // entries that do have minutes would disagree with the phone, so COB is withheld.
+        val full = WearJournalBridge.encode(listOf(carb(40f, durationMinutes = 90)), emptyList()) { rateGramsPerHour }
+        val oldPhone = full.copyOf(full.size - 4) // drops u16 count + one u16 minutes
+        val journal = WearJournalSync.decode(oldPhone)
+        assertEquals(1, journal.entries.size)
+        assertNull(journal.entries.single().absorptionMinutes)
+        assertNull(WearJournalIob.cobGrams(journal, doseTime + minutes(10)))
+    }
+
+    @Test
+    fun aJournalWithNoCarbsHasZeroCobNotUnavailable() {
+        val entries = listOf(model(amount = 6f))
+        assertEquals(0f, watchCob(entries, doseTime)!!, 0f)
+    }
+
+    @Test
+    fun aPendingWatchCarbIsNotCountedAndDoesNotWithholdCob() {
+        val confirmed = WearJournalSync.decode(
+            WearJournalBridge.encode(listOf(carb(40f, durationMinutes = 90)), emptyList()) { rateGramsPerHour }
+        )
+        val pending = WearJournalSync.Entry(
+            timestampMs = doseTime, id = 0L, type = WearJournalSync.TYPE_CARBS,
+            amount = 50f, title = "", pending = true
+        )
+        val at = doseTime + minutes(10)
+        assertEquals(
+            WearJournalIob.cobGrams(confirmed, at)!!,
+            WearJournalIob.cobGrams(confirmed.copy(entries = confirmed.entries + pending), at)!!,
             0f
         )
     }
