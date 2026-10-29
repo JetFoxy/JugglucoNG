@@ -120,4 +120,55 @@ class WearJournalIobDisplayTests {
         assertEquals("1.5", WearJournalIobDisplay.format(1.5f, Locale.US))
         assertEquals("12.3", WearJournalIobDisplay.format(12.3f, Locale.US))
     }
+
+    // ---- truncation ---------------------------------------------------------------------------
+
+    private fun note(agoMin: Int, n: Int) = WearJournalSync.Entry(
+        timestampMs = now - agoMin * minute, id = 1000L + n, type = WearJournalSync.TYPE_NOTE,
+        amount = Float.NaN, title = "n$n",
+    )
+
+    private fun notes(count: Int, oldestAgoMin: Int): List<WearJournalSync.Entry> =
+        (0 until count).map { note(oldestAgoMin * it / (count - 1).coerceAtLeast(1), it) }
+
+    private fun fullJournal(oldestAgoMin: Int, vararg extra: WearJournalSync.Entry) =
+        WearJournalSync.Journal(
+            enabled = true,
+            entries = notes(WearJournalSync.SERVED_ENTRY_CAP - extra.size, oldestAgoMin) + extra.toList()
+        )
+
+    @Test
+    fun belowTheCapIsNeverTruncated() {
+        val j = WearJournalSync.Journal(enabled = true, entries = notes(WearJournalSync.SERVED_ENTRY_CAP - 1, 10))
+        assertFalse(WearJournalIob.isPossiblyTruncated(j, now))
+    }
+
+    @Test
+    fun atTheCapWithAnOldOldestEntryIsNotTruncated() {
+        assertFalse(WearJournalIob.isPossiblyTruncated(fullJournal(oldestAgoMin = 361), now))
+    }
+
+    @Test
+    fun atTheCapWithARecentOldestEntryIsTruncated() {
+        assertTrue(WearJournalIob.isPossiblyTruncated(fullJournal(oldestAgoMin = 200), now))
+    }
+
+    @Test
+    fun aLongCustomCurveExtendsTheHorizon() {
+        val longDose = WearJournalSync.Entry(
+            timestampMs = now - 10 * minute, id = 5L, type = WearJournalSync.TYPE_INSULIN,
+            amount = 2f, title = "i",
+            curveMinutes = intArrayOf(0, 300, 720), curveActivity = floatArrayOf(0f, 1f, 0f),
+        )
+        // 500 minutes old is outside the 360 minute COB horizon but inside the 720 minute curve.
+        assertFalse(WearJournalIob.isPossiblyTruncated(fullJournal(500), now))
+        assertTrue(WearJournalIob.isPossiblyTruncated(fullJournal(500, longDose), now))
+    }
+
+    @Test
+    fun aTruncatedListShowsNoTotals() {
+        val j = fullJournal(200, insulin(0, 4f), carbs(0, 40f, 120))
+        assertTrue(display(j).isEmpty)
+        assertFalse(display(fullJournal(361, insulin(0, 4f), carbs(0, 40f, 120))).isEmpty)
+    }
 }

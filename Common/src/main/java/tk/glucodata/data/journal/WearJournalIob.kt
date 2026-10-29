@@ -14,6 +14,13 @@ import tk.glucodata.WearJournalSync
  * phone's: an insulin entry with no usable curve contributes nothing rather than being
  * resolved again from a preset the watch may not have.
  *
+ * **Truncated lists.** The phone serves only the newest 60 entries of any type, so notes and
+ * fingersticks can push a still-active dose or meal out. [isPossiblyTruncated] detects that and
+ * the display then withholds the totals instead of showing a silently low number.
+ *
+ * Also, a dose whose preset is non-counting AND archived is absent from the served presets, so its
+ * snapshot curve is still sent and counted here, unlike on the phone (#500).
+ *
  * One thing the watch cannot compute yet, raised on #500 rather than worked around:
  *
  * - **A dose whose preset has since been archived.** The phone counts it on purpose
@@ -50,6 +57,27 @@ object WearJournalIob {
                 }
             )
         }
+
+    /** Longest COB absorption the phone allows (the 360 minute clamp). */
+    private const val COB_HORIZON_MINUTES = 360L
+
+    /**
+     * True when the served list may have dropped an entry that is still active, so IOB/COB would
+     * read low without saying so. The phone serves only the newest [WearJournalSync.SERVED_ENTRY_CAP]
+     * entries of any type, so a full list whose oldest entry is still inside the horizon (the longest
+     * of 360 minutes and the longest curve end among the insulin entries) may be missing an older
+     * dose or meal. Pending watch-only entries are ignored: they are not part of a serve.
+     */
+    fun isPossiblyTruncated(journal: WearJournalSync.Journal, atMillis: Long): Boolean {
+        val served = journal.entries.filterNot { it.pending }
+        if (served.size < WearJournalSync.SERVED_ENTRY_CAP) return false
+        val curveEnd = served.maxOf { entry ->
+            if (entry.type == WearJournalSync.TYPE_INSULIN) entry.curveMinutes.maxOrNull() ?: 0 else 0
+        }
+        val horizonMinutes = maxOf(COB_HORIZON_MINUTES, curveEnd.toLong())
+        val oldest = served.minOf { it.timestampMs }
+        return oldest > atMillis - horizonMinutes * 60_000L
+    }
 
     /** IOB and eIOB in units at [atMillis], from the shared maths the phone uses. */
     fun compute(journal: WearJournalSync.Journal, atMillis: Long): IobResult =

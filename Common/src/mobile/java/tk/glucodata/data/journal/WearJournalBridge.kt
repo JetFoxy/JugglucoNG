@@ -28,8 +28,8 @@ object WearJournalBridge : JournalBridge {
     private const val PREFS_NAME = "tk.glucodata_preferences"
     private const val JOURNAL_ENABLED_KEY = "dashboard_journal_enabled"
 
-    /** Keeps a watch payload inside a single Data Layer message. */
-    private const val MAX_ENTRIES = 60
+    /** Keeps a watch payload inside a single Data Layer message; shared with the watch's truncation check. */
+    private const val MAX_ENTRIES = WearJournalSync.SERVED_ENTRY_CAP
     private const val MAX_TITLE_BYTES = 40
     private const val MAX_CURVE_POINTS = 24
 
@@ -149,12 +149,42 @@ object WearJournalBridge : JournalBridge {
 
     /**
      * The preset's curve, capped so one payload stays inside a single Data
-     * Layer message. A preset that does not count toward IOB contributes no
-     * curve, which is how the phone's own model treats it.
+     * Layer message (see [thinCurve]: a longer curve keeps its true end). A
+     * preset that does not count toward IOB contributes no curve, which is how
+     * the phone's own model treats it.
      */
     private fun curvePointsOf(preset: JournalInsulinPreset): List<JournalCurvePoint> {
         if (preset.isArchived || !preset.countsTowardIob) return emptyList()
-        return preset.curvePoints.take(MAX_CURVE_POINTS)
+        return thinCurve(preset.curvePoints, MAX_CURVE_POINTS)
+    }
+
+    /**
+     * At most [cap] points, always including the first and the last: the watch's IOB maths takes
+     * the last received point as the end of the curve, so truncating would end it early. Interior
+     * points are picked evenly by index (deterministic). A curve within the cap is returned as is.
+     */
+    internal fun thinCurve(points: List<JournalCurvePoint>, cap: Int): List<JournalCurvePoint> {
+        if (points.size <= cap) return points
+        if (cap < 2) return points.take(cap)
+        val last = points.size - 1
+        return List(cap) { i -> points[Math.round(i.toDouble() * last / (cap - 1)).toInt()] }
+    }
+
+    /**
+     * The curve the watch counts for [entry]. A dose whose preset is present and does not count
+     * toward IOB sends none even if it has a snapshot, as the phone drops it
+     * (`JournalIobCalculator.toDose`). Residual (#500): a non-counting preset that is also
+     * archived is absent from the presets (`serveEntries` filters archived), so its snapshot is
+     * still sent and the watch counts that dose.
+     */
+    private fun resolveCurve(
+        entry: JournalEntry,
+        presetsById: Map<Long, JournalInsulinPreset>
+    ): List<JournalCurvePoint> {
+        val preset = entry.insulinPresetId?.let(presetsById::get)
+        if (preset != null && !preset.countsTowardIob) return emptyList()
+        val snapshot = thinCurve(parseJournalCurve(entry.insulinCurveJsonSnapshot), MAX_CURVE_POINTS)
+        return if (snapshot.size >= 2) snapshot else preset?.let(::curvePointsOf).orEmpty()
     }
 
     // internal so the IOB agreement test can encode through the real bridge rather than a
@@ -170,17 +200,11 @@ object WearJournalBridge : JournalBridge {
             val title = entry.title.toByteArray(StandardCharsets.UTF_8).let {
                 if (it.size <= MAX_TITLE_BYTES) it else it.copyOf(MAX_TITLE_BYTES)
             }
-            val snapshot = parseJournalCurve(entry.insulinCurveJsonSnapshot)
-                .take(MAX_CURVE_POINTS)
-            val fallback = entry.insulinPresetId
-                ?.let(presetsById::get)
-                ?.let(::curvePointsOf)
-                .orEmpty()
             EncodedEntry(
                 entry = entry,
                 title = title,
                 wireType = wireTypeOf(entry.type),
-                curve = if (snapshot.size >= 2) snapshot else fallback
+                curve = resolveCurve(entry, presetsById)
             )
         }
         val encodedPresets = presets.map { preset ->

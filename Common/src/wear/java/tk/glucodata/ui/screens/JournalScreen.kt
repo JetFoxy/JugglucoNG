@@ -73,14 +73,19 @@ fun JournalScreen(
 
     // Recomputed when the journal changes and once a minute. The maths is a handful of entries,
     // so it runs inline rather than off the main thread.
-    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    // The tick only invalidates; the clock is read when computing, so a journal that changes
+    // between ticks is evaluated at the current time (a dose arriving after the tick would
+    // otherwise look future-dated and count as zero).
+    var tick by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(ACTIVITY_REFRESH_MS)
-            nowMillis = System.currentTimeMillis()
+            tick++
         }
     }
-    val activity = remember(journal, nowMillis) { WearJournalIobDisplay.of(journal, nowMillis) }
+    val activity = remember(journal, tick) {
+        WearJournalIobDisplay.of(journal, System.currentTimeMillis())
+    }
 
     ScreenScaffold(timeText = { TimeText() }) {
         ScalingLazyColumn(

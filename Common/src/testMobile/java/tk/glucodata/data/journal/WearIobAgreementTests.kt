@@ -140,6 +140,81 @@ class WearIobAgreementTests {
         )
     }
 
+    /** The snapshot must not resurrect a dose the phone drops for a non-counting preset. */
+    @Test
+    fun aNonCountingPresetDoseWithASnapshotIsZeroOnBothSides() {
+        val entries = listOf(model(amount = 6f, curveSnapshot = "0:0;20:1;120:0"))
+        val presets = listOf(trianglePreset(countsTowardIob = false))
+        for (offset in listOf(10L, 30, 90)) {
+            val at = doseTime + minutes(offset)
+            assertEquals(0f, phone(entries, presets, at).iobUnits, 0f)
+            assertAgree(entries, presets, at, "non-counting with snapshot +$offset")
+            assertEquals(0f, WearJournalIob.compute(watch(entries, presets, at), at).iobUnits, 0f)
+        }
+    }
+
+    private fun longSnapshot(points: Int, stepMinutes: Int): String =
+        (0 until points).joinToString(";") { i ->
+            val activity = Math.sin(Math.PI * i / (points - 1)).toFloat()
+            "${i * stepMinutes}:$activity"
+        }
+
+    @Test
+    fun aCurveLongerThanTheWireCapKeepsItsTrueEnd() {
+        val entries = listOf(model(amount = 6f, curveSnapshot = longSnapshot(40, 6)))
+        val presets = listOf(trianglePreset())
+        val journal = watch(entries, presets, doseTime)
+        assertEquals(24, journal.entries.single().curveMinutes.size)
+        assertEquals(234, journal.entries.single().curveMinutes.last())
+        // Stated tolerance: thinning a smooth 40-point curve to 24 moves IOB by < 0.1 U of 6 U.
+        for (offset in listOf(0L, 30, 90, 150, 200, 225, 233, 240)) {
+            val at = doseTime + minutes(offset)
+            val onPhone = phone(entries, presets, at)
+            val onWatch = WearJournalIob.compute(watch(entries, presets, at), at)
+            assertEquals("IOB +$offset", onPhone.iobUnits, onWatch.iobUnits, 0.1f)
+            assertEquals("eIOB +$offset", onPhone.eiobUnits, onWatch.eiobUnits, 0.1f)
+        }
+        val tail = doseTime + minutes(200)
+        assertTrue(
+            "the tail must still count on the watch",
+            WearJournalIob.compute(watch(entries, presets, tail), tail).iobUnits > 0.01f
+        )
+    }
+
+    @Test
+    fun aLongPresetCurveWithoutASnapshotIsThinnedTheSameWay() {
+        val preset = trianglePreset().copy(curveJson = longSnapshot(40, 6))
+        val entries = listOf(model(amount = 6f))
+        val at = doseTime + minutes(200)
+        assertEquals(
+            phone(entries, listOf(preset), at).iobUnits,
+            WearJournalIob.compute(watch(entries, listOf(preset), at), at).iobUnits,
+            0.1f
+        )
+    }
+
+    @Test
+    fun aCurveWithinTheCapIsUnchangedOnTheWire() {
+        val points = (0 until 24).map { JournalCurvePoint(it * 5, it / 23f) }
+        org.junit.Assert.assertSame(points, WearJournalBridge.thinCurve(points, 24))
+        val snapshot = points.joinToString(";") { "${it.minute}:${it.activity}" }
+        val journal = watch(listOf(model(amount = 6f, curveSnapshot = snapshot)), listOf(trianglePreset()), doseTime)
+        assertEquals(points.map { it.minute }, journal.entries.single().curveMinutes.toList())
+        assertEquals(points.map { it.activity }, journal.entries.single().curveActivity.toList())
+    }
+
+    @Test
+    fun thinningKeepsEndpointsAndIsDeterministic() {
+        val points = (0 until 100).map { JournalCurvePoint(it, 0.5f) }
+        val a = WearJournalBridge.thinCurve(points, 24)
+        assertEquals(24, a.size)
+        assertEquals(points.first(), a.first())
+        assertEquals(points.last(), a.last())
+        assertEquals(a, WearJournalBridge.thinCurve(points, 24))
+        assertEquals(a.map { it.minute }.sorted(), a.map { it.minute })
+        assertEquals(24, a.map { it.minute }.toSet().size)
+    }
+
     @Test
     fun theWireAgreesOnSeveralDosesAtOnce() {
         val entries = listOf(

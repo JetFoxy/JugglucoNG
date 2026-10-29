@@ -66,6 +66,13 @@ object WearJournalSync {
     const val TYPE_ACTIVITY = 3
     const val TYPE_NOTE = 4
 
+    /**
+     * Most entries the phone serves in one payload (newest first, any type). A payload at this
+     * size may have dropped older entries, so the watch cannot trust totals from it; see
+     * `WearJournalIob.isPossiblyTruncated`.
+     */
+    const val SERVED_ENTRY_CAP = 60
+
     private const val HISTORY_MS = 24L * 60L * 60L * 1000L
     private const val PREFS = "wear_journal_cache"
     private const val KEY_PAYLOAD = "payload"
