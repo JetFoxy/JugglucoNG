@@ -227,4 +227,11 @@ class ICanHealthConstantsTests {
             ICanHealthConstants.shouldRebindStaleAddress(null, "AA", "ICN-7BF00099C663", ids, stale, now)
         )
     }
+
+    @Test
+    fun formatCalibrationMarker_showsScaleOrNothing() {
+        assertEquals("", ICanHealthConstants.formatCalibrationMarker(null))
+        assertEquals("F6 0xFFFF", ICanHealthConstants.formatCalibrationMarker(0xFFFF))
+        assertEquals("F6 0x0244 (580), x13 0.580", ICanHealthConstants.formatCalibrationMarker(580))
+    }
 }

@@ -741,6 +741,17 @@ object ICanHealthConstants {
         }
     }
 
+    /**
+     * The sensor-info marker is the calibration scale the sensor holds, times 1000 (`0xFFFF` =
+     * nothing installed). Shown read-only so users can compare it with a meter.
+     */
+    @JvmStatic
+    fun formatCalibrationMarker(marker: Int?): String = when {
+        marker == null -> ""
+        marker == 0xFFFF -> "F6 0xFFFF"
+        else -> "F6 0x%04X (%d), x13 %.3f".format(java.util.Locale.US, marker, marker, marker / 1000f)
+    }
+
     /** How long a stored address may go without a reading before the advertised name may replace it. */
     const val STALE_ADDRESS_REBIND_MS = 10 * 60_000L
 

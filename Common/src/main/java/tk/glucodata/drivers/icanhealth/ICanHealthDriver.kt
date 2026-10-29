@@ -16,6 +16,9 @@ data class ICanHealthCurrentSnapshot(
 )
 
 interface ICanHealthDriver : ManagedBluetoothSensorDriver {
+    /** Read-only calibration marker (F6) shown in the sensor details. */
+    fun getSensorDetailTelemetry(): String = ""
+
 
     override fun canConnectWithoutDataptr(): Boolean = true
 
@@ -91,6 +94,7 @@ interface ICanHealthDriver : ManagedBluetoothSensorDriver {
             sensorAgeHours = runCatching { getSensorAgeHours() }.getOrDefault(-1),
             vendorFirmware = runCatching { vendorFirmwareVersion }.getOrDefault(""),
             vendorModel = runCatching { vendorModelName }.getOrDefault(""),
+            sensorDetailTelemetry = runCatching { getSensorDetailTelemetry() }.getOrDefault(""),
         )
     }
 
