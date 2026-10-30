@@ -268,6 +268,9 @@ class ICanHealthBleManager(
     private val pendingHistoryBatch = LinkedHashMap<Int, PendingHistoryReading>()
     private val recentLiveGlucoseMgdl = ArrayDeque<Float>(RECENT_GLUCOSE_WINDOW_SIZE)
     private val rejectedOnboardingAddresses = CopyOnWriteArraySet<String>()
+
+    /** Address we rebound away from; kept until the new device proves it is the saved sensor. */
+    @Volatile private var rebindPreviousAddress: String? = null
     // The address the onboarding scan picked by name or advert, as opposed to one the user or the
     // registry supplied. Only a guess like that may be dropped for not being a CGM.
     @Volatile private var onboardingScanPickedAddress: String? = null
@@ -1199,6 +1202,7 @@ class ICanHealthBleManager(
                 nowMs = System.currentTimeMillis(),
             )
             if (rebind) {
+                rebindPreviousAddress = knownAddress
                 Log.w(TAG, "Rebinding $SerialNumber from stale address $knownAddress to $address (advertised '$trimmedName')")
             }
             return rebind
@@ -1604,6 +1608,9 @@ class ICanHealthBleManager(
                 val rawSerial = ICanHealthParser.parseRawDeviceSerial(data)
                 val resolvedSerial = ICanHealthParser.parseDeviceSerial(data)
                 if (resolvedSerial.isNotEmpty()) {
+                    if (rejectMismatchedRebindCandidate(gatt, rawSerial, resolvedSerial)) {
+                        return
+                    }
                     if (rejectMismatchedOnboardingCandidate(gatt, rawSerial, resolvedSerial)) {
                         return
                     }
@@ -1715,6 +1722,43 @@ class ICanHealthBleManager(
         nonCgmCandidateStrikes.remove(address)
         Log.w(TAG, "Rejected iCan candidate address=$address: no CGM service on ${services.size} services")
         dropOnboardingCandidate(address)
+        return true
+    }
+
+    /**
+     * A rebind trusts only the advertised name, which any nearby device can copy. Once the
+     * device reports its serial, keep the new address only if it is the saved sensor;
+     * otherwise put the old address back before [handleResolvedSerial] rewrites the identity.
+     */
+    private fun rejectMismatchedRebindCandidate(
+        gatt: BluetoothGatt,
+        rawSerial: String,
+        resolvedSerial: String,
+    ): Boolean {
+        val previousAddress = rebindPreviousAddress ?: return false
+        rebindPreviousAddress = null
+        val savedIds = listOf(SerialNumber, serialFromDevice, rawSerialFromDevice)
+            .map { ICanHealthConstants.canonicalSensorId(it) }
+            .filter { it.isNotEmpty() && !ICanHealthConstants.isProvisionalSensorId(it) }
+        if (savedIds.isEmpty()) {
+            return false
+        }
+        val reported = listOf(rawSerial, resolvedSerial).map { ICanHealthConstants.canonicalSensorId(it) }
+        if (savedIds.any { saved -> reported.any { it.equals(saved, ignoreCase = true) } }) {
+            return false
+        }
+        val address = gatt.device?.address?.trim()?.uppercase(Locale.US)
+        Log.w(
+            TAG,
+            "Rejected rebind to address=${address ?: "unknown"}: device reports $resolvedSerial, " +
+                "saved sensor is ${savedIds.first()}; restoring $previousAddress"
+        )
+        if (address != null) {
+            rejectedOnboardingAddresses.add(address)
+        }
+        rawSerialFromDevice = null
+        close()
+        setDeviceAddress(previousAddress)
         return true
     }
 
