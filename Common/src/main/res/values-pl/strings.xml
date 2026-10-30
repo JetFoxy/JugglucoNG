@@ -1023,6 +1023,9 @@
     <string name="writedown">Zapisz!</string>
     <string name="xdrip_report_as_libre2_title">Identyfikuj jako Libre 2</string>
     <string name="xdrip_report_as_libre2_desc">Pozwala AAPS włączyć SMB zawsze dla tego sensora. Włącz tylko, jeśli ufasz jego odczytom</string>
+    <string name="xdrip_compatible_desc">Local broadcast</string>
+    <string name="xdrip_follower_title">xDrip+ Sync Follower</string>
+    <string name="xdrip_follower_desc">Wysyłaj odczyty glukozy do xDrip+ na tym telefonie</string>
     <string name="health_connect_title">Health Connect</string>
     <string name="zero">0</string>
 
@@ -1687,8 +1690,8 @@
     <string name="journal_dose_math_title">Kalkulator dawki</string>
     <string name="journal_food_macros_title">Zaawansowane wchłanianie posiłku</string>
     <string name="journal_food_macros_desc">Uwzględniaj białko i tłuszcz przy opóźnionym wchłanianiu posiłku</string>
-    <string name="journal_aaps_import_title">Importuj terapie AAPS</string>
-    <string name="journal_aaps_import_desc">Odbieraj transmisje terapii AAPS i dodawaj insulinę oraz węglowodany do dziennika</string>
+    <string name="journal_aaps_import_title">Terapie AAPS</string>
+    <string name="journal_aaps_import_desc">Dodawaj insulinę i węglowodany z AAPS do dziennika</string>
     <string name="journal_aaps_carbs_title">Węglowodany AAPS</string>
     <string name="journal_aaps_insulin_title">Insulina AAPS</string>
     <string name="journal_food_library">Baza żywności</string>
@@ -1728,7 +1731,7 @@
     <string name="journal_meal_shape_mixed">Mieszane</string>
     <string name="journal_meal_shape_slow">Wolno</string>
     <string name="journal_meal_shape_extended">Przedłużone</string>
-    <string name="journal_import_health_activity">Importuj aktywność z Health Connect</string>
+    <string name="journal_import_health_activity">Aktywność z Health Connect</string>
     <string name="journal_dose_pair_insulin">Połącz insulinę</string>
     <string name="journal_dose_pair_carbs">Połącz węglowodany</string>
     <string name="journal_dose_suggested_insulin">Sugerowane %1$s j.</string>
@@ -1753,10 +1756,18 @@
     <string name="journal_manage_desc">Dostosuj typy insuliny i okna działania</string>
     <string name="journal_quick_actions">Szybki wpis</string>
     <string name="journal_show_tab_title">Pokaż kartę dziennika</string>
-    <string name="journal_show_tab_desc">Dodaj Dziennik do głównej dolnej nawigacji, gdy narzędzia dziennika są włączone</string>
+    <string name="journal_show_tab_desc">Dodaj Dziennik do dolnej nawigacji</string>
     <string name="journal_type_temp_basal">Tymczasowa baza</string>
     <string name="journal_dashboard_types_title">Pokaż na ekranie głównym</string>
     <string name="journal_dashboard_types_desc">Ukryte wpisy znikają tylko z głównego wykresu i listy odczytów. Nadal liczą się do IOB, COB, prognozy i podpowiedzi dawki.</string>
+    <string name="journal_import_health_activity_desc">Dodawaj treningi i kroki do dziennika</string>
+    <string name="journal_section_main_screen">Ekran główny</string>
+    <string name="journal_section_dosing">Dawkowanie</string>
+    <string name="journal_section_import">Import</string>
+    <string name="journal_entry_types_title">Typy wpisów</string>
+    <string name="journal_entry_types_all_shown">Wszystkie widoczne</string>
+    <string name="journal_entry_types_all_hidden">Wszystkie ukryte</string>
+    <string name="journal_entry_types_hidden">Ukryte: %1$s</string>
     <string name="journal_dashboard_temp_basal_desc">Paski u góry wykresu dla tymczasowych baz z AAPS</string>
     <string name="journal_rate_units_per_hour">%1$s j./h</string>
     <string name="journal_events_today">%1$d zdarzeń dziś</string>
@@ -2722,10 +2733,12 @@
     <string name="insulin_pen_full_read">Następnym razem odczytaj cały dziennik</string>
     <string name="insulin_pen_full_read_armed">Gotowe — przyłóż wstrzykiwacz do telefonu</string>
     <string name="insulin_pen_full_read_desc">Wstrzykiwacz przechowuje dawki z wielu miesięcy i wymaga kilku sekund stabilnego kontaktu. Pozwala sięgnąć dalej niż ostatni import.</string>
+    <string name="insulin_pen_full_read_off">Włącz „Odczytuj wstrzykiwacze”, aby odczytać wstrzykiwacz.</string>
     <string name="insulin_pen_read_cut_short">Wstrzykiwacz został odsunięty za wcześnie. Trzymaj go przy telefonie, aż zawibruje.</string>
     <string name="insulin_pen_background_title">Importuj w tle</string>
-    <string name="insulin_pen_background_desc">Gdy aplikacja nie jest otwarta, nowe dawki pena przyłożonego do telefonu są dodawane do dziennika bez pytania.</string>
-    <string name="insulin_pen_background_desc_more">Odpowietrzenia są pomijane. Ekran musi być włączony, a telefon odblokowany — Android nie czyta NFC przy wyłączonym ekranie. Każda karta zbliżeniowa przyłożona do telefonu na chwilę budzi czytnik, a inne aplikacje kart mogą zapytać, której aplikacji użyć.</string>
+    <string name="insulin_pen_background_desc">Dodaje nowe dawki bez pytania, gdy aplikacja jest zamknięta</string>
+    <string name="insulin_pen_background_desc_more">Odpowietrzenia są pomijane, a telefon musi być odblokowany. Każda karta zbliżeniowa przyłożona do telefonu na chwilę budzi czytnik, a inne aplikacje kart mogą zapytać, której aplikacji użyć.</string>
+    <string name="insulin_pen_notification_duration">Powiadomienie po imporcie</string>
     <string name="insulin_pen_import_channel">Importy z pena</string>
     <plurals name="insulin_pen_imported_count">
         <item quantity="one">%d dawka dodana do dziennika</item>
@@ -3111,8 +3124,8 @@
     <string name="settings_import_title">Import</string>
     <string name="settings_xdrip_broadcast_title">Broadcast xDrip+</string>
     <string name="settings_xdrip_broadcast_desc">Dla xDrip+ i AAPS</string>
-    <string name="settings_patched_libre_title">Broadcast zmodyfikowanej aplikacji Libre</string>
-    <string name="settings_patched_libre_desc">Dla aplikacji czytających zmodyfikowaną aplikację Libre</string>
+    <string name="settings_patched_libre_title">xDrip+ (zmodyfikowane Libre)</string>
+    <string name="settings_patched_libre_desc">W xDrip+ wybierz „Libre2 (patched App)” jako źródło danych</string>
     <string name="settings_glucodata_title">Broadcast Glucodata</string>
     <string name="settings_glucodata_desc">Dla GlucoDataHandler</string>
     <string name="settings_health_connect_desc">Udostępniaj odczyty aplikacjom zdrowotnym</string>

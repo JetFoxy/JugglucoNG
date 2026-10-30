@@ -1028,6 +1028,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="writedown">Write down!</string>
     <string name="xdrip_report_as_libre2_title">Представляться как Libre 2</string>
     <string name="xdrip_report_as_libre2_desc">Позволяет AAPS включить SMB always с этим датчиком. Включайте, только если доверяете его показаниям</string>
+    <string name="xdrip_compatible_desc">Совместимый с AAPS</string>
+    <string name="xdrip_follower_title">xDrip+ Sync Follower</string>
+    <string name="xdrip_follower_desc">Отправлять показания глюкозы в xDrip+ на этом телефоне</string>
     <string name="health_connect_title">Health Connect</string>
     <string name="zero">0</string>
 
@@ -1694,8 +1697,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_dose_math_title">Калькулятор дозы</string>
     <string name="journal_food_macros_title">Расширенное усвоение еды</string>
     <string name="journal_food_macros_desc">Учитывать белки и жиры для замедленного усвоения пищи</string>
-    <string name="journal_aaps_import_title">Импорт терапии AAPS</string>
-    <string name="journal_aaps_import_desc">Принимать трансляции терапии AAPS и добавлять инсулин и углеводы в журнал</string>
+    <string name="journal_aaps_import_title">Терапия AAPS</string>
+    <string name="journal_aaps_import_desc">Добавлять инсулин и углеводы из AAPS в журнал</string>
     <string name="journal_aaps_carbs_title">Углеводы AAPS</string>
     <string name="journal_aaps_insulin_title">Инсулин AAPS</string>
     <string name="journal_food_library">База еды</string>
@@ -1735,7 +1738,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_meal_shape_mixed">Смешанная</string>
     <string name="journal_meal_shape_slow">Медленно</string>
     <string name="journal_meal_shape_extended">Длительно</string>
-    <string name="journal_import_health_activity">Импортировать активность из Health Connect</string>
+    <string name="journal_import_health_activity">Активность из Health Connect</string>
     <string name="journal_dose_pair_insulin">Добавить инсулин</string>
     <string name="journal_dose_pair_carbs">Добавить углеводы</string>
     <string name="journal_dose_suggested_insulin">Предложено %1$s ЕД</string>
@@ -1760,10 +1763,18 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_manage_desc">Настройте типы инсулина и диапазоны действия</string>
     <string name="journal_quick_actions">Быстрая запись</string>
     <string name="journal_show_tab_title">Показывать вкладку журнала</string>
-    <string name="journal_show_tab_desc">Добавляет журнал в нижнюю навигацию, когда инструменты журнала включены</string>
+    <string name="journal_show_tab_desc">Добавляет журнал в нижнюю навигацию</string>
     <string name="journal_rate_units_per_hour">%1$s ЕД/ч</string>
     <string name="journal_dashboard_types_title">Показывать на главной</string>
     <string name="journal_dashboard_types_desc">Скрытые записи пропадают только с графика и из списка показаний на главной. В IOB, COB, прогнозе и подсказках дозы они по-прежнему учитываются.</string>
+    <string name="journal_import_health_activity_desc">Добавлять тренировки и шаги в журнал</string>
+    <string name="journal_section_main_screen">Главный экран</string>
+    <string name="journal_section_dosing">Дозирование</string>
+    <string name="journal_section_import">Импорт</string>
+    <string name="journal_entry_types_title">Типы записей</string>
+    <string name="journal_entry_types_all_shown">Показаны все</string>
+    <string name="journal_entry_types_all_hidden">Все скрыты</string>
+    <string name="journal_entry_types_hidden">Скрыты: %1$s</string>
     <string name="journal_dashboard_temp_basal_desc">Полосы сверху графика для временных базалов из AAPS</string>
     <string name="journal_type_temp_basal">Временный базал</string>
     <string name="journal_events_today">%1$d событий сегодня</string>
@@ -2751,10 +2762,12 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="insulin_pen_full_read">В следующий раз считать весь журнал</string>
     <string name="insulin_pen_full_read_armed">Готово — поднесите ручку к телефону</string>
     <string name="insulin_pen_full_read_desc">Ручка хранит дозы за несколько месяцев, и на полное считывание нужно несколько секунд без отрыва. Так можно взять данные старше последнего импорта.</string>
+    <string name="insulin_pen_full_read_off">Чтобы считать ручку, включите «Считывать инсулиновые ручки».</string>
     <string name="insulin_pen_read_cut_short">Ручку убрали слишком рано. Держите её у телефона, пока он не завибрирует.</string>
     <string name="insulin_pen_background_title">Импорт в фоне</string>
-    <string name="insulin_pen_background_desc">Когда приложение не открыто, новые дозы ручки, приложенной к телефону, добавляются в журнал без вопросов.</string>
-    <string name="insulin_pen_background_desc_more">Продувки пропускаются. Экран должен быть включён, а телефон разблокирован — Android не читает NFC при выключенном экране. Любая бесконтактная карта, приложенная к телефону, на мгновение будит считыватель, а другие приложения для карт могут спросить, какое приложение использовать.</string>
+    <string name="insulin_pen_background_desc">Добавляет новые дозы без вопросов, когда приложение закрыто</string>
+    <string name="insulin_pen_background_desc_more">Продувки пропускаются, а телефон должен быть разблокирован. Любая бесконтактная карта, приложенная к телефону, на мгновение будит считыватель, а другие приложения для карт могут спросить, какое приложение использовать.</string>
+    <string name="insulin_pen_notification_duration">Уведомление после импорта</string>
     <string name="insulin_pen_import_channel">Импорт с ручки</string>
     <plurals name="insulin_pen_imported_count">
         <item quantity="one">%d доза добавлена в журнал</item>
@@ -3117,8 +3130,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_import_title">Импорт</string>
     <string name="settings_xdrip_broadcast_title">Трансляция xDrip+</string>
     <string name="settings_xdrip_broadcast_desc">Для xDrip+ и AAPS</string>
-    <string name="settings_patched_libre_title">Трансляция патченного приложения Libre</string>
-    <string name="settings_patched_libre_desc">Для приложений, читающих патченное приложение Libre</string>
+    <string name="settings_patched_libre_title">xDrip+ (патченный Libre)</string>
+    <string name="settings_patched_libre_desc">В xDrip+ выберите «Libre2 (patched App)» как источник данных</string>
     <string name="settings_glucodata_title">Трансляция Glucodata</string>
     <string name="settings_glucodata_desc">Для GlucoDataHandler</string>
     <string name="settings_health_connect_desc">Делиться значениями с приложениями для здоровья</string>

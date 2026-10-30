@@ -21,6 +21,7 @@
 /*      Fri Nov 21 11:08:14 CET 2025                                                 */
 #pragma once
 #include <condition_variable>
+#include <thread>
 #include <memory>
 #include <utility>
 #include "datbackup.hpp"
@@ -34,6 +35,7 @@
 #include "net/Connect.hpp"
 #include "ICE_data.hpp"
 #include "ICEConfig.hpp"
+#include "RendezvousFailover.hpp"
 #include "LocalICESignal.hpp"
 #include "RecoveryWakeLease.hpp"
 #define LOGGERICE(...) LOGGER("ICE: " __VA_ARGS__)
@@ -88,15 +90,32 @@ std::atomic_bool remoteDescriptionSet{false};
 std::atomic_bool remoteDescriptionWasLocal{false};
 std::mutex localSignalMutex;
 std::shared_ptr<LocalICESignalSession> localSignal;
+// The rendezvous /address reader may outlive initAgent(): after the START
+// handshake the server can still hold its poll. It feeds candidates into the
+// agent, so it must be joined before that agent is destroyed.
+std::mutex candidateReaderMutex;
+std::jthread candidateReader;
+std::atomic_bool candidateReaderFinished{true};
 ICE_data   icedata[2]{{allindex,side},{allindex,!side}};
 std::atomic<juice_agent*> agent;
 std::atomic<uint64_t> agentGeneration{0};
 std::atomic<int> selectedCloneTransport{clone_transport_unknown};
 char sdp[JUICE_MAX_SDP_STRING_LEN];
 int sdplen;
+// Primary rendezvous server; it also carries the peer generation watch.
 std::string rendezvousHost;
 uint16_t rendezvousPort;
 bool verifyRendezvousCertificate;
+// Every server this connection may use, primary first. Rewritten only by
+// reloadNetworkConfig() in newConnection(), while no attempt runs.
+std::vector<RendezvousEndpoint> rendezvousEndpoints;
+std::mutex activeRendezvousMutex;
+RendezvousEndpoint activeRendezvous;
+std::atomic<size_t> activeRendezvousIndex{0};
+// Survive agent replacement: a struggling primary keeps the other servers in
+// play until a negotiation connects through the primary again.
+std::atomic_bool rendezvousEscalated{false};
+std::atomic_bool rendezvousExchangedUnconnected{false};
 bool useLocalDiscovery;
 RecoveryWakeLease recoveryWake;
 
@@ -106,6 +125,7 @@ void reloadNetworkConfig(const passhost_t &host);
         finish=true;
         endConnectionHere();
         cancelLocalSignal();
+        stopCandidateReader();
         }
 void endConnectionHere() {
        LOGGERICE("%d: endConnectionHere\n",side);
@@ -199,6 +219,47 @@ void replaceLocalSignal(std::shared_ptr<LocalICESignalSession> replacement) {
 void cancelLocalSignal() {
         replaceLocalSignal(nullptr);
         }
+RendezvousEndpoint activeRendezvousEndpoint() {
+        std::lock_guard<std::mutex> lock(activeRendezvousMutex);
+        return activeRendezvous;
+        }
+void setActiveRendezvous(size_t index) {
+        std::lock_guard<std::mutex> lock(activeRendezvousMutex);
+        activeRendezvous=rendezvousEndpoints[index];
+        activeRendezvousIndex.store(index,std::memory_order_release);
+        }
+template<class Function,class... Args>
+void startCandidateReader(Function &&function,Args &&...args) {
+        // A previous reader was cancelled with its own rendezvous generation;
+        // cancelling here would hit the negotiation that is starting.
+        joinCandidateReader();
+        candidateReaderFinished.store(false,std::memory_order_release);
+        std::lock_guard<std::mutex> lock(candidateReaderMutex);
+        candidateReader=std::jthread(
+            [this](std::stop_token,auto function,auto... args) {
+                function(std::move(args)...);
+                candidateReaderFinished.store(true,std::memory_order_release);
+                },
+            std::forward<Function>(function),std::forward<Args>(args)...);
+        }
+void joinCandidateReader() {
+        std::jthread reader;
+        {
+        std::lock_guard<std::mutex> lock(candidateReaderMutex);
+        reader=std::move(candidateReader);
+        }
+        if(!reader.joinable())
+            return;
+        if(reader.get_id()==std::this_thread::get_id()) {
+            reader.detach();
+            return;
+            }
+        reader.join();
+        }
+void stopCandidateReader() {
+        cancelRendezvous();
+        joinCandidateReader();
+        }
 virtual int setindex(int in) override{
         LOGGER("setindex(%d)\n",in);
         icedata[1].allindex=in;
@@ -245,6 +306,7 @@ void releaseReceiverThread() {
         cancelRendezvous();
         cancelGenerationWatch();
         cancelLocalSignal();
+        stopCandidateReader();
         auto wasagent=agent.exchange(nullptr);
         advanceAgentGeneration();
         if(wasagent) {
@@ -293,6 +355,7 @@ void releaseReceiverThread() {
                 phase=FailedInitAgent;
                 cancelGenerationWatch();
                 LOGGER("end ICEConnect::newConnection failed allindex=%d, juice_destroy(%p)\n",allindex,theagent);
+                stopCandidateReader();
                 auto current=agent.exchange(nullptr);
                 advanceAgentGeneration();
                 if(current) {
@@ -333,6 +396,7 @@ void endConnection() override{
                 }
         destruct _{[this]{initrunning.clear();}};
         LOGGERICE("%d: ICEConnect::endConnection allindex=%d agent=%p\n",side,allindex,agent.load());
+        stopCandidateReader();
         juice_agent *wasagent=agent.exchange(nullptr);
         advanceAgentGeneration();
         if(wasagent) {

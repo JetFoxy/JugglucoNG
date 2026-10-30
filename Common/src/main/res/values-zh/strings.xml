@@ -1004,6 +1004,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="writedown">Write down!</string>
     <string name="xdrip_report_as_libre2_title">识别为 Libre 2</string>
     <string name="xdrip_report_as_libre2_desc">允许 AAPS 对此传感器启用“始终 SMB”。仅在您信任其读数时开启</string>
+    <string name="xdrip_compatible_desc">Local broadcast</string>
+    <string name="xdrip_follower_title">xDrip+ Sync Follower</string>
+    <string name="xdrip_follower_desc">将血糖读数发送到此手机上的 xDrip+</string>
     <string name="health_connect_title">Health Connect</string>
     <string name="zero">0</string>
 
@@ -1668,8 +1671,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_dose_math_title">剂量计算器</string>
     <string name="journal_food_macros_title">高级食物吸收</string>
     <string name="journal_food_macros_desc">使用蛋白质和脂肪计算延迟的食物吸收</string>
-    <string name="journal_aaps_import_title">导入 AAPS 治疗</string>
-    <string name="journal_aaps_import_desc">接收 AAPS 治疗广播，并将胰岛素和碳水添加到日志</string>
+    <string name="journal_aaps_import_title">AAPS 治疗</string>
+    <string name="journal_aaps_import_desc">将 AAPS 的胰岛素和碳水添加到日志</string>
     <string name="journal_aaps_carbs_title">AAPS 碳水</string>
     <string name="journal_aaps_insulin_title">AAPS 胰岛素</string>
     <string name="journal_food_library">食物库</string>
@@ -1709,7 +1712,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_meal_shape_mixed">混合</string>
     <string name="journal_meal_shape_slow">缓慢</string>
     <string name="journal_meal_shape_extended">延长</string>
-    <string name="journal_import_health_activity">导入 Health Connect 活动</string>
+    <string name="journal_import_health_activity">Health Connect 活动</string>
     <string name="journal_dose_pair_insulin">配对胰岛素</string>
     <string name="journal_dose_pair_carbs">配对碳水</string>
     <string name="journal_dose_suggested_insulin">建议 %1$s U</string>
@@ -1734,10 +1737,18 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_manage_desc">调整胰岛素类型和作用区间</string>
     <string name="journal_quick_actions">快速记录</string>
     <string name="journal_show_tab_title">显示日志标签</string>
-    <string name="journal_show_tab_desc">启用日志工具时，将日志加入主底部导航</string>
+    <string name="journal_show_tab_desc">将日志加入底部导航</string>
     <string name="journal_type_temp_basal">临时基础率</string>
     <string name="journal_dashboard_types_title">在主屏幕上显示</string>
     <string name="journal_dashboard_types_desc">隐藏的记录只会从主图表和读数列表中消失，仍会计入 IOB、COB、预测和剂量提示。</string>
+    <string name="journal_import_health_activity_desc">将锻炼和步数添加到日志</string>
+    <string name="journal_section_main_screen">主屏幕</string>
+    <string name="journal_section_dosing">剂量</string>
+    <string name="journal_section_import">导入</string>
+    <string name="journal_entry_types_title">记录类型</string>
+    <string name="journal_entry_types_all_shown">全部显示</string>
+    <string name="journal_entry_types_all_hidden">全部隐藏</string>
+    <string name="journal_entry_types_hidden">已隐藏：%1$s</string>
     <string name="journal_dashboard_temp_basal_desc">图表顶部的条形，表示来自 AAPS 的临时基础率</string>
     <string name="journal_rate_units_per_hour">%1$s U/小时</string>
     <string name="journal_events_today">今天 %1$d 个事件</string>
@@ -2701,10 +2712,12 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="insulin_pen_full_read">下次读取完整记录</string>
     <string name="insulin_pen_full_read_armed">已就绪 — 把笔贴近手机</string>
     <string name="insulin_pen_full_read_desc">胰岛素笔会保存数月的剂量，完整读取需要数秒的稳定贴合。用这个可以取回上次导入之前的记录。</string>
+    <string name="insulin_pen_full_read_off">请先开启“读取胰岛素笔”，再读取笔。</string>
     <string name="insulin_pen_read_cut_short">笔移开得太早了。请贴住手机直到它振动。</string>
     <string name="insulin_pen_background_title">在后台导入</string>
-    <string name="insulin_pen_background_desc">应用未打开时，贴近手机的胰岛素笔会将新剂量直接添加到日志，不再询问。</string>
-    <string name="insulin_pen_background_desc_more">排气剂量会被跳过。屏幕必须亮起且手机已解锁——熄屏时 Android 不读取 NFC。任何贴近手机的非接触卡都会短暂唤醒读取器，其他卡片应用可能会询问使用哪个应用。</string>
+    <string name="insulin_pen_background_desc">应用关闭时直接添加新剂量，不再询问</string>
+    <string name="insulin_pen_background_desc_more">排气剂量会被跳过，且手机须已解锁。任何贴近手机的非接触卡都会短暂唤醒读取器，其他卡片应用可能会询问使用哪个应用。</string>
+    <string name="insulin_pen_notification_duration">导入后通知</string>
     <string name="insulin_pen_import_channel">胰岛素笔导入</string>
     <plurals name="insulin_pen_imported_count">
         <item quantity="one">已将 %d 个剂量添加到日志</item>
@@ -3078,8 +3091,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_import_title">导入</string>
     <string name="settings_xdrip_broadcast_title">xDrip+ 广播</string>
     <string name="settings_xdrip_broadcast_desc">用于 xDrip+ 和 AAPS</string>
-    <string name="settings_patched_libre_title">修改版 Libre 应用广播</string>
-    <string name="settings_patched_libre_desc">用于读取修改版 Libre 应用的应用</string>
+    <string name="settings_patched_libre_title">xDrip+（修改版 Libre）</string>
+    <string name="settings_patched_libre_desc">在 xDrip+ 中选择“Libre2 (patched App)”作为数据源</string>
     <string name="settings_glucodata_title">Glucodata 广播</string>
     <string name="settings_glucodata_desc">用于 GlucoDataHandler</string>
     <string name="settings_health_connect_desc">与健康应用共享读数</string>

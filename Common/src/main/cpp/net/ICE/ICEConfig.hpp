@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 struct ICEConfigSnapshot {
     std::string rendezvousHost;
@@ -24,4 +25,5 @@ struct RendezvousEndpoint {
     bool verifyCertificate;
 };
 
-RendezvousEndpoint resolveRendezvousEndpoint(std::string_view label);
+// Primary first; see RendezvousFailover.hpp.
+std::vector<RendezvousEndpoint> resolveRendezvousEndpoints(std::string_view label);

@@ -234,4 +234,19 @@ class ICanHealthConstantsTests {
         assertEquals("F6 0xFFFF", ICanHealthConstants.formatCalibrationMarker(0xFFFF))
         assertEquals("F6 0x0244 (580), x13 0.580", ICanHealthConstants.formatCalibrationMarker(580))
     }
+
+    @Test
+    fun boxSerialForDisplay_returnsFullBoxSerialStoredAtOnboarding() {
+        assertEquals("84F01FF13594A", ICanHealthConstants.boxSerialForDisplay("84f01ff13594A"))
+        assertEquals("ZA1OR03MSE50", ICanHealthConstants.boxSerialForDisplay("ZA1OR03MSE50"))
+    }
+
+    @Test
+    fun boxSerialForDisplay_rejectsPrefixOnlyOrMissingSerial() {
+        // A long launcher code is stored as its 8-character DIS prefix, which says less than
+        // the sensor id already does.
+        assertEquals(null, ICanHealthConstants.boxSerialForDisplay("84F01FF1"))
+        assertEquals(null, ICanHealthConstants.boxSerialForDisplay(""))
+        assertEquals(null, ICanHealthConstants.boxSerialForDisplay(null))
+    }
 }

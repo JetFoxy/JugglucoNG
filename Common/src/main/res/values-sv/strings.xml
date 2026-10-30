@@ -988,6 +988,9 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="writedown">Write down!</string>
     <string name="xdrip_report_as_libre2_title">Identifiera som Libre 2</string>
     <string name="xdrip_report_as_libre2_desc">Låter AAPS tillåta SMB alltid med den här sensorn. Aktivera bara om du litar på dess värden</string>
+    <string name="xdrip_compatible_desc">Local broadcast</string>
+    <string name="xdrip_follower_title">xDrip+ Sync Follower</string>
+    <string name="xdrip_follower_desc">Skicka glukosvärden till xDrip+ på den här telefonen</string>
     <string name="health_connect_title">Health Connect</string>
     <string name="zero">0</string>
 
@@ -1652,8 +1655,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_dose_math_title">Dosräknare</string>
     <string name="journal_food_macros_title">Avancerat matupptag</string>
     <string name="journal_food_macros_desc">Använd protein och fett för fördröjt matupptag</string>
-    <string name="journal_aaps_import_title">Importera AAPS-behandlingar</string>
-    <string name="journal_aaps_import_desc">Ta emot AAPS-behandlingsbroadcasts och lägg till insulin och kolhydrater i journalen</string>
+    <string name="journal_aaps_import_title">AAPS-behandlingar</string>
+    <string name="journal_aaps_import_desc">Lägg till insulin och kolhydrater från AAPS i journalen</string>
     <string name="journal_aaps_carbs_title">AAPS-kolhydrater</string>
     <string name="journal_aaps_insulin_title">AAPS-insulin</string>
     <string name="journal_food_library">Matbibliotek</string>
@@ -1693,7 +1696,7 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_meal_shape_mixed">Blandad</string>
     <string name="journal_meal_shape_slow">Långsam</string>
     <string name="journal_meal_shape_extended">Förlängd</string>
-    <string name="journal_import_health_activity">Importera aktivitet från Health Connect</string>
+    <string name="journal_import_health_activity">Aktivitet från Health Connect</string>
     <string name="journal_dose_pair_insulin">Koppla insulin</string>
     <string name="journal_dose_pair_carbs">Koppla kolhydrater</string>
     <string name="journal_dose_suggested_insulin">%1$s E föreslaget</string>
@@ -1718,10 +1721,18 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="journal_manage_desc">Justera insulintyper och verkansfönster</string>
     <string name="journal_quick_actions">Snabblogg</string>
     <string name="journal_show_tab_title">Visa journalflik</string>
-    <string name="journal_show_tab_desc">Lägg till Journal i den nedre huvudnavigeringen när journalverktyg är aktiverade</string>
+    <string name="journal_show_tab_desc">Lägg till Journal i den nedre navigeringen</string>
     <string name="journal_type_temp_basal">Tillfällig basal</string>
     <string name="journal_dashboard_types_title">Visa på huvudskärmen</string>
     <string name="journal_dashboard_types_desc">Dolda poster försvinner bara från huvuddiagrammet och avläsningslistan. De räknas fortfarande in i IOB, COB, prognosen och dosförslagen.</string>
+    <string name="journal_import_health_activity_desc">Lägg till träningspass och steg i journalen</string>
+    <string name="journal_section_main_screen">Huvudskärm</string>
+    <string name="journal_section_dosing">Dosering</string>
+    <string name="journal_section_import">Importera</string>
+    <string name="journal_entry_types_title">Posttyper</string>
+    <string name="journal_entry_types_all_shown">Alla visas</string>
+    <string name="journal_entry_types_all_hidden">Alla dolda</string>
+    <string name="journal_entry_types_hidden">Dolda: %1$s</string>
     <string name="journal_dashboard_temp_basal_desc">Staplar överst i diagrammet för tillfälliga basaler från AAPS</string>
     <string name="journal_rate_units_per_hour">%1$s E/h</string>
     <string name="journal_events_today">%1$d händelser idag</string>
@@ -2686,10 +2697,12 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="insulin_pen_full_read">Läs hela loggen nästa gång</string>
     <string name="insulin_pen_full_read_armed">Redo — håll pennan mot telefonen</string>
     <string name="insulin_pen_full_read_desc">En penna sparar månader av doser och behöver flera sekunders stadig kontakt. Använd detta för att gå längre bakåt än senaste importen.</string>
+    <string name="insulin_pen_full_read_off">Slå på ”Läs av insulinpennor” för att läsa av en penna.</string>
     <string name="insulin_pen_read_cut_short">Pennan togs bort för tidigt. Håll den mot telefonen tills den vibrerar.</string>
     <string name="insulin_pen_background_title">Importera i bakgrunden</string>
-    <string name="insulin_pen_background_desc">När appen inte är öppen läggs nya doser från en penna som hålls mot telefonen till i dagboken utan att fråga.</string>
-    <string name="insulin_pen_background_desc_more">Luftningar hoppas över. Skärmen måste vara på och telefonen upplåst — Android läser inte NFC med släckt skärm. Alla kontaktlösa kort som hålls mot telefonen väcker läsaren ett ögonblick, och andra kortappar kan fråga vilken app som ska användas.</string>
+    <string name="insulin_pen_background_desc">Lägger till nya doser utan att fråga när appen är stängd</string>
+    <string name="insulin_pen_background_desc_more">Luftningar hoppas över, och telefonen måste vara upplåst. Alla kontaktlösa kort som hålls mot telefonen väcker läsaren ett ögonblick, och andra kortappar kan fråga vilken app som ska användas.</string>
+    <string name="insulin_pen_notification_duration">Avisering efter import</string>
     <string name="insulin_pen_import_channel">Pennimporter</string>
     <plurals name="insulin_pen_imported_count">
         <item quantity="one">%d dos tillagd i dagboken</item>
@@ -3065,8 +3078,8 @@ Pressing OK will generate a connection on this phone and display a QR code that 
     <string name="settings_import_title">Importera</string>
     <string name="settings_xdrip_broadcast_title">xDrip+-sändning</string>
     <string name="settings_xdrip_broadcast_desc">För xDrip+ och AAPS</string>
-    <string name="settings_patched_libre_title">Sändning från patchad Libre-app</string>
-    <string name="settings_patched_libre_desc">För appar som läser den patchade Libre-appen</string>
+    <string name="settings_patched_libre_title">xDrip+ (patchad Libre)</string>
+    <string name="settings_patched_libre_desc">Välj ”Libre2 (patched App)” som datakälla i xDrip+</string>
     <string name="settings_glucodata_title">Glucodata-sändning</string>
     <string name="settings_glucodata_desc">För GlucoDataHandler</string>
     <string name="settings_health_connect_desc">Dela värden med hälsoappar</string>

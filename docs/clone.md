@@ -48,6 +48,21 @@ the glucose data itself travels directly over the local network. If the server
 does not support the watch or is temporarily unavailable, Clone falls back to
 normal ICE failure detection and rendezvous polling.
 
+Clone normally signals through one rendezvous server: your own if one is
+configured, otherwise one of the public servers chosen from the connection
+label. When that server cannot be reached, gives up, or the phones have not
+met there within 30 seconds, the other servers join the same attempt and the
+first one where both phones meet carries it. The extra servers stay in play
+until a connection succeeds through the first server again. Phones only meet
+on a server they both use, so keep the same app version and server settings
+on both.
+
+The public names `a.juggluco.nl` and `azure.juggluco.nl` share one server;
+`mx.juggluco.nl` and `ipv6.juggluco.nl` share the other. Clone tries each
+service only once, including when one of these names is configured manually.
+If a server rejects the receiver's answer after delivering an offer, Clone
+restarts the negotiation with the other servers enabled.
+
 ## Security and privacy
 
 Quick Pair generates a random Clone connection password. The Mirror protocol
@@ -67,9 +82,11 @@ configured, the TURN username and password. Share it directly with the intended
 receiver. Do not publish the QR or a screenshot of it. If it leaks, delete the
 Clone connection and rotate the TURN credentials.
 
-Self-hosting removes the default rendezvous and STUN operators from the path,
-but it does not hide normal IP and traffic metadata from networks between the
-phones and your server.
+Self-hosting removes the default STUN operator and, while your server works,
+the default rendezvous operators from the path. If your rendezvous server
+struggles, the public rendezvous servers help until it recovers. Self-hosting
+does not hide normal IP and traffic metadata from networks between the phones
+and your server.
 
 ## Day-to-day use
 
@@ -99,6 +116,31 @@ run again.
 local discovery so nearby devices can find the phone without scanning a QR.
 Changing this option does not replace an already working Clone connection. The
 saved choice is used the next time that connection negotiates.
+
+Manual calibration profiles synchronize in both directions between a connection's
+master (glucose sender) and receiver, including Raw/Auto points, calibration
+settings, and deletion of the last point.
+They are read from the calibration database even for sensors without native
+sensor files. A newer local manual profile takes precedence over an older
+incoming profile. Journal-derived calibration points are maintained locally
+from the journal and are preserved when a manual profile arrives.
+
+The master retrieves receiver-entered calibrations during the next normal
+calibration synchronization, including after reconnection. The glucose pairing
+can remain receive-only on the receiver; no second pairing is needed. Both
+phones must run a version supporting this return exchange. Older peers keep
+the existing master-to-receiver behavior. Edits and deletions are retained
+locally while disconnected and compared by revision when the link returns.
+Profiles carry their glucose units, so the two phones can use different
+mg/dL or mmol/L display preferences.
+
+Calibration points retain their saved units across display-preference changes and
+profile/backup transfers. Startup restores the saved unit before starting native
+connections, so legacy rows without unit information keep that interpretation at
+their first load. Past unrecorded unit changes cannot be reconstructed.
+Return-profile discovery covers the full known sensor roster independently of the
+forward calibration cursor. Competing receiver imports are serialized through the
+revision check, replacement, and accepted-revision publication.
 
 The other Hybrid transport switches also take effect on the next connection
 attempt. Changing a server address, port, username, password, or which
