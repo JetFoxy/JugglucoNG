@@ -19,6 +19,9 @@ import tk.glucodata.data.calibration.CalibrationEntity
 import tk.glucodata.data.calibration.CalibrationManager
 import tk.glucodata.data.journal.JournalEntryEntity
 import tk.glucodata.data.journal.CloneJournalIdentity
+import tk.glucodata.data.food.FoodDetailsBackup
+import tk.glucodata.data.food.FoodLibrary
+import tk.glucodata.data.food.FoodLibraryDatabase
 import tk.glucodata.data.journal.JournalFoodEntity
 import tk.glucodata.data.journal.JournalInsulinPresetEntity
 import tk.glucodata.data.journal.JournalPendingDeleteEntity
@@ -41,6 +44,7 @@ object ExportPackageExporter {
     private const val PROGRESS_LOG_READINGS = 100_000
     private const val HISTORY_READINGS = "history.readings"
     private const val HISTORY_DELETED_READINGS = "history.deletedReadings"
+    private const val HISTORY_FOOD_DETAILS = "journalFoodDetails"
     private val historyImportMutex = Mutex()
 
     data class ExportRequest(
@@ -79,10 +83,7 @@ object ExportPackageExporter {
         val journalFoods: Int,
         val insulinPresets: Int,
         val calibrations: Int,
-        val restartRequired: Boolean,
-        // Serial to display on the dashboard for the imported glucose (may be a
-        // synthetic "imported"/"__imported_csv__" id when the file had no serial).
-        val historyDisplaySerial: String? = null
+        val restartRequired: Boolean
     )
 
     data class BackupValidationSummary(
@@ -102,16 +103,14 @@ object ExportPackageExporter {
 
     // Result of importing only the glucose/history section.
     data class HistoryOnlyImport(
-        val readings: Int,
-        val displaySerial: String?
+        val readings: Int
     )
 
     private data class HistoryImportSummary(
         val readings: Int = 0,
         val journalEntries: Int = 0,
         val journalFoods: Int = 0,
-        val insulinPresets: Int = 0,
-        val displaySerial: String? = null
+        val insulinPresets: Int = 0
     )
 
     suspend fun exportToUri(
@@ -360,8 +359,7 @@ object ExportPackageExporter {
                         journalFoods = historySummary.journalFoods,
                         insulinPresets = historySummary.insulinPresets,
                         calibrations = calibrationCount,
-                        restartRequired = settingsResult != null,
-                        historyDisplaySerial = historySummary.displaySerial
+                        restartRequired = settingsResult != null
                     )
                 }
             }
@@ -389,7 +387,7 @@ object ExportPackageExporter {
                     val history = payload.optJSONObject("history") ?: return@withLock null
                     val aidex = prepareAiDexImport(appContext, uri, imported, drivers, validateSettings = false)
                     val summary = importHistorySection(appContext, uri, history, aidex)
-                    HistoryOnlyImport(readings = summary.readings, displaySerial = summary.displaySerial)
+                    HistoryOnlyImport(readings = summary.readings)
                 }
             }
         }
@@ -539,7 +537,7 @@ object ExportPackageExporter {
             database.journalDao().getEntries()
         }
         val insulinPresets = database.journalDao().getInsulinPresets()
-        val foods = database.journalDao().getFoods()
+        val (foods, foodDetails) = FoodLibrary(database.journalDao(), FoodLibraryDatabase.getInstance(context).foodDetailsDao()).snapshot()
         val pendingJournalDeletes = database.journalDao().getPendingNightscoutDeletes()
             .filter { it.deletedAt >= startMillis }
 
@@ -647,6 +645,8 @@ object ExportPackageExporter {
                     foods.forEach { array.put(it.toJson()) }
                 }
             )
+            // Skipped by a build that does not know the key; its foods are then plain presets.
+            .put(HISTORY_FOOD_DETAILS, FoodDetailsBackup.toJson(foodDetails))
             .put(
                 "deletedReadings",
                 StreamedJsonArray { emit -> deletedReadings.forEach { emit(it.toJson()) } }
@@ -842,7 +842,6 @@ object ExportPackageExporter {
         // A full history does not fit in memory as one list (#627), so readings are merged a
         // chunk at a time; the first pass has already shown the file parses to the end.
         var importedReadings = 0
-        var newestReading: HistoryReading? = null
         val pendingReadings = ArrayList<HistoryReading>(IMPORT_CHUNK)
         val pendingTombstones = ArrayList<DeletedHistoryReading>(IMPORT_CHUNK)
         suspend fun flushReadings() {
@@ -862,9 +861,6 @@ object ExportPackageExporter {
             mapOf(
                 HISTORY_READINGS to StreamedArraySink { element ->
                     val reading = element?.toHistoryReading() ?: return@StreamedArraySink
-                    if (newestReading.let { it == null || reading.timestamp > it.timestamp }) {
-                        newestReading = reading
-                    }
                     pendingReadings += reading
                     if (pendingReadings.size >= IMPORT_CHUNK) flushReadings()
                 },
@@ -877,7 +873,9 @@ object ExportPackageExporter {
         flushReadings()
         flushTombstones()
         if (foods.isNotEmpty()) {
-            database.journalDao().insertFoods(foods)
+            FoodLibrary(database.journalDao(), FoodLibraryDatabase.getInstance(context).foodDetailsDao()).restore(
+                foods, FoodDetailsBackup.fromJson(history.optJSONArray(HISTORY_FOOD_DETAILS))
+            )
         }
         if (insulinPresets.isNotEmpty()) {
             database.journalDao().insertInsulinPresets(insulinPresets)
@@ -895,16 +893,11 @@ object ExportPackageExporter {
             }
             tk.glucodata.NightscoutUploadWake.afterJournalChange()
         }
-        // Serial to key the dashboard on: the newest reading's serial (already
-        // normalized to "imported" by toHistoryReading() when the file had none).
-        val displaySerial = newestReading?.sensorSerial
-
         return HistoryImportSummary(
             readings = importedReadings,
             journalEntries = entries.size,
             journalFoods = foods.size,
-            insulinPresets = insulinPresets.size,
-            displaySerial = displaySerial
+            insulinPresets = insulinPresets.size
         )
     }
 

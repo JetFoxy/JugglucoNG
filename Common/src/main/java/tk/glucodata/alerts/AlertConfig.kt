@@ -19,7 +19,8 @@ enum class AlertType(val id: Int, val nameResId: Int) {
     PERSISTENT_HIGH(10, R.string.alert_persistent_high),
     SENSOR_EXPIRY(11, R.string.alert_sensor_expiry),
     FALLING_FAST(12, R.string.alert_falling_fast),
-    RISING_FAST(13, R.string.alert_rising_fast);
+    RISING_FAST(13, R.string.alert_rising_fast),
+    SIGNAL_RESTORED(14, R.string.alert_signal_restored);
 
     companion object {
         fun fromId(id: Int): AlertType? = entries.find { it.id == id }
@@ -39,6 +40,7 @@ enum class AlertType(val id: Int, val nameResId: Int) {
             MISSED_READING,
             PERSISTENT_HIGH,
             LOSS,
+            SIGNAL_RESTORED,
             SENSOR_EXPIRY,
             FALLING_FAST,
             RISING_FAST
@@ -127,6 +129,8 @@ data class AlertConfig(
     // covers the projected overshoot x this factor. 0 = off. Never applied to
     // PRE_LOW - insulin makes a predicted low MORE likely.
     val iobCoverageFactor: Float? = null,
+    // PRE_LOW only: use insulin and recent glucose evidence before episode entry.
+    val preLowEvidenceEnabled: Boolean = false,
     // PERSISTENT_HIGH: suppress while the value falls at least this fast
     // (mg/dl per minute, magnitude). HIGH uses any positive value only as the
     // opt-in marker for suppressing while its displayed arrow points down.
@@ -464,6 +468,13 @@ object AlertDefaults {
                 soundEnabled = true,
                 defaultSnoozeMinutes = 120,
                 expiryWarningMinutes = setOf(DEFAULT_EXPIRY_WARNING_MINUTES)
+            )
+            AlertType.SIGNAL_RESTORED -> AlertConfig(
+                type = type,
+                enabled = false,
+                deliveryMode = AlertDeliveryMode.NOTIFICATION_ONLY,
+                hapticProfile = HapticProfile.SOFT,
+                defaultSnoozeMinutes = 30
             )
             AlertType.LOSS -> AlertConfig(
                 type = type,

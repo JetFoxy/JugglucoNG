@@ -462,12 +462,14 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="stream">Akış</string>
     
     <string name="exchanges">Gönder/Al</string>
-    <string name="duration_days">days</string>
+    <string name="duration_days">gün</string>
     <string name="sensor_state">Status</string>
 
     <!-- Newly Extracted Strings -->
     <string name="import_history">Geçmişi İçe Aktar</string>
     <string name="import_history_desc">JugglucoNG dışa aktarımından veya CSV dosyasından glikoz verilerini içe aktar</string>
+    <string name="continue_without_sensor">Sensör olmadan devam et</string>
+    <string name="continue_without_sensor_desc">İnsülin, yiyecek ve parmak ölçümlerini günlüğe kaydedin</string>
     <string name="get_started_desc">Sensörünüzü ekleyerek başlayın</string>
     <string name="select_sensor">Sensör Tipini Seçin</string>
     <string name="select_sibionics_type">Bir Sibionics sensörü seçin</string>
@@ -518,25 +520,8 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="import_history_sub">JugglucoNG dışa aktarımından veya CSV dosyasından glikoz ölçümlerini geri yükle</string>
     <string name="import_no_glucose">Bu dosyada glikoz verisi yok</string>
     <string name="import_unsupported_file">Desteklenmeyen dosya. Bir JugglucoNG dışa aktarımı veya glikoz geçmişi CSV dosyası seçin.</string>
-    <string name="clear_history_title">Geçmişi Temizle?</string>
-    <string name="clear_history_confirmation">Bu, veritabanındaki tüm glikoz okumalarını silecektir. Bu işlem geri alınamaz.</string>
     <string name="delete_reading_title">Okuma silinsin mi?</string>
     <string name="delete_reading_confirmation">Bu glikoz okumasını yerel geçmişten kaldır. Bu işlem geri alınamaz.</string>
-    <string name="clear_button">Temizle</string>
-    <string name="clear_app_data_title">Uygulama Verilerini Temizle?</string>
-    <string name="clear_app_data_intro">Bu şunları kaldıracaktır:</string>
-    <string name="all_glucose_readings">• Tüm glikoz okumaları</string>
-    <string name="cache_files">• Önbellek dosyaları</string>
-    <string name="sensor_data">• Sensör verileri</string>
-    <string name="all_settings">• Tüm ayarlar</string>
-    <string name="settings_preserved">Ayarlar korunacaktır.</string>
-    <string name="cannot_be_undone_warning">Bu işlem geri alınamaz.</string>
-    <string name="clear_data_button">Verileri Temizle</string>
-    <string name="factory_reset_title">⚠️ Fabrika Ayarlarına Sıfırla?</string>
-    <string name="factory_reset_intro">Bu HER ŞEYİ SİLECEKTİR:</string>
-    <string name="factory_reset_outcome">Uygulama başlangıç durumuna dönecektir.</string>
-    <string name="cannot_be_undone_critical">BU İŞLEM GERİ ALINAMAZ!</string>
-    <string name="reset_everything_button">HER ŞEYİ SIFIRLA</string>
     <string name="alert_sound">Uyarı Sesi</string>
     <string name="vibrate_only">Sadece Titreşim</string>
     <string name="sound_vibrate">Ses ve Titreşim</string>
@@ -628,9 +613,6 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="settings_import_successful">Ayarlar içe aktarıldı. Yeniden başlatılıyor…</string>
     <string name="danger_zone">Tehlike Bölgesi</string>
     <string name="clear_history">Geçmişi Temizle</string>
-    <string name="clear_history_desc_short">Tüm okumaları kaldır</string>
-    <string name="clear_app_data">Uygulama Verilerini Temizle</string>
-    <string name="clear_app_data_desc">Geçmişi/önbelleği kaldır, ayarları koru</string>
     <string name="factory_reset">Fabrika Ayarlarına Sıfırla</string>
     <string name="factory_reset_desc">Her şeyi sil, başa dön</string>
     <string name="sibionics_setup_title">Sibionics Kurulumu</string>
@@ -738,7 +720,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="about_text">GPL-3.0 • Fork of Juggluco</string>
     <string name="accuchek_scan_instruction">Accu-Chek SmartGuide sensörünüzdeki veri matrisini tarayın</string>
     <string name="accuchek_setup_title">Accu-Chek Kurulumu</string>
-    <string name="add_sensor">Add Sensor</string>
+    <string name="add_sensor">Sensör ekle</string>
     <string name="advanced_title">Advanced</string>
     <string name="afrezza">Afrezza</string>
     <string name="aidex_connected">Bağlı!</string>
@@ -777,7 +759,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="amountshort">@string/amountsname</string>
     <string name="auto">Auto</string>
     <string name="auto_raw">Auto+Raw</string>
-    <string name="auto_reset_days">%1$d days</string>
+    <string name="auto_reset_days">%1$d gün</string>
     <string name="auto_reset_title">Auto reset</string>
     <string name="avg">Ort.</string>
     <string name="bloodafter">"Only add glucose readings from after: "</string>
@@ -790,9 +772,13 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="calibrations">Calibrations</string>
     <string name="caresens_air_scan_instruction">CareSens Air paketinizdeki sensör kodunu tarayın</string>
     <string name="caresens_air_setup_title">CareSens Hava Kurulumu</string>
-    <string name="clean_data_confirm">Clear App Data?</string>
-    <string name="clean_history_confirm">Clear History?</string>
-    <string name="clear_history_desc_long">Remove all glucose readings. Cannot be undone.</string>
+    <string name="clean_history_confirm">Geçmiş temizlensin mi?</string>
+    <string name="clear_history_desc">Okumaları, günlük kayıtlarını veya ikisini birden kaldır</string>
+    <string name="clear_history_scope_readings">Bu telefondaki tüm glikoz okumalarını kaldırır ve geri alınamaz. Günlük, sensörler ve ayarlar kalır.</string>
+    <string name="clear_history_scope_journal">Tüm günlük kayıtlarını kaldırır, Nightscout\'a gönderildiyse oradan da, ve geri alınamaz. Okumalar, insülin türleri ve ayarlar kalır.</string>
+    <string name="clear_history_scope_both">Tüm glikoz okumalarını ve günlük kayıtlarını kaldırır, Nightscout\'a gönderildiyse oradan da, ve geri alınamaz. Sensörler, insülin türleri ve ayarlar kalır.</string>
+    <string name="clear_history_done">Geçmiş temizlendi</string>
+    <string name="clear_history_failed">Geçmiş temizlenemedi</string>
     <string name="confidence">Güven</string>
     <string name="connecting_to_sensor">Sensöre bağlanılıyor…</string>
     <string name="connecting_to_sensor_wait">Bağlantı kurulurken lütfen bekleyin.</string>
@@ -821,8 +807,10 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="enternums">Enter amounts on</string>
     <string name="exclude">Exclude</string>
     <string name="expired">Expired</string>
-    <string name="factory_reset_alert">Remove EVERYTHING. Cannot be undone!</string>
-    <string name="factory_reset_confirm">Factory Reset?</string>
+    <string name="factory_reset_confirm">Fabrika ayarlarına sıfırlansın mı?</string>
+    <string name="factory_reset_message">Tüm okumaları, günlük kayıtlarını, sensörleri ve ayarları, ayrıca verdiğiniz izinleri siler, ardından uygulamayı kapatır. Bir sensörü yeniden kurana kadar glikoz izleme ve alarmlar durur ve bu işlem geri alınamaz.</string>
+    <string name="factory_reset_action">Her şeyi sil</string>
+    <string name="factory_reset_failed">Uygulama sıfırlanamadı</string>
     <string name="fiasp">Fiasp</string>
     <string name="finddevices">"Find devices"</string>
     <string name="finish_setup">Bitiş</string>
@@ -882,6 +870,8 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="libreview_password">Şifre</string>
     <string name="libreview_resend">Verileri Yeniden Gönder</string>
     <string name="libreview_russia">Rusya bölgesi</string>
+    <string name="libreview_official_end">Sensörün resmi bitişinde durdur</string>
+    <string name="libreview_official_end_desc">Libre 2 sensörünün resmi bitişinden sonraki ek saatleri atla</string>
     <string name="libreview_send_now">Şimdi Gönder</string>
     <string name="libreview_send_numbers">İnsülin/Karbonhidrat Gönder</string>
     <string name="libreview_settings_title">LibreView Ayarları</string>
@@ -917,7 +907,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="newdata">"New data"</string>
     <string name="no_data_available">No data available</string>
     <string name="no_sensor_description">Connect a continuous glucose monitor to start tracking your glucose levels.</string>
-    <string name="no_sensor_title">No Sensor Connected</string>
+    <string name="no_sensor_title">Bağlı sensör yok</string>
     <string name="nonewdata">"No new data"</string>
     <string name="nothing"></string>
     <string name="off">Off</string>
@@ -941,6 +931,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="raw">Raw</string>
     <string name="raw_auto">Raw+Auto</string>
     <string name="reconnect">Reconnect</string>
+    <string name="ican_reset_bluetooth_binding">Bluetooth bağlantısını sıfırla (veriler korunur)</string>
     <string name="reconnect_sensor_desc">This will reset the connection and attempt to reconnect.</string>
     <string name="reconnect_sensor_title">Reconnect Sensor?</string>
     <string name="remove_sensor_desc">Bu, sensörü kalıcı olarak kaldıracak, eşleştirme anahtarlarını silecek ve oturumu durduracaktır. Sensörün tekrar kullanılabilmesi için yeniden eşleştirilmesi gerekir.</string>
@@ -1023,7 +1014,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="zero">0</string>
 
     <!-- Auto-added formatted strings -->
-    <string name="background_opacity_percent">Arka plan opaklığı: %1$d%%</string>
+    <string name="background_opacity_label">Arka plan opaklığı</string>
     <string name="calibrate_sensor_desc">Enter a blood glucose value in %1$s to calibrate the sensor.</string>
     <string name="calibrate_sensor_timing_note">Yemeklerden veya insülinden sonraki 2 saat içinde kalibrasyon yapmaktan kaçının.</string>
     <string name="calibration_with_mode">Kalibrasyon (%1$s)</string>
@@ -1082,7 +1073,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="calibrations_deleted_count">Silinen %1$d kalibrasyonları</string>
     <string name="calibrations_will_be_removed_count">%1$d kalibrasyonları kaldırılacak</string>
     <string name="connection_number">Bağlantı %1$d</string>
-    <string name="corner_radius_dp">Köşe yarıçapı: %1$d dp</string>
+    <string name="corner_radius_label">Köşe yarıçapı</string>
     <string name="custom_sound_prefix">Özel ses: %1$s</string>
     <string name="delete_calibrations_count">%1$d kalibrasyonlarını sil</string>
     <string name="disabled_calibrations_cleared">%1$d devre dışı bırakılan kalibrasyonlar temizlendi</string>
@@ -1091,7 +1082,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="dp_value">%1$d dp</string>
     <string name="end_time_with_value">Bitiş: %1$s</string>
     <string name="export_failed_with_error">Dışa aktarma başarısız oldu: %1$s</string>
-    <string name="gap_width_value">Boşluk genişliği: %1$s</string>
+    <string name="gap_width_label">Boşluk genişliği</string>
     <string name="glucose_with_unit">Glikoz (%1$s)</string>
     <string name="import_failed_with_error">İçe aktarma başarısız oldu: %1$s</string>
     <string name="import_summary">İçe aktarıldı: %1$d, atlandı: %2$d, değiştirildi: %3$d</string>
@@ -1181,7 +1172,8 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="font_app_plex">Uygulama (IBM Plex)</string>
     <string name="font_system_sans">Sistem Sans\'ı</string>
     <string name="font_system_google_sans">Sistem</string>
-    <string name="size_sp">Boyut: %1$d sp</string>
+    <string name="size_label">Boyut</string>
+    <string name="sp_value">%1$d sp</string>
     <string name="font_weight_label">Yazı tipi ağırlığı</string>
     <string name="regular">Düzenli</string>
     <string name="medium">Orta</string>
@@ -1728,6 +1720,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="journal_dose_pair_insulin">İnsülini eşleştir</string>
     <string name="journal_dose_pair_carbs">Karbonhidratı eşleştir</string>
     <string name="journal_dose_suggested_insulin">%1$s Ü önerildi</string>
+    <string name="journal_amount_suggested">Önerilen</string>
     <string name="unit_insulin_value">%1$s Ü</string>
     <string name="unit_insulin_short">Ü</string>
     <string name="unit_carbs_value">%1$s g</string>
@@ -1827,12 +1820,12 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="show_chart_collapsed_desc">Daraltılmış görünümde kompakt grafik</string>
     <string name="show_target_range">Hedef aralığı göster</string>
     <string name="show_target_range_desc">Grafikte hedef glikoz aralığını vurgula</string>
-    <string name="font_size_percent">Yazı tipi boyutu: %1$d%%</string>
-    <string name="status_bar_icon_size_percent">Durum çubuğu simgesi boyutu: %1$d%%</string>
-    <string name="arrow_size_percent">Ok boyutu: %1$d%%</string>
-    <string name="opacity_percent">Opaklık: %1$d%%</string>
-    <string name="text_size_percent">Metin boyutu: %1$d%%</string>
-    <string name="chart_size_percent">Grafik boyutu: %1$d%%</string>
+    <string name="font_size_label">Yazı tipi boyutu</string>
+    <string name="status_bar_icon_size_label">Durum çubuğu simgesi boyutu</string>
+    <string name="arrow_size_label">Ok boyutu</string>
+    <string name="opacity_label">Opaklık</string>
+    <string name="text_size_label">Metin boyutu</string>
+    <string name="chart_size_label">Grafik boyutu</string>
     <string name="use_subtle_outline">İnce çerçeve kullan</string>
     <string name="use_subtle_outline_desc">Yer paylaşımı çevresinde ince kenar vurgusu</string>
     <string name="position_top">Üst</string>
@@ -2357,7 +2350,7 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="risk_low">Düşük</string>
     <string name="risk_moderate">Orta</string>
     <string name="risk_high">Yüksek</string>
-    <string name="stats_coverage_active">CGM etkin %%%1$d</string>
+    <string name="stats_coverage_active">Etkin %%%1$d</string>
     <string name="stats_tight_range_chip">Dar %%%1$d</string>
     <string name="stats_tight_range">Dar aralık</string>
     <string name="stats_tight_range_description">%1$s aralığındaki süre — hedef bandınızdan bir kademe dar; günün diyabetsiz değerlere ne kadar yakın kaldığını gösterir.</string>
@@ -2488,7 +2481,6 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="ottai_unused_binding_desc">%1$s hesabınıza bağlı ama burada kullanılmıyor. Süresi bittiyse, yeni bir sensörün etkinleştirilebilmesi için bağlantısını kaldırın.</string>
     <string name="ottai_cloud_binding_checking">Hesap kontrol ediliyor…</string>
     <string name="ottai_cloud_binding_bound">Hesabınıza bağlı</string>
-    <string name="ottai_cloud_binding_not_bound">Hesabınıza bağlı değil</string>
     <string name="ottai_cloud_binding_error">Hesap kontrol edilemedi</string>
     <string name="ottai_account_title">Ottai hesabı</string>
     <string name="ottai_saved_sensors_title">Kayıtlı sensörler</string>
@@ -2507,11 +2499,13 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="ottai_state_missing_signed_out">Almak için oturum açın veya bir dosya içe aktarın.</string>
     <string name="ottai_state_partial_title">Kimlik bilgileri eksik</string>
     <string name="ottai_state_partial_body">Glikoz formülü eksik. Yeniden alın veya içe aktarın.</string>
-    <string name="ottai_v3_needs_nearby">Bu sensörü bulunan sensörler listesinden seçin: kimlik bilgileri Bluetooth üzerinden doğrulanır.</string>
     <string name="ottai_fetch_failed">Bu sensörün kimlik bilgileri alınamadı.</string>
+    <string name="ottai_server_unreachable">Ottai sunucusuna ulaşılamadı. Tekrar deneyin.</string>
     <string name="ottai_connect_failed">Bağlantı başlatılamadı. Tekrar deneyin.</string>
-    <string name="ottai_offline_hint">Kayıtlı sensörler altında bir kimlik bilgisi dosyası da içe aktarabilirsiniz.</string>
     <string name="ottai_already_binding_hint">Hesabınıza hâlâ başka bir sensör bağlı. Kayıtlı sensörler altında bağını kaldırın, sonra tekrar deneyin.</string>
+    <string name="ottai_ota_upgrade_required">Ottai hizmeti bu sensörü bağlarken bellenim güncellemesi istedi. Bellenim kurulumunu yeniden deneyin veya kayıtlı kimlik bilgilerini içe aktarın. Resmî Ottai uygulamasını da deneyebilirsiniz.</string>
+    <string name="ottai_retry">Yeniden dene</string>
+    <string name="ottai_setup_failed">Kurulum durdu. Yeniden deneyin veya kapatıp kayıtlı kimlik bilgilerini içe aktarın.</string>
     <string name="ottai_region_cn_full">Ottai Çin</string>
     <string name="ottai_region_global_full">Ottai Global</string>
     <string name="ottai_sms_country_title">Ülke kodu</string>
@@ -2892,6 +2886,8 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="aidex_pairing_key_deleted">Eşleştirme anahtarı silindi</string>
     <string name="rearm_margin_label">Yeniden alarm marjı</string>
     <string name="rearm_min_interval_label">Alarmlar arası asgari süre</string>
+    <string name="pre_low_evidence_label">IOB ve son glikoz değerlerini dikkate al</string>
+    <string name="pre_low_evidence_description">Sürekli bir düşüşü doğrulamak için tahmin uyarılarını geciktirebilir</string>
     <string name="pre_high_iob_coverage_label">İnsülin karşılama</string>
     <string name="alert_feature_off">Kapalı</string>
     <string name="same_direction_suppression_title">Eğilim alarmından sonra sessiz süre</string>
@@ -3139,7 +3135,53 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <!-- Settings search -->
     <string name="settings_search_hint">Ayarlarda ara</string>
     <string name="settings_search_no_results">“%1$s” ile eşleşen ayar yok</string>
+    <string name="settings_search_related">İlgili ayarlar</string>
     <string name="settings_search_clear">Aramayı temizle</string>
+
+    <!-- Explicit firmware field test. -->
+    <string name="ottai_ota_title">Deneysel ürün yazılımı testi</string>
+    <string name="ottai_ota_warning">Başarısız bir güncelleme sensörü kullanılamaz hâle getirebilir. Bu ekranı açık tutun ve telefonu sensöre yakın tutun.</string>
+    <string name="ottai_ota_connecting">Etkinleştirmeden bağlanılıyor…</string>
+    <string name="ottai_ota_authenticating">Sensör kimliği doğrulanıyor…</string>
+    <string name="ottai_ota_checking">Ürün yazılımı denetleniyor ve indiriliyor…</string>
+    <string name="ottai_ota_recovery">Kurtarma paketi hazır. Kaydedilen paket baştan yüklenir.</string>
+    <string name="ottai_ota_ready">Ürün yazılımı hazır. Sensör etkinleştirilmedi.</string>
+    <string name="ottai_ota_no_update">Ürün yazılımı güncellemesi sunulmadı</string>
+    <string name="ottai_ota_installing">Ürün yazılımı yükleniyor…</string>
+    <string name="ottai_ota_reconnecting">Yeniden bağlanılıyor ve yüklü sürüm denetleniyor…</string>
+    <string name="ottai_ota_preparing">Kimlik bilgileri yenileniyor ve fabrika parametreleri yazılıyor…</string>
+    <string name="ottai_ota_complete">Hazırlık tamamlandı. Bu pencereyi kapatıp sensörü etkinleştirmek için normal şekilde bağlanın.</string>
+    <string name="ottai_ota_failed">Kurulum durdu. Yeniden deneyin veya izleme günlüğüne bakın. Tamamlanmamış kurulum etkinleştirmeyi engeller.</string>
+    <string name="ottai_ota_version">Sensör: %1$s · Güncelleme: %2$s</string>
+    <string name="ottai_ota_package">%1$d bayt · SHA-256: %2$s</string>
+    <string name="ottai_ota_error_code">Tanılama kodu: %1$s</string>
+    <string name="ottai_ota_install">Ürün yazılımını yükle</string>
+    <string name="ottai_ota_parameters">Yalnızca fabrika parametrelerini yaz</string>
+    <string name="ottai_ota_confirm">Bu deneysel güncelleme yüklensin mi? Sensör kalıcı olarak kullanılamaz hâle gelebilir. Sürüm ve fabrika parametreleri doğrulandıktan sonra ayrıca etkinleştirilir.</string>
+    <string name="ottai_ota_parameters_confirm">Desteklenen fabrika katsayıları ve kalibrasyon yazılsın mı? Bu işlem ürün yazılımını güncellemeden veya sensör ömrünü başlatmadan yapılandırmayı değiştirir.</string>
+    <string name="ottai_ota_check">Ürün yazılımını denetle (deneysel)</string>
+    <string name="ottai_ota_cloud_recheck">V3 bulut kimlik doğrulamasıyla yeniden denetle</string>
+    <string name="ottai_ota_cloud_authenticating">Ottai hesabınız üzerinden kimlik doğrulanıyor…</string>
+    <string name="ottai_ota_cloud_recheck_hint">Sunucu aracılı sensör kimlik doğrulamasıyla bellenim kullanılabilirliğini yeniden denetleyin. Bu işlem sensörü etkinleştirmez veya hesaba bağlamaz.</string>
+
+    <!-- Started-sensor OTA experiment. -->
+    <string name="ottai_ota_mode_hint">Önce bu sensörün izleme bağlantısını kesin. Başlatılmış bir sensörü güncellemek okumaları silebilir, ömrünü sıfırlayabilir veya sensörü sonlandırabilir.</string>
+    <string name="ottai_ota_fresh_mode">Yeni sensör</string>
+    <string name="ottai_ota_started_mode">Başlatılmış sensör</string>
+    <string name="ottai_ota_started_ready">Başlatılmış sensör için güncelleme hazır. Yüklemeden önce başlangıç verilerini inceleyin.</string>
+    <string name="ottai_ota_result_active">Ürün yazılımı güncellendi. Sensör etkin olduğunu bildiriyor; izlemeye yeniden bağlamadan önce günlüğü inceleyin.</string>
+    <string name="ottai_ota_result_ended">Ürün yazılımı güncellendi. Sensör sona erdiğini bildiriyor; günlüğü inceleyin.</string>
+    <string name="ottai_ota_result_reset">Ürün yazılımı güncellendi. Sensör etkin olmadığını bildiriyor; yeniden etkinleştirme denenmedi.</string>
+    <string name="ottai_ota_started_confirm">Bu başlatılmış sensöre yüklensin mi? Okumalar ve çalışma durumu silinebilir veya sıfırlanabilir. Test, yeniden etkinleştirmeden veya fabrika parametrelerini yazmadan sonucu kaydeder.</string>
+    <string name="ottai_ota_observation">%1$s · durum %2$d · ömür %3$s sn · son kayıt %4$s · RTC %5$s sn</string>
+    <string name="ottai_ota_before">Önce</string>
+    <string name="ottai_ota_after">Sonra</string>
+
+    <string name="ottai_ota_discard">Tamamlanmamış kurulumu sil</string>
+    <string name="ottai_ota_discard_confirm">Bağlantıyı açmak için kayıtlı güncelleme ve hazırlık durumu silinsin mi? Bu işlem bellenimi veya ayarları geri yüklemez. Yarıda kesilen güncelleme hâlâ kurtarma gerektirebilir.</string>
+    <string name="ottai_ota_pending">Sensör kurulumu tamamlanmadı. Tamamlamak veya silmek için yeniden bağlanın ya da kurtarmayı açın.</string>
+    <string name="ottai_ota_finish_preparation">Firmware doğrulandı. Kurulumu bitirmek için fabrika parametrelerini onaylayın.</string>
+    <string name="ottai_ota_discard_failed">Firmware testi iptal edilemedi. Tekrar deneyin.</string>
     <string name="prediction_analysis_section">Tahmin analizi</string>
     <string name="prediction_analysis_record">Tahminleri kaydet</string>
     <string name="prediction_analysis_record_summary">Her tahmini, olanlarla karşılaştırmak için bu telefonda sakla</string>
@@ -3212,4 +3254,144 @@ Tamam\'a basmak bağlantı için QR kod görüntüleyecektir. QR kodu diğer tel
     <string name="tts_trend_decreasing">düşüyor</string>
     <string name="tts_trend_rising_quickly">hızla yükseliyor</string>
     <string name="tts_trend_falling_quickly">hızla düşüyor</string>
+
+    <!-- Restricted mode -->
+    <string name="restricted_mode_title">Kısıtlı mod</string>
+    <string name="restricted_mode_desc">Ayarları ve denetimleri gizler</string>
+    <string name="restricted_full_mode_title">Şimdilik tam mod</string>
+    <string name="restricted_full_mode_desc">Kısıtlı mod, uygulamadan çıktıktan bir dakika sonra ya da kilitlediğinizde geri gelir.</string>
+    <string name="restricted_lock_now">Şimdi kilitle</string>
+    <string name="restricted_section_unlock">Tam moda geçiş</string>
+    <string name="restricted_pin_title">PIN</string>
+    <string name="restricted_pin_set">Açık · tam moddan önce sorulur</string>
+    <string name="restricted_pin_not_set">Kapalı · herkes tam moda geçebilir</string>
+    <string name="restricted_biometric_title">Parmak izi veya yüz</string>
+    <string name="restricted_biometric_desc">Telefonun biyometrisiyle de kilidi aç</string>
+    <string name="restricted_biometric_needs_pin">Önce bir PIN belirleyin</string>
+    <string name="restricted_section_allowed">Kısıtlı modda izin verilenler</string>
+    <string name="restricted_section_available">Şimdi kullanılabilir</string>
+    <string name="restricted_allow_sensor_change">Sensör değiştirme</string>
+    <string name="restricted_allow_sensor_change_desc">Yeni sensör ekle ve eskisinin bağlantısını kes</string>
+    <string name="restricted_sensor_types_label">Eklenebilecek sensörler</string>
+    <string name="restricted_sensor_types_none">En az birini seçin, yoksa hiçbir sensör eklenemez.</string>
+    <string name="restricted_handover_on">Otomatik sensör devri açık: eski sensör bitince yenisi devralır.</string>
+    <string name="restricted_handover_off">Otomatik sensör devri kapalı. Eski sensör bitince yenisinin devralması için açın.</string>
+    <string name="restricted_turn_on_handover">Devri aç</string>
+    <string name="restricted_allow_journal">Günlük kayıtları</string>
+    <string name="restricted_allow_journal_desc">İnsülin, öğün ve not ekle ve düzenle</string>
+    <string name="restricted_allow_calibration_desc">Kalibrasyon ekle ve düzenle</string>
+    <string name="restricted_allow_alarm_stop">Alarmları durdurma</string>
+    <string name="restricted_allow_alarm_stop_desc">Kapalıyken alarmlar yalnızca ertelenebilir</string>
+    <string name="restricted_always_hidden">Diğer ayarlar, sensör sıfırlama, gelişmiş sensör denetimleri ve veri silme her zaman tam mod gerektirir.</string>
+    <string name="restricted_pin_options_desc">PIN\'i değiştirin ya da tam modun tek dokunuşla açılması için kaldırın.</string>
+    <string name="restricted_change_pin">PIN\'i değiştir</string>
+    <string name="restricted_remove_pin">PIN\'i kaldır</string>
+    <string name="restricted_use_biometric">Parmak izi veya yüz kullan</string>
+    <string name="restricted_unlock_title">Tam moda geç</string>
+    <string name="restricted_unlock_desc">Ayarlar ve tüm sensör denetimleri açılır. Uygulamadan çıktıktan bir dakika sonra kapanır.</string>
+    <string name="restricted_unlock_desc_pin">Ayarları ve tüm sensör denetimlerini açmak için PIN\'i girin. Uygulamadan çıktıktan bir dakika sonra kapanır.</string>
+    <string name="restricted_needs_full_mode">Önce Ayarlar\'dan tam moda geçin.</string>
+    <string name="restricted_wrong_pin">Yanlış PIN</string>
+    <string name="restricted_pin_locked_out">Çok fazla deneme · %1$s bekleyin</string>
+    <string name="restricted_choose_pin">PIN seçin</string>
+    <string name="restricted_confirm_pin">PIN\'i tekrar girin</string>
+    <string name="restricted_choose_pin_desc">%1$d–%2$d basamak</string>
+    <string name="restricted_pin_mismatch">PIN\'ler eşleşmedi. Yeniden PIN seçin.</string>
+    <string name="restricted_delete_digit">Basamağı sil</string>
+    <string name="restricted_disconnect_desc">Bu telefon sensörü okumayı bırakır. Şimdiye kadarki ölçümler saklanır.</string>
+    <string name="restricted_sensors_locked">Sensör eklemek için tam mod gerekir.</string>
+    <plurals name="restricted_pin_digits_entered">
+        <item quantity="one">%d basamak girildi</item>
+        <item quantity="other">%d basamak girildi</item>
+    </plurals>
+    <string name="restricted_sensor_ends_soon">Bir saat içinde bitiyor</string>
+    <string name="restricted_sensor_ended">Bitti</string>
+    <plurals name="restricted_sensor_ends_in_days">
+        <item quantity="one">%d gün sonra bitiyor</item>
+        <item quantity="other">%d gün sonra bitiyor</item>
+    </plurals>
+    <plurals name="restricted_sensor_ends_in_hours">
+        <item quantity="one">%d saat sonra bitiyor</item>
+        <item quantity="other">%d saat sonra bitiyor</item>
+    </plurals>
+    <string name="restricted_section_settings">Kısıtlı modda açık ayarlar</string>
+    <string name="restricted_allow_alarm_settings_desc">Seviyeleri ve sesleri değiştir veya uyarıları kapat</string>
+    <string name="restricted_allow_voice_desc">Sesli okunan değerler ve alarmlar</string>
+    <string name="restricted_allow_display_desc">Hedef aralık, grafikler, bildirimler, kayan glukoz ve kilit ekranı</string>
+    <string name="lumiflex_remove_follower_confirm">%1$s için ölçümlerinize erişim kaldırılsın mı?</string>
+    <string name="lumiflex_discard_changes_title">Değişiklikler silinsin mi?</string>
+    <string name="lumiflex_discard_changes_message">Bu takipçi için yaptığınız değişiklikler kaydedilmedi.</string>
+    <string name="lumiflex_follower_alerts">Takipçi bildirimleri</string>
+    <string name="lumiflex_follow_mode">Al</string>
+    <string name="lumiflex_upload_mode">Gönder</string>
+    <string name="lumiflex_follow_subtitle">Lumiflex üzerinden glikoz al</string>
+    <string name="lumiflex_follow_refreshing">Ölçümler alınıyor</string>
+    <string name="lumiflex_follow_current">Ölçümler alındı</string>
+    <string name="lumiflex_follow_failed">Ölçümler alınamadı</string>
+    <string name="lumiflex_no_providers">Paylaşılan hesap yok. Sensör sahibinden hesabınızı takipçi olarak eklemesini isteyin.</string>
+    <string name="lumiflex_follow_refresh">Yenile</string>
+    <!-- Voice readings quick controls (#840) -->
+    <string name="voice_readings">Sesli okuma</string>
+    <string name="voice_turn_off">Sesi kapat</string>
+    <string name="voice_turn_on">Sesi aç</string>
+    <string name="voice_every_reading">Her ölçüm</string>
+    <string name="voice_every_minutes">Her %1$d dk</string>
+    <string name="voice_resumes_at">%1$s itibarıyla</string>
+    <string name="voice_quick_dashboard">Panoda göster</string>
+    <string name="voice_quick_dashboard_desc">Grafiğin üstünde tek dokunuşla anahtar</string>
+    <string name="voice_quick_notification">Bildirimde göster</string>
+    <string name="voice_quick_notification_desc">Glukoz bildiriminde ses düğmesi</string>
+    <string name="aidex_keys_before_connect">Bağlanmadan önce bu sensörün anahtarlarını içe aktarın veya talep edin.</string>
+    <string name="aidex_delete_keys_message">Bu telefondan %1$s için kaydedilmiş eşleştirme anahtarları kaldırılsın mı? Daha sonra gerekebilecekse önce dışa aktarın.</string>
+    <!-- food catalogue -->
+    <string name="food_scan_barcode">Barkod tara</string>
+    <string name="food_recent">Son kullanılanlar</string>
+    <string name="food_my_foods">Besinlerim</string>
+    <string name="food_common_foods">Yaygın besinler</string>
+    <string name="food_reference_tables">Besin tabloları (İngilizce)</string>
+    <string name="food_search_online">Open Food Facts’te ara</string>
+    <string name="food_online_empty">Open Food Facts’te sonuç bulunamadı</string>
+    <string name="food_online_failed">Open Food Facts’e ulaşılamadı</string>
+    <string name="food_enter_values">“%1$s” için değerleri gir</string>
+    <string name="food_enter_label_values">Etiketteki değerleri gir</string>
+    <string name="food_barcode_looking">%1$s aranıyor…</string>
+    <string name="food_barcode_not_found">Open Food Facts’te %1$s barkodlu ürün yok</string>
+    <string name="food_try_again">Tekrar dene</string>
+    <string name="food_carbs">Karbonhidrat</string>
+    <string name="food_carbs_value">%1$s g karbonhidrat</string>
+    <string name="food_amount_ml">%1$s ml</string>
+    <string name="food_unit_ml">ml</string>
+    <string name="food_one_serving">1 porsiyon</string>
+    <string name="food_servings">Porsiyon</string>
+    <string name="food_weight">Ağırlık</string>
+    <string name="food_volume">Hacim</string>
+    <string name="food_portion_piece">adet</string>
+    <string name="food_portion_slice">dilim</string>
+    <string name="food_portion_cup">fincan</string>
+    <string name="food_portion_glass">bardak</string>
+    <string name="food_portion_tbsp">yemek kaşığı</string>
+    <string name="food_portion_tsp">çay kaşığı</string>
+    <string name="food_portion_serving">porsiyon</string>
+    <string name="food_portion_package">paket</string>
+    <string name="food_per_100g_label">100 g’da, etikete göre</string>
+    <string name="food_sources">Kaynaklar</string>
+    <string name="food_online_desc">Çevrimiçi arama ve barkodlar</string>
+    <string name="food_file_title">İçe ve dışa aktarma</string>
+    <string name="food_import">İçe aktar</string>
+    <string name="food_file_hint">name, carbs, protein, fat ve per_grams sütunları olan bir CSV veya JSON tablosu. per_grams yoksa değerler 100 g için sayılır.</string>
+    <string name="food_import_empty">Bu dosyada besin bulunamadı. name ve carbs sütunları gerekli.</string>
+    <string name="food_fiber">Lif</string>
+    <string name="food_energy">Enerji</string>
+    <string name="food_kcal_value">%1$s kcal</string>
+    <string name="food_values_for">Değerler şunun için</string>
+    <string name="food_serving_weight">Porsiyon ağırlığı</string>
+    <!-- /food catalogue -->
+
+    <!-- Food library management -->
+    <string name="food_delete_title">Yiyecekler silinsin mi (%1$d)?</string>
+    <string name="food_deleted">Silinen yiyecekler: %1$d</string>
+    <string name="food_manage_failed">Yiyecek kitaplığı güncellenemedi</string>
+    <string name="food_reorder">Yiyecekleri yeniden sırala</string>
+    <string name="food_move_up">Yukarı taşı</string>
+    <string name="food_move_down">Aşağı taşı</string>
 </resources>

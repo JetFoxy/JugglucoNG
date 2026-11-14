@@ -27,6 +27,7 @@
 // Created by jka on 27-11-20.
 //
 #include <algorithm>
+#include <cmath>
 #include <cinttypes>
 #include <future>
 #include <jni.h>
@@ -624,6 +625,21 @@ fromjava(removeSensorById)(JNIEnv *env, jclass cl, jstring jsensor) {
   return removedAll ? JNI_TRUE : JNI_FALSE;
 }
 
+// Whether every native slot holding this id was finished or removed by the user.
+// An id native has no slot for is not finished: it is a source that lives outside
+// native, such as a Nightscout follower.
+extern "C" JNIEXPORT jboolean JNICALL
+fromjava(sensorFinishedById)(JNIEnv *env, jclass cl, jstring jsensor) {
+  const auto sensorindices = sensorIndicesFromId(env, jsensor);
+  if (sensorindices.empty())
+    return JNI_FALSE;
+  for (const int sensorindex : sensorindices) {
+    if (!sensors->getsensor(sensorindex)->finished)
+      return JNI_FALSE;
+  }
+  return JNI_TRUE;
+}
+
 // Retires a managed driver's native mirror shell by its full id. Unlike
 // removeSensorById this only marks the slot finished, so data written after
 // the same sensor is added again revives it. finishfromSensorptr cannot stand
@@ -641,6 +657,31 @@ fromjava(finishSensorById)(JNIEnv *env, jclass cl, jstring jsensor) {
            sensors->getsensor(sensorindex)->showsensorname(), sensorindex,
            sensorindices.size());
     sensors->finishsensor(sensorindex);
+    if (SensorGlucoseData *sensorptr = sensors->getSensorData(sensorindex))
+      setstreaming(sensorptr);
+  }
+  setusedsensors();
+  if (backup)
+    backup->wakebackup(Backup::wakeall);
+  return JNI_TRUE;
+}
+
+// Brings a managed driver's native mirror shell back by its full id, for a
+// driver that has no dataptr to pass to unfinishSensor (Medtrum). Data written
+// to a slot revives it only when it was finished, not when it was removed by
+// the user; a driver that is streaming again under the same id has to say so.
+extern "C" JNIEXPORT jboolean JNICALL
+fromjava(unfinishSensorById)(JNIEnv *env, jclass cl, jstring jsensor) {
+  const auto sensorindices = sensorIndicesFromId(env, jsensor);
+  if (sensorindices.empty()) {
+    LOGAR("unfinishSensorById unknown sensor");
+    return JNI_FALSE;
+  }
+  for (const int sensorindex : sensorindices) {
+    LOGGER("unfinishSensorById %s index=%d of %zu\n",
+           sensors->getsensor(sensorindex)->showsensorname(), sensorindex,
+           sensorindices.size());
+    sensors->unfinishsensor(sensorindex);
     if (SensorGlucoseData *sensorptr = sensors->getSensorData(sensorindex))
       setstreaming(sensorptr);
   }
@@ -1296,7 +1337,14 @@ static jlong glucoselong(uint32_t nu, uint32_t glval, float drate,
                          const SensorGlucoseData *hist) {
   if (!glval)
     return 0LL;
-  const jlong rate = roundl(((long double)drate) * 1000LL);
+  // Rate x1000 in 16 bits; 0x8000 means no rate, which
+  // SuperGattCallback.packedRate reads back as NaN. Converting a NaN rate
+  // directly is undefined, so it never reaches roundl.
+  const jlong rate =
+      std::isnan(drate)
+          ? jlong{0x8000}
+          : std::clamp<jlong>(roundl(((long double)drate) * 1000LL), -0x7FFF,
+                              0x7FFF);
 
   const double cali = calibrateNow(hist, nu, glval);
   uint32_t mgL;
@@ -1484,23 +1532,34 @@ static bool storeGlucoseStreamSample(SensorGlucoseData *hist, const char *sensor
                                      jlong timestamp, jfloat glucose,
                                      jfloat rawGlucose, jfloat temperatureC,
                                      bool overwriteRaw, bool overwriteTemp,
-                                     bool quiet, int *rewindFrom) {
+                                     bool quiet, int *rewindFrom, bool primaryIsResolved = false,
+                                     bool onlyIfMissing = false, bool localSource = false) {
   if (!hist || hist->error() || timestamp <= 0)
     return false;
   auto *info = hist->getinfo();
   if (!info)
     return false;
 
+  std::unique_lock<std::recursive_mutex> writing(SensorGlucoseData::pollWriteMutex());
   uint32_t start = info->starttime;
+  // Owner backfill uses the driver's existing time origin. Moving it would
+  // reinterpret every stored slot; a sample before it must not land in slot 0.
+  if (onlyIfMissing && (!start || timestamp < start))
+    return false;
   if (!start && timestamp > 3600) {
     start = timestamp - 3600;
     info->starttime = start;
     syncListStarttime(hist, start);
   }
 
+  // Dexcom stores one reading per 5-minute sensor slot, not per minute.
+  // Readings mirrored from the watch at minute indices ran the stream end far
+  // past the live slot, so no backfill was requested any more (#767).
+  const bool dexslots = hist->isDexcom();
   int lifeCount = 0;
   if (start > 0 && timestamp >= start)
-    lifeCount = (timestamp - start) / 60;
+    lifeCount = dexslots ? hist->dexSlotFor(timestamp)
+                         : (timestamp - start) / 60;
   const uint16_t mgVal = (uint16_t)(glucose * 10.0f);
 
   if (!hist->validPollIndex(lifeCount)) {
@@ -1517,6 +1576,14 @@ static bool storeGlucoseStreamSample(SensorGlucoseData *hist, const char *sensor
   uint16_t preservedTemp = 0;
   const ScanData *pollsbuf = hist->getPollsData();
   const bool fillsPollGap = pollsbuf && pollsbuf[lifeCount].g <= 0;
+  // Check and write under the same lock as the live driver. Filtering a chunk
+  // in Kotlin first would still let a live write be overwritten between them.
+  if (onlyIfMissing && !fillsPollGap)
+    return false;
+  // The driver's own reading for a slot wins; a mirrored copy only fills a
+  // slot it missed.
+  if (dexslots && lifeCount < hist->pollcount() && !fillsPollGap)
+    return false;
   if (hist->hasStreamID(lifeCount)) {
     const RawData *rawbuf = hist->getRawPollsData();
     if (rawbuf)
@@ -1529,14 +1596,27 @@ static bool storeGlucoseStreamSample(SensorGlucoseData *hist, const char *sensor
     preservedTemp = static_cast<uint16_t>(temperatureC * 10.0f);
 
   const float change = derivechangeforsample(hist->getPollsData(), 0, lifeCount,
-                                             mgVal, timestamp);
-  const bool stored = quiet
-                          ? hist->savepollallIDsQuiet<60>(
-                                timestamp, lifeCount, mgVal, 0, change,
-                                preservedRaw, preservedTemp)
-                          : hist->savepollallIDs<60>(
-                                timestamp, lifeCount, mgVal, 0, change,
-                                preservedRaw, preservedTemp);
+                                             mgVal, timestamp, primaryIsResolved);
+  // Persist before the sample, under the same lock as peer imports. A process
+  // restart or temporary disconnect must not turn local history into peer data.
+  if (localSource && !hist->wearHistoryOrigin.markLocal(hist->getsensordir())) {
+    LOGGER("cannot persist local Wear history provenance for %s\n", sensorId);
+    return false;
+  }
+  const int storedGlucose = mgVal | (primaryIsResolved ? ScanData::resolvedGlucoseFlag : 0);
+  const bool stored =
+      dexslots ? (quiet ? hist->savepollallIDsQuiet<300>(
+                              timestamp, lifeCount, storedGlucose, 0, change,
+                              preservedRaw, preservedTemp)
+                        : hist->savepollallIDs<300>(timestamp, lifeCount,
+                                                    storedGlucose, 0, change,
+                                                    preservedRaw, preservedTemp))
+      : quiet ? hist->savepollallIDsQuiet<60>(timestamp, lifeCount, storedGlucose,
+                                              0, change, preservedRaw,
+                                              preservedTemp)
+              : hist->savepollallIDs<60>(timestamp, lifeCount, storedGlucose, 0,
+                                         change, preservedRaw, preservedTemp);
+  writing.unlock();
   if (!stored)
     return false;
 
@@ -1569,12 +1649,16 @@ static bool addGlucoseStreamInternal(JNIEnv *env, jlong timestamp, jfloat glucos
     return false;
 
   bool stored = false;
+  bool localSource = false;
+#ifdef WEAROS
+  localSource = isManagedDirectStreamSensorId(env, str);
+#endif
   if (timestamp > 0) {
     if (SensorGlucoseData *hist = ensureDirectStreamShellForId(str, 0)) {
       seedDirectStreamStateIfMissing(hist, timestamp);
       stored = storeGlucoseStreamSample(
           hist, str, timestamp, glucose, rawGlucose, temperatureC,
-          overwriteRaw, overwriteTemp, false, nullptr);
+          overwriteRaw, overwriteTemp, false, nullptr, false, false, localSource);
       if (stored)
         setstreaming(hist);
     }
@@ -1627,6 +1711,10 @@ extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithTemp)(
   }
 
   jint stored = 0;
+  bool localSource = false;
+#ifdef WEAROS
+  localSource = isManagedDirectStreamSensorId(env, str);
+#endif
   jlong firstTimestamp = 0;
   for (jsize index = 0; index < count && firstTimestamp <= 0; ++index)
     firstTimestamp = timeValues[index];
@@ -1636,7 +1724,8 @@ extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithTemp)(
     for (jsize index = 0; index < count; ++index) {
       if (storeGlucoseStreamSample(
               hist, str, timeValues[index], glucoseValues[index], 0.0f,
-              temperatureValues[index], false, true, true, &rewindFrom)) {
+              temperatureValues[index], false, true, true, &rewindFrom,
+              false, false, localSource)) {
         ++stored;
       }
     }
@@ -1662,9 +1751,13 @@ extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithTemp)(
 // quiet writes that skip the per-sample LOGGER, a single backstream/backhistory
 // rewind from the lowest index touched, and one setstreaming. Mirroring a
 // 4867-sample history one call at a time cost all of that per reading.
-extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithRawTemp)(
-    JNIEnv *env, jclass cl, jlongArray timestamps, jfloatArray glucoses,
-    jfloatArray raws, jfloatArray temperatures, jstring sensorId) {
+static jlong ensureSensorShellInternal(const char *str, jlong startTimeSec,
+                                       size_t minimumRecords);
+
+static jint addGlucoseStreamBatchWithRawTempInternal(
+    JNIEnv *env, jlongArray timestamps, jfloatArray glucoses,
+    jfloatArray raws, jfloatArray temperatures, jstring sensorId, bool primaryIsResolved,
+    bool wearPeerImport = false, bool forceOnlyMissing = false) {
   if (!sensors || !timestamps || !glucoses || !raws || !temperatures ||
       !sensorId)
     return 0;
@@ -1698,14 +1791,45 @@ extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithRawTemp)(
   jlong firstTimestamp = 0;
   for (jsize index = 0; index < count && firstTimestamp <= 0; ++index)
     firstTimestamp = timeValues[index];
-  if (SensorGlucoseData *hist = ensureDirectStreamShellForId(str, 0)) {
-    seedDirectStreamStateIfMissing(hist, firstTimestamp);
+  // Classification, shell initialization and import are atomic with local
+  // writes. A Kotlin ownership check followed by a JNI write leaves a race.
+  std::unique_lock<std::recursive_mutex> importing(SensorGlucoseData::pollWriteMutex(),
+                                                  std::defer_lock);
+  bool onlyIfMissing = forceOnlyMissing;
+  bool localSource = false;
+#ifdef WEAROS
+  localSource = !wearPeerImport && isManagedDirectStreamSensorId(env, str);
+#endif
+  SensorGlucoseData *hist = nullptr;
+  if (wearPeerImport) {
+    importing.lock();
+    hist = sensors->getSensorData(str);
+    if (!hist)
+      hist = sensors->gethistshort(str);
+    if (hist && !hist->error()) {
+      onlyIfMissing |= hist->wearHistoryOrigin.protectsExisting(
+          hist->getsensordir(), hist->pollcount() > 0);
+    }
+    if (!onlyIfMissing) {
+      hist = reinterpret_cast<SensorGlucoseData *>(ensureSensorShellInternal(
+          str, std::max<jlong>(1, firstTimestamp - 3600), 0));
+      if (hist && !hist->wearHistoryOrigin.markPeerOnly(hist->getsensordir())) {
+        LOGGER("cannot persist peer-only Wear history provenance for %s\n", str);
+        hist = nullptr;
+      }
+    }
+  } else {
+    hist = ensureDirectStreamShellForId(str, 0);
+  }
+  if (hist) {
+    if (!onlyIfMissing)
+      seedDirectStreamStateIfMissing(hist, firstTimestamp);
     int rewindFrom = -1;
     for (jsize index = 0; index < count; ++index) {
       if (storeGlucoseStreamSample(
               hist, str, timeValues[index], glucoseValues[index],
               rawValues[index], temperatureValues[index], true, true, true,
-              &rewindFrom)) {
+              &rewindFrom, primaryIsResolved, onlyIfMissing, localSource)) {
         ++stored;
       }
     }
@@ -1713,8 +1837,13 @@ extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithRawTemp)(
       hist->backstream(rewindFrom);
       hist->backhistory(rewindFrom);
     }
-    if (stored > 0)
+    if (stored > 0 && !onlyIfMissing)
       setstreaming(hist);
+    if (!onlyIfMissing && stored < count) {
+      LOGGER("native mirror %s stored=%d/%d start=%u polls=%d capacity=%zu\n",
+             str, stored, count, hist->getstarttime(), hist->pollcount(),
+             hist->pollStorageCapacity());
+    }
   }
 
   env->ReleaseFloatArrayElements(temperatures, temperatureValues, JNI_ABORT);
@@ -1723,6 +1852,27 @@ extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithRawTemp)(
   env->ReleaseLongArrayElements(timestamps, timeValues, JNI_ABORT);
   env->ReleaseStringUTFChars(sensorId, str);
   return stored;
+}
+
+extern "C" JNIEXPORT jint JNICALL fromjava(importWearGlucoseStreamBatchWithRawTemp)(
+    JNIEnv *env, jclass, jlongArray timestamps, jfloatArray glucoses,
+    jfloatArray raws, jfloatArray temperatures, jstring sensorId, jboolean localOwner) {
+  return addGlucoseStreamBatchWithRawTempInternal(env, timestamps, glucoses, raws,
+                                                 temperatures, sensorId, false, true, localOwner);
+}
+
+extern "C" JNIEXPORT jint JNICALL fromjava(addGlucoseStreamBatchWithRawTemp)(
+    JNIEnv *env, jclass, jlongArray timestamps, jfloatArray glucoses,
+    jfloatArray raws, jfloatArray temperatures, jstring sensorId) {
+  return addGlucoseStreamBatchWithRawTempInternal(env, timestamps, glucoses, raws,
+                                                 temperatures, sensorId, false);
+}
+
+extern "C" JNIEXPORT jint JNICALL fromjava(addResolvedGlucoseStreamBatchWithRawTemp)(
+    JNIEnv *env, jclass, jlongArray timestamps, jfloatArray glucoses,
+    jfloatArray raws, jfloatArray temperatures, jstring sensorId) {
+  return addGlucoseStreamBatchWithRawTempInternal(env, timestamps, glucoses, raws,
+                                                 temperatures, sensorId, true);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL fromjava(addGlucoseStreamWithRawTemp)(
@@ -1746,6 +1896,11 @@ static jlong ensureSensorShellInternal(const char *str, jlong startTimeSec,
 
   hist->sensorerror = false;
   const int ind = hist->sensorIndex;
+  // A Dexcom's slots are counted from the start the sensor reported; the
+  // guess WearSync2 passes (first mirrored reading minus an hour) must not
+  // move it, or mirrored and direct readings land on different slots.
+  if (hist->isDexcom())
+    startTimeSec = 0;
   if (auto *sens = sensors->getsensor(ind)) {
     sens->reactivateFromData();
     if (startTimeSec > 0 &&
@@ -1851,6 +2006,23 @@ extern "C" JNIEXPORT void JNICALL fromjava(setSensorManagedFamily)(
   env->ReleaseStringUTFChars(sensorId, str);
 }
 
+extern "C" JNIEXPORT jboolean JNICALL fromjava(setSensorViewMode)(
+    JNIEnv *env, jclass cl, jstring sensorId, jint mode) {
+  if (!sensors || !sensorId || mode < 0 || mode > 3)
+    return JNI_FALSE;
+  const char *str = env->GetStringUTFChars(sensorId, nullptr);
+  if (!str)
+    return JNI_FALSE;
+  // Exact identity only: do not create a shell or change a sensor sharing a suffix.
+  const int index = sensors->sensorindex(str);
+  env->ReleaseStringUTFChars(sensorId, str);
+  auto *hist = index >= 0 ? sensors->getSensorData(index) : nullptr;
+  if (!hist || hist->error() || !hist->getinfo())
+    return JNI_FALSE;
+  hist->getinfo()->viewMode = mode;
+  return JNI_TRUE;
+}
+
 extern "C" JNIEXPORT jint JNICALL fromjava(getSensorManagedFamily)(
     JNIEnv *env, jclass cl, jlong dataptr) {
   if (!dataptr)
@@ -1870,9 +2042,15 @@ extern "C" JNIEXPORT jboolean JNICALL fromjava(hasSensorStreamCapacity)(
   if (!str)
     return JNI_FALSE;
   SensorGlucoseData *hist = ensureDirectStreamShellForId(str, 0);
-  const bool ready =
-      hist && !hist->error() &&
+  const bool usable = hist && !hist->error();
+  const bool ready = usable &&
       hist->pollStorageCapacity() >= static_cast<size_t>(minimumRecords);
+  if (!ready) {
+    LOGGER("native stream capacity unavailable for %s: required=%d capacity=%zu "
+           "start=%u polls=%d\n", str, minimumRecords,
+           usable ? hist->pollStorageCapacity() : 0,
+           usable ? hist->getstarttime() : 0, usable ? hist->pollcount() : 0);
+  }
   env->ReleaseStringUTFChars(sensorId, str);
   return ready ? JNI_TRUE : JNI_FALSE;
 }
@@ -1932,7 +2110,8 @@ fromjava(addRawGlucoseStream)(JNIEnv *env, jclass cl, jlong timestamp,
       }
 
       if (hist->validPollIndex(lifeCount) && hist->hasStreamID(lifeCount)) {
-        int preservedAuto = hist->getPollsData()[lifeCount].g;
+        const ScanData &preserved = hist->getPollsData()[lifeCount];
+        int preservedAuto = preserved.g;
         uint16_t preservedTemp = hist->getTempForPoll(lifeCount);
         int rawVal = 0;
         if (rawGlucose > 0) {
@@ -1945,7 +2124,8 @@ fromjava(addRawGlucoseStream)(JNIEnv *env, jclass cl, jlong timestamp,
         }
         // See addGlucoseStreamInternal(): derive rather than storing a fake flat 0.0f.
         const float change = derivechangeforsample(hist->getPollsData(), 0, lifeCount,
-                                                   preservedAuto, timestamp);
+                                                   preserved.getmgdL(), timestamp,
+                                                   preserved.hasResolvedGlucose());
         hist->savepollallIDs<60>(timestamp, lifeCount, preservedAuto, 0, change,
                                  rawVal, preservedTemp);
         if (backup) {
@@ -2138,7 +2318,7 @@ static void appendPollHistory(const SensorGlucoseData *hist, jlong starttime,
     jlong valAuto = 0;
     if (autoValid) {
       double cali = calibrateNow(hist, item);
-      valAuto = !isnan(cali) ? (jlong)(cali * 10) : (jlong)item.g * 10;
+      valAuto = !isnan(cali) ? (jlong)(cali * 10) : (jlong)item.getmgdL() * 10;
     }
 
     jlong valRaw = rawVal > 0 ? (jlong)(rawVal * convfactordL) : 0;
@@ -2169,7 +2349,7 @@ static void appendScanHistory(const SensorGlucoseData *hist, jlong starttime,
       continue;
 
     const double cali = calibrateNow(hist, item);
-    const jlong valAuto = !isnan(cali) ? (jlong)(cali * 10) : (jlong)item.g * 10;
+    const jlong valAuto = !isnan(cali) ? (jlong)(cali * 10) : (jlong)item.getmgdL() * 10;
 
     // Scans have no dedicated raw lane like rawpolls.dat. Assignment is
     // intentional: a scan is a newer source than the periodic history point.
@@ -2559,6 +2739,28 @@ fromjava(finishfromSensorptr)(JNIEnv *env, jclass cl, jlong sensorptr) {
   finishsensor(sens, sensorindex);
 }
 #endif
+// Why activeSensors leaves this sensor out, for the log when its driver is
+// removed (#872).
+extern std::string usedsensorreason(int ind);
+extern "C" JNIEXPORT jstring JNICALL fromjava(activeSensorReason)(JNIEnv *env,
+                                                                  jclass cl,
+                                                                  jstring jname) {
+  if (!sensors || !jname)
+    return nullptr;
+  const char *name = env->GetStringUTFChars(jname, nullptr);
+  if (!name)
+    return nullptr;
+  int ind = sensors->sensorindexshort(name);
+  if (ind < 0)
+    ind = sensors->sensorindex(name);
+  env->ReleaseStringUTFChars(jname, name);
+  if (ind < 0)
+    return env->NewStringUTF("not a native sensor");
+  std::string why = usedsensorreason(ind);
+  if (sensors->sensorDirectoryMissing(ind))
+    why += ", directory missing";
+  return env->NewStringUTF(why.c_str());
+}
 #ifdef LIBRE3
 extern "C" JNIEXPORT jobjectArray JNICALL fromjava(activeSensors)(JNIEnv *env,
                                                                   jclass cl) {

@@ -2,6 +2,8 @@
 
 package tk.glucodata.ui
 
+import tk.glucodata.ui.components.RevealSettingsSearchAnchor
+import androidx.compose.foundation.lazy.rememberLazyListState
 import tk.glucodata.ui.components.AdaptiveButtonRow
 import tk.glucodata.ui.components.IconButtonTooltip
 import androidx.compose.material3.IconButtonDefaults
@@ -107,6 +109,8 @@ import tk.glucodata.ui.components.AppTopBar
 import tk.glucodata.webserver.WebServerCertificate
 import tk.glucodata.Applic
 import tk.glucodata.AutoSensorSwitch
+import tk.glucodata.WearToggleSync
+import tk.glucodata.MessageSender
 import tk.glucodata.GoogleServices
 import tk.glucodata.Natives
 import tk.glucodata.NotificationForwardingSettings
@@ -168,7 +172,16 @@ fun WatchSettingsScreen(navController: NavController) {
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        RevealSettingsSearchAnchor(
+            listState,
+            setOf(
+                SettingsSearchAnchors.forRow(R.string.watch_forwarding_title),
+                SettingsSearchAnchors.forRow(R.string.watch_forwarding_interval_title),
+            )
+        )
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -301,6 +314,7 @@ fun WatchSettingsScreen(navController: NavController) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     SettingsItem(
                         title = stringResource(R.string.watch_forwarding_title),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.watch_forwarding_title),
                         subtitle = watchForwardingChoiceLabel(forwardingChoice),
                         icon = Icons.AutoMirrored.Filled.Send,
                         iconTint = MaterialTheme.colorScheme.tertiary,
@@ -311,6 +325,7 @@ fun WatchSettingsScreen(navController: NavController) {
                     if (intervalChosen) {
                         SettingsItem(
                             title = stringResource(R.string.watch_forwarding_interval_title),
+                            searchAnchor = SettingsSearchAnchors.forRow(R.string.watch_forwarding_interval_title),
                             subtitle = pluralStringResource(R.plurals.watch_forwarding_minutes, forwardingMode, forwardingMode),
                             icon = Icons.Default.Timer,
                             iconTint = MaterialTheme.colorScheme.tertiary,
@@ -454,6 +469,8 @@ fun WearOsConfigScreen(navController: NavController) {
             }
             applyNodes(latest)
             syncStatus = WatchInterop.getWearSyncStatus()
+            // The watch can flip this too, and a saved copy outlives the screen.
+            autoSwitch = AutoSensorSwitch.isEnabled()
         } finally {
             refreshingNodes = false
         }
@@ -494,6 +511,8 @@ fun WearOsConfigScreen(navController: NavController) {
     // known native host first was circular: applying the routing is what creates
     // that host, so both switches sat greyed out forever on a fresh pairing.
     val canSetDirect = selectedAppInstalled
+    // Off is always reachable, so a watch that is gone cannot pin it on.
+    val canChangeAutoSwitch = autoSwitch || (selected != null && canSetDirect)
     val canSetNums = selectedAppInstalled
     // Both directions apply immediately. Turning direct mode on used to change
     // nothing until "Sync now" was pressed, and the state was overwritten by the
@@ -529,7 +548,21 @@ fun WearOsConfigScreen(navController: NavController) {
 
     fun updateAutoSwitch(enabled: Boolean) {
         autoSwitch = enabled
-        val node = selected ?: return
+        val node = selected
+        if (node == null) {
+            // Turning it off is a phone setting and needs no selected watch.
+            // Broadcast it anyway: discovery may simply not have finished, and
+            // a reachable watch must not stay armed until its next sync.
+            // Turning it on does need one, to send the sensor's setup to.
+            if (!enabled) {
+                // Stored now, not from a coroutine: this screen's scope dies on
+                // back, and a cancelled launch would leave it switched on. The
+                // broadcast goes on the app-wide scope for the same reason.
+                AutoSensorSwitch.setEnabled(false)
+                MessageSender.scope.launch { WearToggleSync.push() }
+            }
+            return
+        }
         scope.launch {
             val ok = withContext(Dispatchers.IO) {
                 WatchInterop.setAutoSensorSwitch(node.id, enabled)
@@ -585,7 +618,17 @@ fun WearOsConfigScreen(navController: NavController) {
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        RevealSettingsSearchAnchor(
+            listState,
+            setOf(
+                SettingsSearchAnchors.forRow(R.string.wear_auto_sensor_switch),
+                SettingsSearchAnchors.forRow(R.string.wear_direct_sensor_on_watch),
+                SettingsSearchAnchors.forRow(R.string.watch_enter_amounts),
+            )
+        )
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -674,6 +717,7 @@ fun WearOsConfigScreen(navController: NavController) {
                     }
                     SettingsItem(
                         title = stringResource(R.string.wear_auto_sensor_switch),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.wear_auto_sensor_switch),
                         subtitle = if (autoSwitch) {
                             stringResource(R.string.wear_auto_sensor_switch_on_desc)
                         } else {
@@ -682,7 +726,7 @@ fun WearOsConfigScreen(navController: NavController) {
                         icon = Icons.Filled.SwapHoriz,
                         iconTint = MaterialTheme.colorScheme.tertiary,
                         position = CardPosition.TOP,
-                        onClick = if (selected != null && canSetDirect) {
+                        onClick = if (canChangeAutoSwitch) {
                             { updateAutoSwitch(!autoSwitch) }
                         } else {
                             null
@@ -690,17 +734,18 @@ fun WearOsConfigScreen(navController: NavController) {
                         trailingContent = {
                             StyledSwitch(
                                 checked = autoSwitch,
-                                onCheckedChange = if (selected != null && canSetDirect) {
+                                onCheckedChange = if (canChangeAutoSwitch) {
                                     { updateAutoSwitch(it) }
                                 } else {
                                     null
                                 },
-                                enabled = selected != null && canSetDirect
+                                enabled = canChangeAutoSwitch
                             )
                         }
                     )
                     SettingsItem(
                         title = stringResource(R.string.wear_direct_sensor_on_watch),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.wear_direct_sensor_on_watch),
                         subtitle = (if (directOnWatch) {
                             stringResource(R.string.wear_direct_sensor_watch_desc)
                         } else {
@@ -728,6 +773,7 @@ fun WearOsConfigScreen(navController: NavController) {
                     )
                     SettingsItem(
                         title = stringResource(R.string.watch_enter_amounts),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.watch_enter_amounts),
                         subtitle = if (enterOnWatch) {
                             stringResource(R.string.watch_enter_amounts_on)
                         } else {
@@ -881,7 +927,15 @@ fun GarminStatusScreen(navController: NavController) {
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        RevealSettingsSearchAnchor(
+            listState,
+            setOf(
+                SettingsSearchAnchors.forRow(R.string.darkmode),
+            )
+        )
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -988,6 +1042,7 @@ fun GarminStatusScreen(navController: NavController) {
                     }
                     SettingsSwitchItem(
                         title = stringResource(R.string.darkmode),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.darkmode),
                         subtitle = stringResource(R.string.kerfstok_watch_ui),
                         checked = kerfstokDark,
                         icon = Icons.Filled.Shield,
@@ -1306,7 +1361,17 @@ fun WebServerSettingsScreen(navController: NavController) {
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        RevealSettingsSearchAnchor(
+            listState,
+            setOf(
+                SettingsSearchAnchors.forRow(R.string.localonly),
+                SettingsSearchAnchors.forRow(R.string.port),
+                SettingsSearchAnchors.forRow(R.string.usessl),
+            )
+        )
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -1371,6 +1436,7 @@ fun WebServerSettingsScreen(navController: NavController) {
                 ) {
                     SettingsSwitchItem(
                         title = stringResource(R.string.localonly),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.localonly),
                         subtitle = stringResource(R.string.webserver_local_only_desc),
                         checked = localOnly,
                         icon = Icons.Filled.Devices,
@@ -1385,6 +1451,7 @@ fun WebServerSettingsScreen(navController: NavController) {
 
                     SettingsItem(
                         title = stringResource(R.string.port),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.port),
                         icon = Icons.Filled.SettingsEthernet,
                         iconTint = MaterialTheme.colorScheme.secondary,
                         position = CardPosition.MIDDLE,
@@ -1411,6 +1478,7 @@ fun WebServerSettingsScreen(navController: NavController) {
 
                     SettingsItem(
                         title = stringResource(R.string.usessl),
+                        searchAnchor = SettingsSearchAnchors.forRow(R.string.usessl),
                         subtitle = stringResource(R.string.webserver_https_subtitle),
                         icon = Icons.Filled.Lock,
                         iconTint = MaterialTheme.colorScheme.primary,

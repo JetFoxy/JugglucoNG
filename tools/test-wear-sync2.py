@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Execute production WearSync2 chunk ingestion with deterministic storage fakes.
+"""Execute production WearSync2 chunk ingestion and backlog requests with deterministic fakes.
 
 JNI, Room scheduling and device transport are outside this test. The fake native
-writer models the minute-derived cursor that caused issue #593.
+writer models the minute-derived cursor that caused issue #593. The request
+scenarios run the production request encoding and the phone's choice between a
+full serve and the tail, including a watch that must have the full horizon (#862).
+The managed handover replay runs the production history reader, chunk encoder
+and ingestion in both directions, switching deterministic phone/watch fakes.
+It is not a BLE/Data Layer test or two live Android runtimes.
 Requires kotlinc and java on PATH.
 """
 from pathlib import Path
@@ -13,7 +18,7 @@ root = Path(__file__).resolve().parents[1]
 source = (root / 'Common/src/main/java/tk/glucodata/WearSync2.kt').read_text()
 
 
-def method(signature):
+def method(signature, source=source):
     start = source.index(signature)
     brace = source.index('{', start)
     depth, end = 1, brace + 1
@@ -29,11 +34,18 @@ def method(signature):
 kotlin = r'''
 package tk.glucodata
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicLong
+import java.util.TreeMap
 
 object Applic { var isWearable = false }
 object SensorIdentity {
     var managed = false
     fun usesNativeDirectStreamShell(serial: String) = managed
+    fun canonicalSensorId(serial: String) = serial
+    fun resolveAppSensorId(serial: String?) = serial
+    fun resolveMainSensor(): String? = null
+    fun shouldUseNativeHistorySync(serial: String) = true
+    fun resolveNativeHistorySensorNames(serial: String) = listOf(serial)
 }
 object SensorOwnershipRuntime {
     var local = false
@@ -51,16 +63,23 @@ object Natives {
     var nativeValues = floatArrayOf()
     var nativeRaws = floatArrayOf()
     var nativeSerial = ""
+    var backfillBatches = 0
+    val watchHistory = sortedMapOf<Long, Pair<Float, Float>>()
+    fun activeSensors() = arrayOf("SIBI:0111801JGS9")
+    fun getGlucoseHistoryForSensor(serial: String, start: Long): LongArray = watchHistory
+        .filterKeys { it > start }.flatMap { (t, v) -> listOf(t, (v.first * 10).toLong(), (v.second * 10).toLong()) }
+        .toLongArray()
     fun getSensorUiSnapshot(serial: String): LongArray? {
         snapshotReads++
         check(serial == "3038HVEAD0D")
         return snapshot
     }
+    fun lastglucosetime() = 0L
     fun ensureSensorShell(serial: String, start: Long) { shellWrites++ }
     fun addGlucoseStreamBatchWithRawTemp(
         times: LongArray, values: FloatArray, raws: FloatArray,
         temps: FloatArray, serial: String,
-    ) {
+    ): Int {
         batches++
         nativeTimes = times
         nativeValues = values
@@ -71,6 +90,21 @@ object Natives {
             if (id >= pollcount) pollcount = id + 1
             lastId = maxOf(lastId, id)
         }
+        if (Applic.isWearable) for (i in times.indices) watchHistory[times[i]] = values[i] * 10f to raws[i]
+        return times.size
+    }
+    fun importWearGlucoseStreamBatchWithRawTemp(
+        times: LongArray, values: FloatArray, raws: FloatArray,
+        temps: FloatArray, serial: String, localOwner: Boolean,
+    ): Int {
+        backfillBatches++
+        var stored = 0
+        for (i in times.indices) {
+            // Slot atomicity and origin handling run against the production C++
+            // writer in test-resolved-glucose.py; this models its gap-only result.
+            if (watchHistory.putIfAbsent(times[i], values[i] * 10f to raws[i]) == null) stored++
+        }
+        return stored
     }
     fun acceptBle(id: Int): Boolean {
         if (id <= lastId) return false
@@ -94,6 +128,9 @@ object HistorySyncAccess {
         historyTimes = times
         historyValues = values
         historyRaws = raws
+        HistoryRepositoryAccess.phoneHistory = times.indices.map {
+            GlucosePoint(times[it], values[it], raws[it])
+        }
     }
     fun storeCurrentReadingAsync(time: Long, value: Float, raw: Float, rate: Float, serial: String) {
         check(serial == historySerial)
@@ -113,12 +150,43 @@ object UiRefreshBus {
 object Log {
     const val doLog = false
     fun i(tag: String, message: String) {}
+    fun w(tag: String, message: String, error: Throwable? = null) {}
     fun stack(tag: String, message: String, error: Throwable): Nothing = throw AssertionError(message, error)
+}
+object WearMessagePath { const val SYNC2_REQ = "/sync2/req"; const val SYNC2_CHUNK = "/sync2/chunk" }
+object GlucoseValuePlausibility { fun isPlausibleMgdl(value: Float) = value in 20f..900f }
+data class GlucosePoint(val timestamp: Long, val value: Float, val rawValue: Float)
+object HistoryRepositoryAccess {
+    var phoneHistory = emptyList<GlucosePoint>()
+    fun getHistoryForSensor(serial: String, start: Long, mmol: Boolean): List<GlucosePoint>? =
+        if (Applic.isWearable) null else phoneHistory.filter { it.timestamp > start }
+}
+object MessageSender {
+    var sent: ByteArray? = null
+    val chunks = ArrayList<ByteArray>()
+    fun sendSyncMessage(path: String, data: ByteArray): Boolean { check(path == WearMessagePath.SYNC2_REQ); sent = data; return true }
+    fun sendSyncMessageAwait(path: String, data: ByteArray, timeoutSeconds: Long): Boolean {
+        check(path == WearMessagePath.SYNC2_CHUNK)
+        chunks += data
+        return true
+    }
 }
 object WearSync2 {
     private const val LOG_ID = "WearSync2"
     private const val VERSION = 1
     private const val doLog = false
+    private const val BACKFILL_HORIZON_SEC = 14L * 24L * 3600L
+    private const val INCREMENTAL_OVERLAP_SEC = 15L * 60L
+    private const val DEEP_SERVE_MIN_INTERVAL_MS = 30L * 60L * 1000L
+    private const val MAX_TRIPLES_PER_CHUNK = 360
+    const val TAIL = -1L
+    private val lastDeepServeMs = AtomicLong(0L)
+    private val lastServedChunkCount = AtomicLong(0L)
+    private val lastServedMs = AtomicLong(0L)
+    private fun sendCalibration(serial: String) {}
+    val served = ArrayList<Long>()
+    private fun serveSince(fromSec: Long) { served.add(fromSec) }
+    private fun tailStartSec(): Long = TAIL
     private object executor { fun execute(action: () -> Unit) = action() }
     var enabled = true
     var removed = false
@@ -132,7 +200,16 @@ object WearSync2 {
     }
 '''
 kotlin += method('private fun isLibre2NativeSensor(') + '\n'
-kotlin += method('fun onChunk(') + '\n}\n'
+kotlin += method('fun onChunk(') + '\n'
+kotlin += method('fun onRequest(') + '\n'
+kotlin += method('private fun sanitizeFrom(') + '\n'
+kotlin += method('private fun allowDeepServe(') + '\n'
+kotlin += method('fun requestSync(') + '\n'
+kotlin += method('private fun serveSensorSince(').replace('private fun', 'fun', 1) + '\n'
+kotlin += method('private fun sendChunk(') + '\n}\n'
+kotlin += (root / 'Common/src/main/java/tk/glucodata/NotificationHistorySource.kt').read_text().replace(
+    'package tk.glucodata', '').replace('import android.util.Log', '').replace('import java.util.TreeMap', '')
+kotlin += method('fun resolveLocalOwnershipProof(', (root / 'Common/src/main/java/tk/glucodata/SensorOwnershipRuntime.kt').read_text())
 kotlin += r'''
 fun chunk(serial: String = "3038HVEAD0D"): ByteArray {
     val name = serial.toByteArray()
@@ -189,15 +266,115 @@ fun main(args: Array<String>) {
                 check(Natives.snapshotReads == 0 && HistorySyncAccess.historyTimes.isEmpty())
             } else assertPhoneImport()
         }
-        "local-owner", "removed", "companion-disabled" -> {
+        "local-owner", "phone-managed-owner", "watch-native-owner", "removed", "companion-disabled" -> {
             when (scenario) {
                 "local-owner" -> SensorOwnershipRuntime.local = true
+                "phone-managed-owner" -> { SensorOwnershipRuntime.local = true; SensorIdentity.managed = true }
+                "watch-native-owner" -> { SensorOwnershipRuntime.local = true; Applic.isWearable = true }
                 "removed" -> WearSync2.removed = true
                 "companion-disabled" -> WearSync2.enabled = false
             }
             WearSync2.onChunk(chunk())
             check(Natives.snapshotReads == 0 && Natives.shellWrites == 0 && Natives.batches == 0)
             check(HistorySyncAccess.historyTimes.isEmpty() && UiRefreshBus.refreshes == 0)
+            check(Natives.backfillBatches == 0)
+        }
+        "managed-watch-handover", "managed-watch-disconnect", "managed-watch-stale" -> {
+            val serial = "SIBI:0111801JGS9"
+            SensorIdentity.managed = true
+            // Phone owns the sensor and serves the real source-lane wire format.
+            HistoryRepositoryAccess.phoneHistory = (0 until 8).map { i ->
+                GlucosePoint((Natives.start + (2918 + i) * 60L) * 1000L, 128f + i, 120f + i)
+            }
+            WearSync2.serveSensorSince(serial, 0L)
+            val phoneChunk = MessageSender.chunks.single()
+            MessageSender.chunks.clear()
+            // It takes over before the phone chunk lands and receives a local
+            // reading. The old guard discarded all seven missing older rows.
+            Applic.isWearable = true
+            SensorOwnershipRuntime.local = true
+            val localTime = Natives.start + 2925 * 60L
+            Natives.watchHistory[localTime] = 171f to 161f
+            if (scenario != "managed-watch-handover") {
+                val now = 1_800_000_000_000L
+                SensorOwnershipRuntime.local = resolveLocalOwnershipProof(
+                    released = false,
+                    gattConnected = scenario == "managed-watch-stale",
+                    connectsPerReading = false,
+                    lastLocalReadingSeenAtMs = if (scenario == "managed-watch-stale") now - 21 * 60_000L else now,
+                    nowMs = now,
+                    perReadingFreshMs = 11 * 60_000L,
+                    connectedStaleMs = 20 * 60_000L,
+                )
+                check(!SensorOwnershipRuntime.local)
+            }
+            WearSensorSelectionSync.selected = "another-selected-sensor"
+            WearSync2.onChunk(phoneChunk)
+            check(Natives.backfillBatches == 1 && Natives.batches == 0 && Natives.shellWrites == 0)
+            val chart = NotificationHistorySource.getDisplayHistory(0L, false, serial)
+            check(chart.size == 8 && chart.first().value == 128f)
+            check(chart.last().value == 171f && chart.last().rawValue == 161f)
+            if (SensorOwnershipRuntime.local) check(WearSensorSelectionSync.selected == "another-selected-sensor")
+            check(HistorySyncAccess.currentTime == 0L && WearSync2.exchangedAt == 0L)
+            // Replayed backfill preserves the local value as well.
+            WearSync2.onChunk(phoneChunk)
+            check(Natives.watchHistory.size == 8 && Natives.watchHistory[localTime]!!.first == 171f)
+            SensorOwnershipRuntime.local = true // reconnect after the delayed/replayed chunk
+            // Another BLE reading is stored by the watch, served through the
+            // same production history reader and encoder, then displayed and
+            // forwarded by the phone after it has stood down.
+            Natives.watchHistory[localTime + 60L] = 172f to 162f
+            WearSync2.serveSensorSince(serial, 0L)
+            val watchChunk = MessageSender.chunks.single()
+            Applic.isWearable = false
+            SensorOwnershipRuntime.local = false
+            WearSync2.onChunk(watchChunk)
+            val phoneChart = NotificationHistorySource.getDisplayHistory(0L, false, serial)
+            check(phoneChart.size == 9 && phoneChart.last().value == 172f)
+            check(HistorySyncAccess.currentTime == (localTime + 60L) * 1000L)
+            check(HistorySyncAccess.currentValue == 172f && WearSync2.exchangedAt == (localTime + 60L) * 1000L)
+        }
+        "request-encoding" -> {
+            WearSync2.requestSync(deep = true)
+            var sent = MessageSender.sent!!
+            check(sent.size == 10 && sent[0] == 1.toByte() && sent[9] == 0.toByte())
+            val horizon = ByteBuffer.wrap(sent, 1, 8).long
+            check(horizon < System.currentTimeMillis() / 1000L - 13L * 24L * 3600L)
+            WearSync2.requestSync(deep = true, force = true)
+            sent = MessageSender.sent!!
+            check(sent.size == 10 && sent[9] == 1.toByte())
+        }
+        "request-serving" -> {
+            fun request(fromSec: Long, force: Int?): ByteArray {
+                val buf = ByteBuffer.allocate(if (force == null) 9 else 10)
+                buf.put(1).putLong(fromSec)
+                if (force != null) buf.put(force.toByte())
+                return buf.array()
+            }
+            val horizon = System.currentTimeMillis() / 1000L - 14L * 24L * 3600L
+            WearSync2.onRequest(request(horizon, null))
+            check(WearSync2.served.size == 1 && WearSync2.served.last() != WearSync2.TAIL)
+            // Within the spacing between full serves only the tail goes, whether
+            // the request is the older nine-byte form or says not to force.
+            WearSync2.onRequest(request(horizon, null))
+            check(WearSync2.served.size == 2 && WearSync2.served.last() == WearSync2.TAIL)
+            WearSync2.onRequest(request(horizon, 0))
+            check(WearSync2.served.size == 3 && WearSync2.served.last() == WearSync2.TAIL)
+            // A watch that threw its copy away gets the full horizon at once...
+            WearSync2.onRequest(request(horizon, 1))
+            check(WearSync2.served.size == 4 && WearSync2.served.last() != WearSync2.TAIL)
+            // ...and that counts as the latest full serve.
+            WearSync2.onRequest(request(horizon, null))
+            check(WearSync2.served.size == 5 && WearSync2.served.last() == WearSync2.TAIL)
+            // A forced request for a short range is just served from there.
+            val recent = System.currentTimeMillis() / 1000L - 3600L
+            WearSync2.onRequest(request(recent, 1))
+            check(WearSync2.served.size == 6 && WearSync2.served.last() == recent)
+            // Unusable requests serve nothing.
+            WearSync2.onRequest(null)
+            WearSync2.onRequest(byteArrayOf(2) + ByteArray(9))
+            WearSync2.onRequest(byteArrayOf(1, 0, 0))
+            check(WearSync2.served.size == 6)
         }
         else -> error(scenario)
     }
@@ -208,7 +385,9 @@ fun main(args: Array<String>) {
 scenarios = [
     'phone-libre2', 'phone-alias', 'watch-libre2', 'phone-libre3',
     'phone-sibionics', 'phone-managed', 'phone-managed-family', 'phone-unknown',
-    'phone-short-snapshot', 'local-owner', 'removed', 'companion-disabled',
+    'phone-short-snapshot', 'local-owner', 'phone-managed-owner', 'watch-native-owner',
+    'managed-watch-handover', 'managed-watch-disconnect', 'managed-watch-stale', 'removed', 'companion-disabled',
+    'request-encoding', 'request-serving',
 ]
 with tempfile.TemporaryDirectory(prefix='wear-sync2-test-') as directory:
     temp = Path(directory)

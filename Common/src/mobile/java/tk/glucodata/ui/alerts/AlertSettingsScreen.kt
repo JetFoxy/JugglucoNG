@@ -65,6 +65,9 @@ import tk.glucodata.ui.components.RevealSettingsSearchAnchor
 import tk.glucodata.ui.components.settingsSearchAnchor
 import tk.glucodata.ui.components.SettingsItem
 import tk.glucodata.ui.components.StyledSwitch
+import tk.glucodata.ui.components.SliderHeader
+import tk.glucodata.ui.components.SliderHeaderGap
+import tk.glucodata.ui.components.SliderHeaderStyle
 import tk.glucodata.ui.components.CardPosition as SettingsItemPosition
 import tk.glucodata.ui.theme.displayLargeExpressive
 import tk.glucodata.ui.theme.labelLargeExpressive
@@ -82,7 +85,12 @@ fun AlertSettingsScreen(
 ) {
     val context = LocalContext.current
     val isMmol = Applic.unit == 1
-    
+    val restricted by tk.glucodata.RestrictedMode.state.collectAsStateWithLifecycle()
+    val voiceOpen = !restricted.locked || tk.glucodata.ui.restricted.RestrictedModeRoutes.isOpenWhileLocked(
+        tk.glucodata.ui.restricted.RestrictedModeRoutes.VOICE,
+        restricted.config,
+    )
+
     // Load all alert configs
     val configs = remember {
         mutableStateMapOf<AlertType, AlertConfig>().apply {
@@ -161,6 +169,7 @@ fun AlertSettingsScreen(
         listOf(
             AlertType.MISSED_READING,
             AlertType.LOSS,
+            AlertType.SIGNAL_RESTORED,
             AlertType.SENSOR_EXPIRY
         )
     }
@@ -202,7 +211,8 @@ fun AlertSettingsScreen(
             listState,
             setOf(
                 SettingsSearchAnchors.HIGH_ALERTS, SettingsSearchAnchors.LOW_ALERTS,
-                SettingsSearchAnchors.PREDICTIVE_ALERTS, SettingsSearchAnchors.OTHER_ALERTS
+                SettingsSearchAnchors.PREDICTIVE_ALERTS, SettingsSearchAnchors.OTHER_ALERTS,
+                SettingsSearchAnchors.forRow(R.string.preemptive_snooze),
             )
         )
         LazyColumn(
@@ -546,15 +556,17 @@ fun AlertSettingsScreen(
                 Spacer(Modifier.height(24.dp))
                 SettingsItem(
                     title = stringResource(R.string.preemptive_snooze),
+                    searchAnchor = SettingsSearchAnchors.forRow(R.string.preemptive_snooze),
                     subtitle = stringResource(R.string.preemptive_snooze_desc),
                     icon = Icons.Default.Snooze,
                     iconTint = MaterialTheme.colorScheme.primary,
-                    position = SettingsItemPosition.TOP,
+                    position = if (voiceOpen) SettingsItemPosition.TOP else SettingsItemPosition.SINGLE,
                     onClick = { showPreemptiveSnooze = true }
                 )
             }
 
-            item(key = "talker-settings") {
+            // Alarms can be open to a restricted phone without Voice; the row is gone then.
+            if (voiceOpen) item(key = "talker-settings") {
                 SettingsItem(
                     title = stringResource(R.string.talker),
                     subtitle = stringResource(R.string.speakglucose) + " \u2022 " + stringResource(R.string.speakalarms),
@@ -1124,7 +1136,7 @@ private fun AlertCard(
  */
 
 @Composable
-private fun AlertSettingsExpanded(
+internal fun AlertSettingsExpanded(
     config: AlertConfig,
     isMmol: Boolean,
     onConfigChange: (AlertConfig) -> Unit,
@@ -1193,6 +1205,14 @@ private fun AlertSettingsExpanded(
                     }
                 }
 
+                if (config.type == AlertType.SIGNAL_RESTORED) {
+                    Text(
+                        text = stringResource(R.string.signal_restored_explanation),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 // === Sensor-expiry pre-warnings (multi-select, this type only) ===
                 if (config.type == AlertType.SENSOR_EXPIRY) {
                     SensorExpiryThresholdSelector(
@@ -1237,6 +1257,14 @@ private fun AlertSettingsExpanded(
                         stepSize = 5,
                         onValueChange = { v -> onConfigChange(config.copy(rearmMinIntervalMinutes = v)) },
                         modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+                if (config.type == AlertType.PRE_LOW) {
+                    ClickableToggleRow(
+                        title = stringResource(R.string.pre_low_evidence_label),
+                        subtitle = stringResource(R.string.pre_low_evidence_description),
+                        checked = config.preLowEvidenceEnabled,
+                        onCheckedChange = { onConfigChange(config.copy(preLowEvidenceEnabled = it)) }
                     )
                 }
                 // PRE_HIGH only: insulin makes a predicted LOW more likely, so PRE_LOW
@@ -1481,29 +1509,13 @@ private fun ThresholdSlider(
             sliderValue = value
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = if (prominent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                // A long (localised) label must wrap, not push the value out
-                // of the row.
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp)
-            )
-            Text(
-                // Use LOCAL sliderValue for real-time updates
-                formatThreshold(sliderValue, isMmol),
-                style = if (prominent) MaterialTheme.typography.headlineSmallEmphasized else MaterialTheme.typography.bodyMediumEmphasized,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        
+        SliderHeader(
+            label = label,
+            // Use LOCAL sliderValue for real-time updates
+            value = formatThreshold(sliderValue, isMmol),
+            style = if (prominent) SliderHeaderStyle.Glucose else SliderHeaderStyle.Compact
+        )
+        Spacer(Modifier.height(SliderHeaderGap))
         Slider(
             value = sliderValue,
             onValueChange = { sliderValue = it },
@@ -1553,26 +1565,12 @@ internal fun DurationSlider(
         // Calculate display value based on current slider position, rounded to step
         val displayValue = (kotlin.math.round(sliderValue / stepSize) * stepSize).toInt()
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyMedium,
-                // A long (localised) label must wrap, not push the value out
-                // of the row.
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp)
-            )
-            Text(
-                valueText(displayValue),
-                style = MaterialTheme.typography.bodyMediumEmphasized,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        
+        SliderHeader(
+            label = label,
+            value = valueText(displayValue),
+            style = SliderHeaderStyle.Compact
+        )
+        Spacer(Modifier.height(SliderHeaderGap))
         Slider(
             value = sliderValue,
             onValueChange = { sliderValue = it },
@@ -2123,6 +2121,7 @@ private fun getAlertIconAndColor(type: AlertType, isDark: Boolean, scheme: Color
         AlertType.PERSISTENT_HIGH -> Icons.Default.Timer to Color(GlucoseRangeColors.veryHigh(isDark))
         AlertType.MISSED_READING -> Icons.Default.SignalWifiOff to scheme.secondary
         AlertType.LOSS -> Icons.Default.BluetoothDisabled to scheme.secondary
+        AlertType.SIGNAL_RESTORED -> Icons.Default.BluetoothConnected to scheme.secondary
         AlertType.SENSOR_EXPIRY -> Icons.Default.Schedule to scheme.tertiary
         else -> Icons.Default.Notifications to scheme.primary
     }

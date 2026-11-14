@@ -9,6 +9,14 @@ import tk.glucodata.drivers.ottai.OttaiConstants
 import tk.glucodata.ui.components.CardPosition
 
 class OttaiSetupFlowTests {
+    @Test fun firmwareEntryNeedsAnAccountAndAddressButNeverRequiresBindingForCredentials() {
+        assertEquals(true, ottaiFirmwareEntryAvailable(true, true, true, false))
+        assertEquals(false, ottaiFirmwareEntryAvailable(false, true, true, false))
+        assertEquals(false, ottaiFirmwareEntryAvailable(true, false, true, false))
+        assertEquals(false, ottaiFirmwareEntryAvailable(true, true, false, false))
+        assertEquals(true, ottaiFirmwareEntryAvailable(false, false, false, true))
+    }
+
     @Test
     fun `stored session region follows its backend`() {
         assertEquals(OttaiRegion.CN, ottaiRegionForApiBase(OttaiConstants.API_BASE))
@@ -51,6 +59,50 @@ class OttaiSetupFlowTests {
             false,
             ottaiSetupPublishesManagedSensor(OttaiSetupConnectRoute.V3_CREDENTIAL_BOOTSTRAP),
         )
+    }
+
+    @Test
+    fun `V3 setup can use its saved BLE address without selecting the sensor again`() {
+        assertEquals("18:DC:12:80:82:10", ottaiSetupBleAddress("", "18:dc:12:80:82:10"))
+        assertEquals("18:DC:12:80:82:10", ottaiSetupBleAddress(null, null, "18:DC:12:80:82:10"))
+        assertEquals("AA:BB:CC:DD:EE:FF", ottaiSetupBleAddress("AA:BB:CC:DD:EE:FF", "18:DC:12:80:82:10"))
+        // Cloud IDs and box serials alone do not establish a BLE address.
+        assertNull(ottaiSetupBleAddress("18DC12808210", "OTT1234567"))
+    }
+
+    @Test
+    fun `a scanned or typed sensor ID is its BLE address`() {
+        // QR and typed IDs used to leave the address empty, so Connect on a fresh V3 sensor
+        // asked the user to pick the very sensor already listed above.
+        assertEquals("8C:73:DA:39:85:79", ottaiSensorIdBleAddress("8C73DA398579"))
+        assertEquals("8C:73:DA:39:85:79", ottaiSensorIdBleAddress("8c:73:da:39:85:79"))
+        assertEquals("8C:73:DA:39:85:79", ottaiSetupBleAddressOrder("", null, null, "8C73DA398579"))
+        // A nearby pick, then a saved (imported/draft or managed) address, win over the derived
+        // one: an Ottai address can change across activation.
+        assertEquals("AA:BB:CC:DD:EE:FF", ottaiSetupBleAddressOrder("AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66", null, "8C73DA398579"))
+        assertEquals("11:22:33:44:55:66", ottaiSetupBleAddressOrder("", "11:22:33:44:55:66", null, "8C73DA398579"))
+        assertEquals("11:22:33:44:55:66", ottaiSetupBleAddressOrder(null, "", "11:22:33:44:55:66", "8C73DA398579"))
+        assertNull(ottaiSetupBleAddressOrder("", null, null, "OTT1234567"))
+        assertNull(ottaiSensorIdBleAddress("OTT1234567"))
+        assertNull(ottaiSensorIdBleAddress(""))
+        assertNull(ottaiSensorIdBleAddress(null))
+    }
+
+    @Test
+    fun `transport failures read as an unreachable server, business refusals do not`() {
+        listOf(
+            OttaiCloudClient.CloudFailure("ota_exchange_http=200_biz=Error", "Error", 200),
+            OttaiCloudClient.CloudFailure("ota_exchange_crypto"),
+            OttaiCloudClient.CloudFailure("ota_response_cipher"),
+            OttaiCloudClient.CloudFailure("ota_request_response_json_http=502", httpStatus = 502),
+            OttaiCloudClient.CloudFailure("network: timeout"),
+            OttaiCloudClient.CloudFailure("http=503 biz=", httpStatus = 503),
+        ).forEach { assertEquals(it.text, true, it.isServerUnreachable) }
+        listOf(
+            OttaiCloudClient.CloudFailure("http=200 biz=AppDevice_AlreadyUsed", "AppDevice_AlreadyUsed", 200),
+            OttaiCloudClient.CloudFailure("ota_request_http=200_biz=Device_Auth_Error", "Device_Auth_Error", 200),
+            OttaiCloudClient.CloudFailure("http=404 biz=", httpStatus = 404),
+        ).forEach { assertEquals(it.text, false, it.isServerUnreachable) }
     }
 
     @Test

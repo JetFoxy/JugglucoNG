@@ -2,6 +2,9 @@
 
 package tk.glucodata.ui
 
+import tk.glucodata.ui.components.settingsSearchAnchor
+import tk.glucodata.ui.components.RevealSettingsSearchAnchor
+import androidx.compose.foundation.lazy.rememberLazyListState
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -78,11 +81,14 @@ import tk.glucodata.R
 import tk.glucodata.SensorBluetooth
 import tk.glucodata.SensorSourceResolver
 import tk.glucodata.share.DexcomShareSettings
+import tk.glucodata.share.lumiflex.LumiflexCloudSettings
 import tk.glucodata.alerts.SensorHandoverRuntime
 import tk.glucodata.data.calibration.CalibrationManager
 import tk.glucodata.data.ScheduledBackupSettings
 import tk.glucodata.data.ScheduledBackupWorker
 import tk.glucodata.drivers.ManagedSensorRuntime
+import tk.glucodata.drivers.nightscout.NightscoutFollowerRegistry
+import tk.glucodata.drivers.nightscout.NightscoutModePreference
 import tk.glucodata.ui.components.StyledSwitch
 import tk.glucodata.ui.theme.labelLargeExpressive
 import tk.glucodata.ui.viewmodel.DashboardViewModel
@@ -127,6 +133,9 @@ fun ExpressiveSettingsScreen(
         runCatching { DexcomShareSettings.isSetUp(context) }.getOrDefault(false) ||
             hasActiveDexcomSensor()
     }
+    val isRussianLanguage = LocalConfiguration.current.locales[0]?.language == "ru"
+    // A cloud follower has no local AiDex sensor to make this entry visible.
+    val showLumiflex = isRussianLanguage
     val showOttaiSettings = remember {
         SensorBluetooth.mygatts().any { callback ->
             (callback as? tk.glucodata.drivers.ottai.OttaiDriver)?.isUiEnabled() == true
@@ -194,7 +203,6 @@ fun ExpressiveSettingsScreen(
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
-    var showClearDataDialog by remember { mutableStateOf(false) }
     var showFactoryResetDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showScheduledBackupDialog by remember { mutableStateOf(false) }
@@ -218,9 +226,25 @@ fun ExpressiveSettingsScreen(
     val showAppTrend = PhoneAppsSettings.showsAppTrend(
         xdripEnabled, patchedLibreEnabled, glucodataBroadcastEnabled, broadcastComputedTrend, otherTrendConsumer
     )
+    // Read once per visit: the mode only changes on the Nightscout screen, and coming back
+    // from there composes this screen afresh.
+    val nightscoutUploadMode = remember(context) {
+        NightscoutModePreference.load(
+            context = context,
+            legacyUploaderActive = Natives.getuseuploader(),
+            legacyFollowerEnabled = NightscoutFollowerRegistry.loadConfig(context).enabled,
+        ) == NightscoutModePreference.Mode.UPLOAD
+    }
+    val journalQuickAddButton by viewModel.journalDashboardQuickAddButton.collectAsStateWithLifecycle()
+    // Like the Nightscout mode, these only change on their own screen: once per visit is enough.
+    val notificationChartEnabled by viewModel.notificationChartEnabled.collectAsStateWithLifecycle()
+    val notificationRows = remember(context) { SettingsSearchIndex.notificationRows(context) }
+    val hiddenRows = remember(context) { SettingsSearchIndex.hiddenRows(context) }
+    val doseHints by viewModel.stateDoseHintEnabled.collectAsStateWithLifecycle()
     val searchCandidates = remember(
         context, searchLocales, showLibreView, showDexcomShare, showMqAccount, showOttaiSettings,
-        showLibre2Identity, showAppTrend
+        showLibre2Identity, showAppTrend, nightscoutUploadMode, journalEnabled, journalQuickAddButton, showLumiflex,
+        notificationChartEnabled, doseHints
     ) {
         SettingsSearchIndex.resolve(context) { condition ->
             when (condition) {
@@ -231,11 +255,26 @@ fun ExpressiveSettingsScreen(
                 SettingsSearchCondition.HEALTH_CONNECT -> PhoneAppsSettings.healthConnectSupported
                 SettingsSearchCondition.LIBRE2_IDENTITY -> showLibre2Identity
                 SettingsSearchCondition.APP_TREND -> showAppTrend
+                SettingsSearchCondition.NIGHTSCOUT_UPLOAD -> nightscoutUploadMode
+                SettingsSearchCondition.NIGHTSCOUT_FOLLOW -> !nightscoutUploadMode
+                SettingsSearchCondition.JOURNAL_QUICK_ADD -> journalEnabled && journalQuickAddButton
+                SettingsSearchCondition.LUMIFLEX -> showLumiflex
+                SettingsSearchCondition.NOTIFICATION_CHART -> notificationChartEnabled || notificationRows.collapsedChart
+                SettingsSearchCondition.NOTIFICATION_IOB_COB -> notificationRows.iobOrCob
+                SettingsSearchCondition.NOTIFICATION_RISK -> notificationRows.iobOrCob && notificationRows.riskColored
+                SettingsSearchCondition.NOTIFICATION_FONT_WEIGHT -> android.os.Build.VERSION.SDK_INT >= 31
+                SettingsSearchCondition.RESTRICTED_BIOMETRICS -> hiddenRows.restrictedBiometrics
+                SettingsSearchCondition.DOSE_HINTS -> doseHints
+                SettingsSearchCondition.WATCH_FORWARDING_INTERVAL -> hiddenRows.watchForwardingInterval
+                SettingsSearchCondition.MIRROR_CONNECTIONS -> hiddenRows.mirrorConnections
+                SettingsSearchCondition.CLONE_CUSTOM_SERVER -> hiddenRows.customCloneServer
+                SettingsSearchCondition.CLONE_CUSTOM_RENDEZVOUS -> hiddenRows.customRendezvous
+                SettingsSearchCondition.APP_UPDATES_SUPPORTED -> hiddenRows.appUpdatesSupported
             }
         }
     }
     val searchResults = remember(searchQuery, searchCandidates) {
-        SettingsSearchMatcher.search(searchQuery, searchCandidates)
+        SettingsSearchMatcher.matches(searchQuery, searchCandidates)
     }
     BackHandler(enabled = searching) {
         searchQuery = ""
@@ -310,11 +349,27 @@ fun ExpressiveSettingsScreen(
         }
     )
 
-    fun openSearchResult(entry: SettingsSearchEntry) {
+    // Restricted mode: the tab opens to the switch to full mode and a few safe settings.
+    val restrictedState by tk.glucodata.RestrictedMode.state.collectAsStateWithLifecycle()
+    // Back to restricted with a full-mode dialog still open (the app came back after the
+    // grace): close it. Theme and language stay, as they are open while restricted too.
+    LaunchedEffect(restrictedState.locked) {
+        if (!restrictedState.locked) return@LaunchedEffect
+        showUnitDialog = false
+        showClearHistoryDialog = false
+        showFactoryResetDialog = false
+        showExportDialog = false
+        showScheduledBackupDialog = false
+        showSealGraceDialog = false
+        pendingSettingsImportUri = null
+        pendingExportPackageImportUri = null
+    }
+
+    fun openSearchResult(result: ResolvedSettingsSearchEntry) {
         focusManager.clearFocus()
-        when (val target = entry.target) {
+        when (val target = result.entry.target) {
             is SettingsSearchTarget.Route -> {
-                SettingsSearchReveal.request(entry.anchor)
+                SettingsSearchReveal.request(result.anchor)
                 navController.navigate(target.route)
             }
             is SettingsSearchTarget.Action -> when (target.action) {
@@ -327,7 +382,6 @@ fun ExpressiveSettingsScreen(
                 SettingsSearchAction.IMPORT -> importLauncher.launch(importMimeTypes)
                 SettingsSearchAction.RESTART -> context.findActivity()?.fullRestart()
                 SettingsSearchAction.CLEAR_HISTORY -> showClearHistoryDialog = true
-                SettingsSearchAction.CLEAR_APP_DATA -> showClearDataDialog = true
                 SettingsSearchAction.FACTORY_RESET -> showFactoryResetDialog = true
             }
         }
@@ -341,6 +395,30 @@ fun ExpressiveSettingsScreen(
     ) {
         item(key = "title") {
             TabScreenHeader(title = stringResource(R.string.settings))
+        }
+
+        if (restrictedState.locked) {
+            item(key = "restricted_full_mode") {
+                tk.glucodata.ui.restricted.RestrictedFullModeCard()
+            }
+            item(key = "restricted_allowed_label") {
+                SectionLabel(stringResource(R.string.restricted_section_available))
+            }
+            item(key = "restricted_allowed_group") {
+                tk.glucodata.ui.restricted.RestrictedAllowedSettings(
+                    config = restrictedState.config,
+                    themeIcon = if (themeMode == ThemeMode.LIGHT) Icons.Default.LightMode else Icons.Default.DarkMode,
+                    themeLabel = themeLabel,
+                    languageLabel = currentLangName,
+                    alertsEnabled = alertsMasterEnabled,
+                    floatingAllowed = floatingOverlayAllowed,
+                    lockScreenEnabled = aodServiceEnabled,
+                    onTheme = { showThemeDialog = true },
+                    onLanguage = { showLanguageDialog = true },
+                    onOpen = { route -> navController.navigate(route) },
+                )
+            }
+            return@LazyColumn
         }
 
         item(key = "search") {
@@ -584,6 +662,16 @@ fun ExpressiveSettingsScreen(
                         onClick = { navController.navigate("settings/dexcom-share") }
                     )
                 }
+                if (showLumiflex) {
+                    SettingsItem(
+                        title = stringResource(R.string.lumiflex_cloud_title),
+                        subtitle = stringResource(R.string.lumiflex_cloud_subtitle),
+                        icon = Icons.Default.CloudUpload,
+                        iconTint = sharingColor,
+                        position = CardPosition.MIDDLE,
+                        onClick = { navController.navigate("settings/lumiflex") }
+                    )
+                }
                 if (showMqAccount) {
                     SettingsItem(
                         title = stringResource(R.string.mq_account_title),
@@ -709,6 +797,7 @@ fun ExpressiveSettingsScreen(
 
         item(key = "advanced_group") {
             val advancedColor = MaterialTheme.colorScheme.onSurfaceVariant
+            val restrictedMode by tk.glucodata.RestrictedMode.state.collectAsStateWithLifecycle()
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SettingsItem(
                     title = stringResource(R.string.debug_logs),
@@ -754,7 +843,19 @@ fun ExpressiveSettingsScreen(
                     onClick = { showSealGraceDialog = true },
                     icon = Icons.Default.Lock,
                     iconTint = advancedColor,
-                    position = CardPosition.BOTTOM
+                    position = CardPosition.MIDDLE
+                )
+                SettingsNavSwitchItem(
+                    title = stringResource(R.string.restricted_mode_title),
+                    subtitle = stringResource(R.string.restricted_mode_desc),
+                    checked = restrictedMode.config.enabled,
+                    onCheckedChange = { on ->
+                        tk.glucodata.RestrictedMode.update(context) { it.copy(enabled = on) }
+                    },
+                    onClick = { navController.navigate("settings/restricted-mode") },
+                    icon = Icons.Default.ChildCare,
+                    iconTint = advancedColor,
+                    position = CardPosition.BOTTOM,
                 )
             }
         }
@@ -774,19 +875,11 @@ fun ExpressiveSettingsScreen(
                 )
                 DangerItem(
                     title = stringResource(R.string.clear_history),
-                    subtitle = stringResource(R.string.clear_history_desc_short),
+                    subtitle = stringResource(R.string.clear_history_desc),
                     icon = Icons.Filled.History,
                     position = CardPosition.MIDDLE,
-                    severity = DangerSeverity.LOW,
-                    onClick = { showClearHistoryDialog = true }
-                )
-                DangerItem(
-                    title = stringResource(R.string.clear_app_data),
-                    subtitle = stringResource(R.string.clear_app_data_desc),
-                    icon = Icons.Filled.Delete,
-                    position = CardPosition.MIDDLE,
                     severity = DangerSeverity.MEDIUM,
-                    onClick = { showClearDataDialog = true }
+                    onClick = { showClearHistoryDialog = true }
                 )
                 DangerItem(
                     title = stringResource(R.string.factory_reset),
@@ -838,35 +931,36 @@ fun ExpressiveSettingsScreen(
     }, { showUnitDialog = false })
     if (showThemeDialog) ThemePickerDialog(themeMode, { onThemeChanged(it); showThemeDialog = false }, { showThemeDialog = false })
     if (showLanguageDialog) LanguagePickerDialog { showLanguageDialog = false }
-    if (showClearHistoryDialog) ConfirmActionDialog(stringResource(R.string.clean_history_confirm), stringResource(R.string.clear_history_desc_long), Icons.Filled.History, { scope.launch { tk.glucodata.data.DataManagement.clearHistory() }; showClearHistoryDialog = false }, { showClearHistoryDialog = false })
-    if (showClearDataDialog) ConfirmActionDialog(
-        stringResource(R.string.clean_data_confirm), 
-        stringResource(R.string.clear_app_data_desc), 
-        Icons.Filled.Delete, 
-        { 
-            scope.launch { 
-                tk.glucodata.data.DataManagement.clearAppData()
-                // Full restart to kill process and clear native memory
-                context.findActivity()?.fullRestart()
+    if (showClearHistoryDialog) ClearHistoryDialog(
+        onConfirm = { clearScope ->
+            showClearHistoryDialog = false
+            scope.launch {
+                val cleared = tk.glucodata.data.DataManagement.clearHistory(clearScope)
+                Toast.makeText(
+                    context,
+                    if (cleared) R.string.clear_history_done else R.string.clear_history_failed,
+                    Toast.LENGTH_LONG
+                ).show()
             }
-            showClearDataDialog = false 
-        }, 
-        { showClearDataDialog = false }, 
-        isDestructive = true
+        },
+        onDismiss = { showClearHistoryDialog = false }
     )
     if (showFactoryResetDialog) ConfirmActionDialog(
-        stringResource(R.string.factory_reset_confirm), 
-        stringResource(R.string.factory_reset_alert), 
-        Icons.Filled.Warning, 
-        { 
-            scope.launch { 
-                tk.glucodata.data.DataManagement.factoryReset()
-                // Full restart to kill process and clear native memory
-                context.findActivity()?.fullRestart()
+        stringResource(R.string.factory_reset_confirm),
+        stringResource(R.string.factory_reset_message),
+        Icons.Filled.Warning,
+        {
+            showFactoryResetDialog = false
+            scope.launch {
+                // On success the system ends this process, so nothing below runs.
+                if (!tk.glucodata.data.DataManagement.factoryReset()) {
+                    Toast.makeText(context, R.string.factory_reset_failed, Toast.LENGTH_LONG).show()
+                }
             }
-        }, 
-        { showFactoryResetDialog = false }, 
-        isDestructive = true
+        },
+        { showFactoryResetDialog = false },
+        isDestructive = true,
+        confirmLabel = stringResource(R.string.factory_reset_action)
     )
     
     if (showExportDialog) {
@@ -943,10 +1037,7 @@ fun ExpressiveSettingsScreen(
                                 Toast.LENGTH_LONG
                             ).show()
                             if (summary.historyReadings > 0) {
-                                // Pin the imported serial for display (when idle) so the
-                                // dashboard chart shows the imported glucose. Persisted, so
-                                // it survives the restart below.
-                                viewModel.onHistoryImported(summary.historyDisplaySerial)
+                                viewModel.onHistoryImported()
                             } else {
                                 viewModel.refreshData()
                             }
@@ -1007,7 +1098,19 @@ fun PredictiveSimulationSettingsScreen(
             )
         }
     ) { padding ->
+        val listState = rememberLazyListState()
+        RevealSettingsSearchAnchor(
+            listState,
+            setOf(
+                SettingsSearchAnchors.PREDICTION_MOMENTUM,
+                SettingsSearchAnchors.PREDICTION_NOTIFICATION_CHART,
+                SettingsSearchAnchors.PREDICTION_HORIZON,
+                SettingsSearchAnchors.PREDICTION_RECORD,
+                SettingsSearchAnchors.PREDICTION_ADAPTIVE,
+            )
+        )
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -1032,7 +1135,8 @@ fun PredictiveSimulationSettingsScreen(
                         checked = trendMomentumEnabled,
                         onCheckedChange = { viewModel.setPredictionTrendMomentumEnabled(it) },
                         position = CardPosition.TOP,
-                        enabled = predictiveSimulationEnabled
+                        enabled = predictiveSimulationEnabled,
+                        searchAnchor = SettingsSearchAnchors.PREDICTION_MOMENTUM
                     )
                     SettingsSwitchItem(
                         title = stringResource(R.string.predictive_notification_chart),
@@ -1040,13 +1144,17 @@ fun PredictiveSimulationSettingsScreen(
                         checked = notificationChartPredictionEnabled,
                         onCheckedChange = { viewModel.setPredictiveSimulationNotificationChartEnabled(it) },
                         position = CardPosition.BOTTOM,
-                        enabled = predictiveSimulationEnabled
+                        enabled = predictiveSimulationEnabled,
+                        searchAnchor = SettingsSearchAnchors.PREDICTION_NOTIFICATION_CHART
                     )
                 }
             }
 
             item(key = "horizon") {
-                PredictiveSimulationSettingsCard(enabled = predictiveSimulationEnabled) {
+                PredictiveSimulationSettingsCard(
+                    enabled = predictiveSimulationEnabled,
+                    searchAnchor = SettingsSearchAnchors.PREDICTION_HORIZON,
+                ) {
                     PredictiveSimulationParameterRow(
                         title = stringResource(R.string.predictive_forecast_horizon),
                         valueLabel = stringResource(R.string.predictive_horizon_value, horizonMinutes),
@@ -1121,6 +1229,7 @@ internal fun PredictionAnalysisSettingsGroup(
                 icon = Icons.Default.History,
                 iconTint = MaterialTheme.colorScheme.secondary,
                 position = CardPosition.TOP,
+                searchAnchor = SettingsSearchAnchors.PREDICTION_RECORD,
             )
             SettingsItem(
                 title = stringResource(R.string.prediction_analysis_accuracy),
@@ -1149,6 +1258,7 @@ internal fun PredictionAnalysisSettingsGroup(
                 iconTint = MaterialTheme.colorScheme.tertiary,
                 position = CardPosition.BOTTOM,
                 enabled = predictionEnabled,
+                searchAnchor = SettingsSearchAnchors.PREDICTION_ADAPTIVE,
             )
         }
         Text(
@@ -1181,11 +1291,13 @@ private fun predictionAccuracySummary(
 @Composable
 private fun PredictiveSimulationSettingsCard(
     enabled: Boolean,
+    searchAnchor: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .settingsSearchAnchor(searchAnchor, cardShape(CardPosition.SINGLE))
             .alpha(if (enabled) 1f else 0.66f),
         shape = cardShape(CardPosition.SINGLE),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -1209,24 +1321,10 @@ internal fun PredictiveSimulationParameterRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (enabled) 1f else 0.5f)
-            .padding(vertical = 8.dp)
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(SliderHeaderGap)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = valueLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        SliderHeader(label = title, value = valueLabel, enabled = enabled)
         Slider(
             value = value.coerceIn(valueRange.start, valueRange.endInclusive),
             onValueChange = onValueChange,
@@ -1592,7 +1690,8 @@ private fun ConfirmActionDialog(
     icon: ImageVector,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    isDestructive: Boolean = false
+    isDestructive: Boolean = false,
+    confirmLabel: String? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1605,7 +1704,7 @@ private fun ConfirmActionDialog(
                 colors = if (isDestructive) ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.textButtonColors(),
                 shapes = ButtonDefaults.shapes(),
                 contentPadding = ButtonDefaults.TextButtonContentPadding
-            ) { Text(if (isDestructive) stringResource(R.string.delete) else stringResource(R.string.ok)) }
+            ) { Text(confirmLabel ?: if (isDestructive) stringResource(R.string.delete) else stringResource(R.string.ok)) }
         },
         dismissButton = { TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes(), contentPadding = ButtonDefaults.TextButtonContentPadding) { Text(stringResource(R.string.cancel)) } }
     )
@@ -1652,3 +1751,10 @@ private val importMimeTypes = arrayOf(
     "text/tab-separated-values",
     "*/*"
 )
+
+private fun hasActiveAiDexSensor(): Boolean = runCatching {
+    Natives.activeSensors()?.filterNotNull().orEmpty().any { sensorId ->
+        SensorSourceResolver.resolveSensorKind(sensorId, SensorSourceResolver.SENSOR_KIND_UNKNOWN) ==
+            SensorSourceResolver.SENSOR_KIND_AIDEX
+    }
+}.getOrDefault(false)

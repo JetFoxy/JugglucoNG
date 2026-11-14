@@ -460,6 +460,9 @@ public class Natives {
 
         public static native void wakehereonly();
 
+        /** A new reading for Clone, without reconnecting; see wakebackup() for that. */
+        public static native void wakestreamonly();
+
         public static native void resetbackuphost(int pos);
 
         public static native void deletebackuphost(int pos);
@@ -770,6 +773,15 @@ public class Natives {
          */
         public static native int addGlucoseStreamBatchWithRawTemp(long[] times, float[] glucoses, float[] raws, float[] temperatures, String sensorId);
 
+        /** Import managed Wear history. Local/unknown populated records retain their
+         * origin and occupied samples even while disconnected. Proven peer-only records
+         * retain ordinary import behavior. The provenance check and import are atomic
+         * with local writes; localOwner also forces gap-only import during warm-up. */
+        public static native int importWearGlucoseStreamBatchWithRawTemp(long[] times, float[] glucoses, float[] raws, float[] temperatures, String sensorId, boolean localOwner);
+
+        /** Stores an upstream final primary with persisted per-reading provenance. */
+        public static native int addResolvedGlucoseStreamBatchWithRawTemp(long[] times, float[] glucoses, float[] raws, float[] temperatures, String sensorId);
+
         public static native long ensureSensorShell(String sensorId, long startTimeSec);
 
         public static native long ensureSensorShellWithCapacity(String sensorId, long startTimeSec, int minimumRecords);
@@ -780,6 +792,8 @@ public class Natives {
         /** ManagedSensorUiFamily.nativeCode; 0 clears. Travels in info.dat, so a Clone receiver sees it. */
         public static native void setSensorManagedFamily(String sensorId, int code);
         public static native int getSensorManagedFamily(long dataptr);
+        /** Updates an existing native record without allocating a BLE stream pointer. */
+        public static native boolean setSensorViewMode(String sensorId, int mode);
 
         public static native boolean hasSensorStreamCapacity(String sensorId, int minimumRecords);
 
@@ -1045,8 +1059,15 @@ public class Natives {
         public static native boolean removeSensorById(String sensorId);
 
         public static native boolean finishSensorById(String sensorId);
+        /** Why activeSensors leaves this sensor out ("listed" when it does not). */
+        public static native String activeSensorReason(String sensorId);
+        /** True when every native slot of this id is finished or removed; false for an id native does not know. */
+        public static native boolean sensorFinishedById(String sensorId);
 
         public static native void unfinishSensor(long dataptr);
+
+        /** Reactivates every native slot of this id, including one removed by the user; false for an unknown id. */
+        public static native boolean unfinishSensorById(String sensorId);
 
         public static native long manualLibreAccountIDnumber();
 
@@ -1193,6 +1214,11 @@ public class Natives {
         public static native void setLibreIsViewed(boolean val);
 
         public static native boolean getLibreIsViewed();
+
+        /** LibreView: stop uploading a Libre 2 sensor's readings at its official end. */
+        public static native void setLibreOfficialEnd(boolean val);
+
+        public static native boolean getLibreOfficialEnd();
 
         public static native void setRTL(boolean val);
 
@@ -1359,6 +1385,9 @@ public class Natives {
 
         public static native byte[] getDexbackfillcmd(long dataptr);
 
+        /** {last reading received without a gap before it, newest reading}, as stream indices. */
+        public static native int[] dexBackfillState(long dataptr);
+
         public static native boolean dexbackfill(long dataptr, byte[] bluetoothdata);
 
         public static native byte[] makeRound3bytes(long dataptr);
@@ -1368,6 +1397,10 @@ public class Natives {
         public static native boolean isAuthenticated(long dataptr);
 
         public static native String dexPairingCode(long dataptr);
+        /** The scan a Dexcom record was set up from, for replaying on the watch. */
+        public static native String dexScanPayload(long dataptr);
+        public static native long[] dexPeerAnchor(long dataptr);
+        public static native String addDexcomScanFromPeer(String scan, long[] anchor);
 
         public static native int getDexCertSize(byte[] ar);
 

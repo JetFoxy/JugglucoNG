@@ -511,7 +511,8 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
         val startT = endT - 3 * 60 * 60 * 1000L
         val isMmol = Applic.unit == 1
         val activeSensorSerial = NotificationHistorySource.resolveSensorSerial(
-            SuperGattCallback.previousglucosesensorid ?: Natives.lastsensorname()
+            tk.glucodata.SensorIdentity.resolveMainSensor()
+                ?.let { main -> SuperGattCallback.previousglucosesensorid ?: main }
         )
 
         var chartPoints: List<GlucosePoint>
@@ -645,6 +646,15 @@ class AODOverlayService : AccessibilityService(), SensorEventListener {
                 textScale * arrowScale
             )
             arrowImg?.setImageBitmap(arrowBitmap)
+            // Space before the arrow follows the value's size (a fixed 8dp shrank to a
+            // sliver at large AOD text): the same em as inline arrows.
+            (arrowImg?.layoutParams as? android.view.ViewGroup.MarginLayoutParams)?.let { lp ->
+                val gap = Math.round(textBitmap.height * 22f / 28f * NotificationChartDrawer.ARROW_GAP_EM)
+                if (lp.marginStart != gap) {
+                    lp.marginStart = gap
+                    arrowImg.layoutParams = lp
+                }
+            }
             arrowImg?.visibility = View.VISIBLE
         } else {
             arrowImg?.visibility = View.GONE

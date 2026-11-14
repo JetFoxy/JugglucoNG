@@ -31,7 +31,6 @@ import tk.glucodata.DataSmoothing
 import tk.glucodata.MultiSensorSelection
 import tk.glucodata.Notify
 import tk.glucodata.SensorBluetooth
-import tk.glucodata.ManagedCurrentSensor
 import tk.glucodata.SensorIdentity
 import tk.glucodata.data.GlucoseRepository
 import tk.glucodata.data.HistorySync
@@ -180,8 +179,10 @@ class DashboardViewModel(
         const val DASHBOARD_PEER_HISTORY_WINDOW_MS = 72L * 60L * 60L * 1000L
         const val JOURNAL_DOSE_CALCULATOR_KEY = "dashboard_journal_dose_calculator_enabled"
         const val JOURNAL_NAVIGATION_TAB_KEY = "dashboard_journal_navigation_tab_enabled"
+        const val SENSOR_SETUP_SKIPPED_KEY = "dashboard_sensor_setup_skipped"
         const val JOURNAL_FOOD_MACROS_KEY = "dashboard_journal_food_macros_enabled"
         const val JOURNAL_FOOD_LIBRARY_KEY = "dashboard_journal_food_library_enabled"
+        const val JOURNAL_FOOD_ONLINE_KEY = "dashboard_journal_food_online_enabled"
         const val JOURNAL_EIOB_DISPLAY_KEY = "dashboard_journal_eiob_display_enabled"
         const val JOURNAL_QUICKADD_ALWAYS_NOW_KEY = "dashboard_journal_quickadd_always_now"
         const val JOURNAL_DASHBOARD_QUICKADD_KEY = "dashboard_journal_quickadd_button"
@@ -432,6 +433,15 @@ class DashboardViewModel(
     private val _journalNavigationTabEnabled = MutableStateFlow(false)
     val journalNavigationTabEnabled = _journalNavigationTabEnabled.asStateFlow()
 
+    // Read here rather than with the other settings: the first frame decides between the
+    // first-run screen and the dashboard, so a later read would flash the wrong one.
+    private val _sensorSetupSkipped = MutableStateFlow(
+        tk.glucodata.Applic.app
+            .getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+            .getBoolean(SENSOR_SETUP_SKIPPED_KEY, false)
+    )
+    val sensorSetupSkipped = _sensorSetupSkipped.asStateFlow()
+
     private val _journalDashboardHiddenTypes = MutableStateFlow<Set<JournalEntryType>>(emptySet())
     val journalDashboardHiddenTypes = _journalDashboardHiddenTypes.asStateFlow()
 
@@ -467,6 +477,10 @@ class DashboardViewModel(
 
     private val _journalFoodLibraryEnabled = MutableStateFlow(true)
     val journalFoodLibraryEnabled = _journalFoodLibraryEnabled.asStateFlow()
+
+    /** Whether the food search offers Open Food Facts and the barcode scanner. */
+    private val _journalFoodOnlineEnabled = MutableStateFlow(true)
+    val journalFoodOnlineEnabled = _journalFoodOnlineEnabled.asStateFlow()
 
     private val _journalEiobDisplayEnabled = MutableStateFlow(true)
     val journalEiobDisplayEnabled = _journalEiobDisplayEnabled.asStateFlow()
@@ -815,19 +829,12 @@ class DashboardViewModel(
 
     /**
      * Call after a glucose history import so the dashboard chart shows the
-     * imported readings. Only pins the imported serial as the display sensor
-     * when there is no current/live sensor to show — never hijacks a live
-     * sensor. [displaySerial] may be a synthetic "imported" id for files
-     * without a sensor serial.
+     * imported readings. An imported file is not a sensor, so nothing is selected:
+     * with no main sensor the chart already shows every stored reading.
      */
-    fun onHistoryImported(displaySerial: String?) {
+    fun onHistoryImported() {
         val currentSerial = SensorIdentity.resolveMainSensor()?.takeIf { it.isNotBlank() }
         if (currentSerial == null) {
-            // No live sensor: pin the imported serial so the dashboard shows it.
-            if (!displaySerial.isNullOrBlank()) {
-                ManagedCurrentSensor.set(displaySerial)
-                glucoseRepository.refreshSensorSerial(displaySerial)
-            }
             refreshData()
         } else {
             // Sensor already present: fold overlapping imported data into it now,
@@ -877,6 +884,7 @@ class DashboardViewModel(
             )
         _journalFoodMacrosEnabled.value = prefs.getBoolean(JOURNAL_FOOD_MACROS_KEY, false)
         _journalFoodLibraryEnabled.value = prefs.getBoolean(JOURNAL_FOOD_LIBRARY_KEY, true)
+        _journalFoodOnlineEnabled.value = prefs.getBoolean(JOURNAL_FOOD_ONLINE_KEY, true)
         _journalEiobDisplayEnabled.value = prefs.getBoolean(JOURNAL_EIOB_DISPLAY_KEY, true)
         _journalQuickAddAlwaysNow.value = prefs.getBoolean(JOURNAL_QUICKADD_ALWAYS_NOW_KEY, false)
         _journalDashboardQuickAddButton.value = prefs.getBoolean(JOURNAL_DASHBOARD_QUICKADD_KEY, false)
@@ -956,20 +964,10 @@ class DashboardViewModel(
     }
 
     private fun refreshSensorSnapshot() {
+        // Never fall back to the name cached here: that is how a removed sensor stayed on the
+        // dashboard. The resolver already keeps every sensor that is still in use.
         var sName = SensorIdentity.resolveMainSensor()
         val activeSensors = Natives.activeSensors()
-
-        val cachedSerial = _sensorName.value.takeIf { it.isNotBlank() }
-            ?: glucoseRepository.currentSerial.value.takeIf { it.isNotBlank() }
-        val fallbackSerial = SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = sName,
-            preferredSensorId = cachedSerial,
-            activeSensors = activeSensors
-        ) ?: cachedSerial
-
-        if (sName.isNullOrBlank()) {
-            sName = fallbackSerial
-        }
 
         val availableDisplaySensors = availableDisplaySensorIds(activeSensors, sName)
         val selectedDisplaySensors = MultiSensorSelection.selectedAvailable(
@@ -1071,6 +1069,7 @@ class DashboardViewModel(
                 _currentDay.value = lifecycle.currentDay
             }
         } else {
+            glucoseRepository.refreshSensorSerial()
             _sensorName.value = ""
             _sensorStatus.value = ""
             _viewMode.value = 0
@@ -1799,6 +1798,17 @@ class DashboardViewModel(
         _journalNavigationTabEnabled.value = enabled
     }
 
+    /** Leave the first-run screen for the regular app. Without a sensor, the journal is the app. */
+    fun skipSensorSetup() {
+        val context = tk.glucodata.Applic.app
+        val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(SENSOR_SETUP_SKIPPED_KEY, true).apply()
+        _sensorSetupSkipped.value = true
+        setJournalEnabled(true)
+        setJournalNavigationTabEnabled(true)
+        setJournalDashboardQuickAddButton(true)
+    }
+
     fun setJournalTypeShownOnDashboard(type: JournalEntryType, visible: Boolean) {
         val hidden = JournalDashboardVisibility.toggled(_journalDashboardHiddenTypes.value, type, visible)
         val context = tk.glucodata.Applic.app
@@ -1859,6 +1869,13 @@ class DashboardViewModel(
         val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
         prefs.edit().putBoolean(JOURNAL_FOOD_LIBRARY_KEY, enabled).apply()
         _journalFoodLibraryEnabled.value = enabled
+    }
+
+    fun setJournalFoodOnlineEnabled(enabled: Boolean) {
+        val context = tk.glucodata.Applic.app
+        val prefs = context.getSharedPreferences("tk.glucodata_preferences", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(JOURNAL_FOOD_ONLINE_KEY, enabled).apply()
+        _journalFoodOnlineEnabled.value = enabled
     }
 
     fun setJournalEiobDisplayEnabled(enabled: Boolean) {
@@ -2173,9 +2190,31 @@ class DashboardViewModel(
         }
     }
 
+    fun keepJournalFood(food: tk.glucodata.data.food.FoodItem, onSaved: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                journalRepository.keepFood(food)
+                onSaved(true)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                tk.glucodata.Log.stack("FoodLibrary", "save", failure)
+                onSaved(false)
+            }
+        }
+    }
+
     fun saveJournalFood(input: JournalFoodInput) {
         viewModelScope.launch {
             journalRepository.upsertFood(input)
+        }
+    }
+
+    /** Adds [foods] to the library; [onDone] gets how many were new and how many replaced a food. */
+    fun importJournalFoods(foods: List<JournalFoodInput>, onDone: (added: Int, replaced: Int) -> Unit) {
+        viewModelScope.launch {
+            val (added, replaced) = journalRepository.importFoods(foods)
+            onDone(added, replaced)
         }
     }
 
@@ -2183,6 +2222,31 @@ class DashboardViewModel(
         viewModelScope.launch {
             journalRepository.deleteFood(foodId)
         }
+    }
+
+    fun deleteJournalFoods(ids: Set<Long>, onDone: (Result<tk.glucodata.data.food.DeletedFoods>) -> Unit) {
+        viewModelScope.launch { onDone(foodLibraryAction { journalRepository.deleteFoods(ids) }) }
+    }
+
+    fun undoDeleteJournalFoods(deleted: tk.glucodata.data.food.DeletedFoods, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(foodLibraryAction { journalRepository.undoDeleteFoods(deleted) }.isSuccess) }
+    }
+
+    fun setJournalFoodsArchived(ids: Set<Long>, archived: Boolean, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(foodLibraryAction { journalRepository.setFoodsArchived(ids, archived) }.isSuccess) }
+    }
+
+    fun moveJournalFoodsBefore(ids: Set<Long>, beforeId: Long?, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(foodLibraryAction { journalRepository.moveFoodsBefore(ids, beforeId) }.isSuccess) }
+    }
+
+    private suspend fun <T> foodLibraryAction(block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        tk.glucodata.Log.stack("FoodLibrary", "manage", failure)
+        Result.failure(failure)
     }
 
     // Floating Glucose Logic
@@ -2299,23 +2363,8 @@ class DashboardViewModel(
         )
     }
 
-    private fun preferredDashboardSensorId(): String? {
-        val nativeCurrent = SensorIdentity.resolveMainSensor()
-            ?.takeIf { it.isNotBlank() }
-        if (nativeCurrent != null) {
-            return nativeCurrent
-        }
-        val cachedSerial = _sensorName.value.takeIf { it.isNotBlank() }
-            ?: glucoseRepository.currentSerial.value.takeIf { it.isNotBlank() }
-        if (!cachedSerial.isNullOrBlank()) {
-            return cachedSerial
-        }
-        return SensorIdentity.resolveAvailableMainSensor(
-            selectedMain = nativeCurrent,
-            preferredSensorId = null,
-            activeSensors = Natives.activeSensors()
-        )
-    }
+    private fun preferredDashboardSensorId(): String? =
+        SensorIdentity.resolveMainSensor()?.takeIf { it.isNotBlank() }
 
     private fun Float.roundToStep(step: Float): Float {
         if (!isFinite() || step <= 0f) return this

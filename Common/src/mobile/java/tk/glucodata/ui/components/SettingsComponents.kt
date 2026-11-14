@@ -24,10 +24,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -83,7 +85,7 @@ fun ExpandableSettingsCard(
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = title, style = MaterialTheme.typography.titleMedium)
-                        Text(
+                        if (summary.isNotBlank()) Text(
                             modifier = Modifier.padding(top = 2.dp),
                             text = summary,
                             style = MaterialTheme.typography.bodyMedium,
@@ -131,11 +133,12 @@ fun DisclosingSwitchCard(
     position: CardPosition,
     iconTint: Color? = null,
     enabled: Boolean = true,
+    searchAnchor: String? = null,
     content: @Composable () -> Unit,
 ) {
     val tint = iconTint ?: MaterialTheme.colorScheme.primary
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().settingsSearchAnchor(searchAnchor, cardShape(position)),
         shape = cardShape(position),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
@@ -251,6 +254,34 @@ fun SettingsItem(
     onClick: (() -> Unit)? = null,
     icon: ImageVector? = null,
     iconTint: Color? = null, // Added tint
+    trailingContent: (@Composable () -> Unit)? = null,
+    position: CardPosition = CardPosition.SINGLE,
+    animatePosition: Boolean = false,
+    modifier: Modifier = Modifier,
+    subtitleStyle: TextStyle? = null,
+    searchAnchor: String? = null,
+) = SettingsItem(
+    title = AnnotatedString(title),
+    subtitle = subtitle?.let(::AnnotatedString),
+    onClick = onClick,
+    icon = icon,
+    iconTint = iconTint,
+    trailingContent = trailingContent,
+    position = position,
+    animatePosition = animatePosition,
+    modifier = modifier,
+    subtitleStyle = subtitleStyle,
+    searchAnchor = searchAnchor,
+)
+
+/** The same row with styled text, for a search result that marks the words it matched. */
+@Composable
+fun SettingsItem(
+    title: AnnotatedString,
+    subtitle: AnnotatedString?,
+    onClick: (() -> Unit)? = null,
+    icon: ImageVector? = null,
+    iconTint: Color? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     position: CardPosition = CardPosition.SINGLE,
     animatePosition: Boolean = false,
@@ -471,85 +502,6 @@ fun MasterSwitchCard(
     }
 }
 
-@Composable
-fun AlarmItem(
-    title: String,
-    enabled: Boolean,
-    value: Float,
-    unit: String,
-    range: ClosedFloatingPointRange<Float>,
-    soundMode: Int,
-    onToggle: (Boolean) -> Unit,
-    onValueChange: (Float) -> Unit,
-    onSoundChange: (Int) -> Unit,
-    position: CardPosition = CardPosition.SINGLE
-) {
-    var sliderValue by remember(value) { mutableFloatStateOf(value) }
-    val displayValue = if (sliderValue < 30) String.format("%.1f", sliderValue) else sliderValue.toInt().toString()
-
-    Surface(
-        onClick = { onToggle(!enabled) },
-        modifier = Modifier.fillMaxWidth(),
-        shape = cardShape(position),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            AdaptiveTrailingRow(
-                trailingContent = {
-                    StyledSwitch(
-                        checked = enabled,
-                        onCheckedChange = null
-                    )
-                }
-            ) {
-                Column {
-                    Text(title, style = MaterialTheme.typography.bodyLarge)
-                    if (enabled) {
-                        Text("$displayValue $unit", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-
-            // Expandable content
-            AnimatedVisibility(visible = enabled) {
-                Column {
-                    Spacer(Modifier.height(16.dp))
-                    Slider(
-                        value = sliderValue,
-                        onValueChange = { sliderValue = it },
-                        onValueChangeFinished = { onValueChange(sliderValue) },
-                        valueRange = range
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.alert_mode), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = soundMode == 0,
-                            onClick = { onSoundChange(0) },
-                            label = { Text(stringResource(R.string.vibrate_only)) },
-                            leadingIcon = { if(soundMode == 0) Icon(Icons.Filled.Check, null) },
-                            shapes = FilterChipDefaults.shapes(),
-                            colors = FilterChipDefaults.filterChipColors()
-                        )
-                        FilterChip(
-                            selected = soundMode == 1,
-                            onClick = { onSoundChange(1) },
-                            label = { Text(stringResource(R.string.sound_vibrate)) },
-                            leadingIcon = { if(soundMode == 1) Icon(Icons.Filled.Check, null) },
-                            shapes = FilterChipDefaults.shapes(),
-                            colors = FilterChipDefaults.filterChipColors()
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 /**
  * The controls of one settings section that are not list rows (choices, sliders), together
  * in one card of the section's group: each a label over its control, at the rows' 16dp
@@ -579,21 +531,38 @@ fun SettingsControlsCard(
     }
 }
 
+// A control inside a [SettingsControlsCard] sits in the card's 16dp padding; its search
+// mark grows into half of it, so it frames the control without touching the card edge.
+private val SearchAnchorInCardShape = RoundedCornerShape(12.dp)
+private val SearchAnchorInCardOutset = 8.dp
+
 /**
- * A slider in a [SettingsControlsCard]. The title carries the value ("Font size: 100%"),
- * so the track draws no tick per step: at 10-50 steps they are a row of dots.
+ * A slider in a [SettingsControlsCard], under a [SliderHeader]: [title] at the start,
+ * [valueText] at the end. The header shows the value, so the track draws no tick per step:
+ * at 10-50 steps they are a row of dots.
  */
 @Composable
 fun SettingsSlider(
     title: String,
+    valueText: String,
     value: Float,
     onValueChange: (Float) -> Unit,
     range: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
     modifier: Modifier = Modifier,
+    searchAnchor: String? = null,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+    Column(
+    modifier = modifier
+        .fillMaxWidth()
+        .settingsSearchAnchor(
+            searchAnchor,
+            SearchAnchorInCardShape,
+            outset = SearchAnchorInCardOutset
+        ),
+    verticalArrangement = Arrangement.spacedBy(SliderHeaderGap)
+    ) {
+    SliderHeader(label = title, value = valueText)
         Slider(
             value = value,
             onValueChange = onValueChange,
@@ -626,10 +595,14 @@ fun <T> SettingsChoice(
     modifier: Modifier = Modifier,
     maxItemsPerRow: Int = Int.MAX_VALUE,
     titleTrailingContent: (@Composable () -> Unit)? = null,
+    searchAnchor: String? = null,
 ) {
     // The bottom padding matches the room a slider leaves under its track.
     Column(
-        modifier = modifier.fillMaxWidth().padding(bottom = 12.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .settingsSearchAnchor(searchAnchor, SearchAnchorInCardShape, outset = SearchAnchorInCardOutset)
+            .padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (titleTrailingContent == null) {
@@ -675,22 +648,28 @@ fun DangerItem(
     position: CardPosition = CardPosition.SINGLE,
     severity: DangerSeverity = DangerSeverity.HIGH
 ) {
-    val (bgColor, contentColor) = when (severity) {
-        DangerSeverity.LOW -> MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurface
-        DangerSeverity.MEDIUM -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
-        DangerSeverity.HIGH -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+    val colors = MaterialTheme.colorScheme
+    // Retain a visible risk hierarchy without the full-strength container fills.
+    val containerColor = when (severity) {
+        DangerSeverity.LOW -> colors.surfaceContainerHigh
+        DangerSeverity.MEDIUM -> colors.tertiaryContainer.copy(alpha = 0.16f)
+            .compositeOver(colors.surfaceContainerHigh)
+        DangerSeverity.HIGH -> colors.errorContainer.copy(alpha = 0.40f)
+            .compositeOver(colors.surfaceContainerHigh)
     }
-    val iconBgColor = when (severity) {
-        DangerSeverity.LOW -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        DangerSeverity.MEDIUM -> contentColor.copy(alpha = 0.12f)
-        DangerSeverity.HIGH -> contentColor.copy(alpha = 0.12f)
+    val titleColor = if (severity == DangerSeverity.HIGH) colors.onErrorContainer else colors.onSurface
+    val subtitleColor = if (severity == DangerSeverity.HIGH) colors.onErrorContainer else colors.onSurfaceVariant
+    val iconColor = when (severity) {
+        DangerSeverity.LOW -> colors.onSurface
+        DangerSeverity.MEDIUM -> colors.tertiary
+        DangerSeverity.HIGH -> colors.onErrorContainer
     }
     
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = cardShape(position),
-        color = bgColor
+        color = containerColor
     ) {
         Row(
             modifier = Modifier
@@ -698,18 +677,18 @@ fun DangerItem(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconTile(icon = icon, tint = contentColor, containerColor = iconBgColor)
+            IconTile(icon = icon, tint = iconColor)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = contentColor
+                    color = titleColor
                 )
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor.copy(alpha = 0.72f)
+                    color = subtitleColor
                 )
             }
         }

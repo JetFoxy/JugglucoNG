@@ -28,6 +28,13 @@ object WearToggleSync {
     const val SCOPE_EXCHANGE = "x"
     const val SCOPE_ALERT = "a"
 
+    /**
+     * Phone → watch only: each alert's "Override silent mode". The watch has no switch for it,
+     * yet it raises the alert itself, so it needs the phone's setting to honour Do Not Disturb
+     * the way the phone does (#902). Never requested from the watch.
+     */
+    const val SCOPE_ALERT_DND = "d"
+
     /** Boolean display preferences the watch is allowed to flip. */
     const val SCOPE_PREF = "p"
 
@@ -63,6 +70,13 @@ object WearToggleSync {
             runCatching { AlertRepository.loadConfig(type).enabled }
                 .getOrNull()
                 ?.let { result += Toggle(SCOPE_ALERT, type.id.toString(), it) }
+        }
+        if (!Applic.isWearable) {
+            AlertType.settingsEntries.forEach { type ->
+                runCatching { AlertRepository.loadConfig(type).overrideDND }
+                    .getOrNull()
+                    ?.let { result += Toggle(SCOPE_ALERT_DND, type.id.toString(), it) }
+            }
         }
         return result
     }
@@ -154,6 +168,15 @@ object WearToggleSync {
                     }.onFailure { Log.stack(LOG_ID, "apply alert ${toggle.id}", it) }
                     applied++
                 }
+                SCOPE_ALERT_DND -> {
+                    // Only the watch takes it: the phone owns the setting.
+                    if (!Applic.isWearable) return@forEach
+                    val type = AlertType.settingsEntries
+                        .firstOrNull { it.id.toString() == toggle.id } ?: return@forEach
+                    runCatching { AlertRepository.applyOverrideDndFromPhone(type, toggle.enabled) }
+                        .onFailure { Log.stack(LOG_ID, "apply alert dnd ${toggle.id}", it) }
+                    applied++
+                }
             }
         }
         if (applied > 0) UiRefreshBus.requestStatusRefresh()
@@ -180,7 +203,7 @@ object WearToggleSync {
         received = toggles
         // Alerts fire on the watch too, and the display preferences are read
         // there, so both have to be written locally from the reply.
-        apply(toggles.filter { it.scope == SCOPE_ALERT || it.scope == SCOPE_PREF })
+        apply(toggles.filter { it.scope == SCOPE_ALERT || it.scope == SCOPE_ALERT_DND || it.scope == SCOPE_PREF })
         UiRefreshBus.requestStatusRefresh()
     }
 
@@ -205,7 +228,12 @@ object WearToggleSync {
 
     // ------------------------------------------------------------- phone side
 
-    @Volatile private var lastSentHash: Int? = null
+    /**
+     * What each watch was last sent, so the ride-along stays silent per watch.
+     * One shared value let a send to one watch hide a change from another, and a
+     * broadcast that never landed hid it from all of them.
+     */
+    private val lastSentHashByNode = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     /** Phone: applies a watch command, then reports the resulting state back. */
     @JvmStatic
@@ -227,9 +255,17 @@ object WearToggleSync {
         val target = nodeName ?: return
         runCatching {
             val payload = encode(currentState())
-            MessageSender.getMessageSender()?.sendToggleState(target, payload)
-            lastSentHash = payload.contentHashCode()
-        }.onFailure { Log.stack(LOG_ID, "pushTo", it) }
+            val sender = MessageSender.getMessageSender()
+            if (sender == null || !MessageSender.outgoingAllowed()) {
+                lastSentHashByNode.remove(target)
+                return
+            }
+            sender.sendToggleState(target, payload)
+            lastSentHashByNode[target] = payload.contentHashCode()
+        }.onFailure {
+            lastSentHashByNode.remove(target)
+            Log.stack(LOG_ID, "pushTo", it)
+        }
     }
 
     /** Phone: broadcasts after a local change, so the watch never lags. */
@@ -239,7 +275,9 @@ object WearToggleSync {
         runCatching {
             val payload = encode(currentState())
             MessageSender.getMessageSender()?.sendToggleState(payload)
-            lastSentHash = payload.contentHashCode()
+            // Which watches it reached is unknown here; let each one's next
+            // ride-along confirm it rather than assume it arrived.
+            lastSentHashByNode.clear()
         }.onFailure { Log.stack(LOG_ID, "push", it) }
     }
 
@@ -251,9 +289,15 @@ object WearToggleSync {
         runCatching {
             val payload = encode(currentState())
             val hash = payload.contentHashCode()
-            if (hash == lastSentHash) return
-            MessageSender.getMessageSender()?.sendToggleState(target, payload)
-            lastSentHash = hash
-        }.onFailure { Log.stack(LOG_ID, "pushIfChanged", it) }
+            if (lastSentHashByNode[target] == hash) return
+            // Nothing went out without a sender, so nothing is remembered as sent.
+            val sender = MessageSender.getMessageSender() ?: return
+            if (!MessageSender.outgoingAllowed()) return
+            sender.sendToggleState(target, payload)
+            lastSentHashByNode[target] = hash
+        }.onFailure {
+            lastSentHashByNode.remove(target)
+            Log.stack(LOG_ID, "pushIfChanged", it)
+        }
     }
 }

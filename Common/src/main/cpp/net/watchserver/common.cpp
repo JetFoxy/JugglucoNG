@@ -46,9 +46,13 @@ static bool ensureexportvalueclass(JNIEnv *env) {
 //raw-primary sensor on its auto lane rather than calibrating against a value that is not
 //there.
 int resolveExportedMgdlAt(const SensorGlucoseData *sens,const sensorname_t *sensorname,
-                          const uint32_t tim,const int storedMgdl,const int rawCurrent) {
+                          const uint32_t tim,const int storedMgdl,const int rawCurrent,const bool primaryIsResolved) {
     if(!sens||!sensorname||storedMgdl<=0)
         return 0;
+    // Upstream primary values are already final, before either the native or
+    // Java calibration layer. The same contract applies on a Clone receiver.
+    if(primaryIsResolved)
+        return storedMgdl;
     int autoMgdl=storedMgdl;
     if(settings->data()->DoCalibrate) {
         if(double calibrated=calibrateONE(sens,tim,(double)storedMgdl);!isnan(calibrated))
@@ -59,7 +63,7 @@ int resolveExportedMgdlAt(const SensorGlucoseData *sens,const sensorname_t *sens
         return autoMgdl;
     const static jmethodID exportedValueMethod = env->GetStaticMethodID(
         exportvalueclass,
-        "resolveExportedValueMgdl",
+        "resolveNativeExportedValueMgdl",
         "(Ljava/lang/String;IIIJ)I"
     );
     if(exportedValueMethod==nullptr) {
@@ -67,9 +71,8 @@ int resolveExportedMgdlAt(const SensorGlucoseData *sens,const sensorname_t *sens
             env->ExceptionClear();
         return autoMgdl;
         }
-    char sensornameStr[64];
-    copyfixedsensorname(sensornameStr,sizeof(sensornameStr),sensorname);
-    auto jsensor=env->NewStringUTF(sensornameStr);
+    const std::string sensorId(sens->sensid());
+    auto jsensor=env->NewStringUTF(sensorId.c_str());
     const auto *info=sens->getinfo();
     const int viewMode=info?info->viewMode:0;
     const int resolved=env->CallStaticIntMethod(
@@ -94,7 +97,7 @@ int resolveExportedMgdl(const SensorGlucoseData *sens, const ScanData *val,
     if(!sens||!val||!sensorname)
         return 0;
     return resolveExportedMgdlAt(sens,sensorname,val->gettime(),val->getmgdL(),
-                                 sens->getRawForPoll(val));
+                                 sens->getRawForPoll(val),val->hasResolvedGlucose());
     }
 
 const ScanData *makeExportedScan(const SensorGlucoseData *sens,

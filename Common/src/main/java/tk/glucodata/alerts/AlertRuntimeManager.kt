@@ -2,6 +2,7 @@ package tk.glucodata.alerts
 
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import tk.glucodata.Applic
 import tk.glucodata.CurrentDisplaySource
@@ -21,7 +22,8 @@ object AlertRuntimeManager {
     private const val LOG_ID = "AlertRuntimeManager"
     private const val CHECK_INTERVAL_MS = 15_000L
 
-    private val scheduler = Executors.newSingleThreadScheduledExecutor()
+    private var scheduler: ScheduledExecutorService? = null
+    private var monitorGeneration = 0L
     private val lock = Any()
     private var monitorTask: ScheduledFuture<*>? = null
 
@@ -34,13 +36,21 @@ object AlertRuntimeManager {
     private var lastLoggedExpiryEndMs: Long = Long.MIN_VALUE
     private var warnedForecastRateUntrusted = false
     private var preLowSuppressionReason: String? = null
+    private var preLowConfidence = ForecastLowConfidencePolicy()
+    private var preLowReturnToBaseline = ForecastLowReturnToBaselineState()
+    private var preLowConfidenceDecision: ForecastLowConfidencePolicy.Decision? = null
     private var preHighIobSuppressed = false
     private var preHighCoverageSkipLogged: String? = null
     private val standardEpisodes = AlertEpisodeState<AlertType>()
     private val sensorExpiryState = SensorExpiryAlertState(AlertRepository.sensorExpiryWarnedStore)
+    private var signalRestoredStateHolder: SignalRestoredAlertState? = null
+    private val signalRestoredState: SignalRestoredAlertState
+        get() = signalRestoredStateHolder ?: SignalRestoredAlertState(
+            SignalRestoredReadingPreferences(Applic.app)
+        ).also { signalRestoredStateHolder = it }
     private val fallingDeltaState = DeltaAlarmState(falling = true)
     private val risingDeltaState = DeltaAlarmState(falling = false)
-    private val calibrationReadingBarrier = ReadingTimestampBarrier()
+    private var calibrationReadingBarrier = ReadingTimestampBarrier()
     // Shared by the standard-glucose and the delta evaluation on purpose: the
     // quiet period must see both families, or one keeps talking over the other.
     private val sameDirectionSuppression = SameDirectionAlertSuppression()
@@ -77,6 +87,8 @@ object AlertRuntimeManager {
         synchronized(lock) {
             val suppressThroughMs = maxOf(lastReadingTimeMs, currentReadingTimeMs)
             calibrationReadingBarrier.suppressThrough(suppressThroughMs)
+            preLowConfidence.reset()
+            preLowReturnToBaseline.clear()
             // A recalibration shifts the displayed value without a real new sample; drop the delta
             // baseline so the jump can't be mistaken for a steep fall/rise.
             fallingDeltaState.resetBaseline()
@@ -132,11 +144,9 @@ object AlertRuntimeManager {
         synchronized(lock) {
             lastReadingTimeMs = maxOf(lastReadingTimeMs, readingTimeMs)
             SensorHandoverRuntime.onReading(sensorId)
-            if (snapshot != null && snapshot.primaryValue.isFinite()) {
-                lastGlucoseValue = snapshot.primaryValue
-                lastRate = snapshot.rate
-                lastDisplaySnapshot = snapshot
-            } else {
+            if (snapshot == null || !snapshot.primaryValue.isFinite()) {
+                preLowConfidence.reset()
+                preLowReturnToBaseline.clear()
                 lastGlucoseValue = Float.NaN
                 lastRate = Float.NaN
                 lastDisplaySnapshot = null
@@ -144,18 +154,44 @@ object AlertRuntimeManager {
                 ensureTaskLocked()
                 return AlertRuntimeEvaluation()
             }
+            // Only usable display readings may advance or consume recovery evidence.
+            lastDisplaySnapshot?.let { signalRestoredState.seed(it.sensorId, it.timeMillis) }
+            val recoveryConfig = AlertRepository.loadConfig(AlertType.SIGNAL_RESTORED)
+            val restored = signalRestoredState.onReading(
+                sensorId, readingTimeMs, System.currentTimeMillis(),
+                if (recoveryConfig.enabled) tk.glucodata.SuperGlucoseAlarms.waitmmsec() else 0L,
+                Notify.glucosetimeout
+            )
+            lastGlucoseValue = snapshot.primaryValue
+            lastRate = snapshot.rate
+            lastDisplaySnapshot = snapshot
             lastDeliveredReadingTimeMs = maxOf(lastDeliveredReadingTimeMs, readingTimeMs)
             ensureTaskLocked()
-            return evaluateLocked(readingTimeMs)
+            val evaluation = evaluateLocked(readingTimeMs)
+            if (restored) {
+                // Each outage starts a new recovery episode. Snooze and time-window
+                // checks remain in the normal delivery gate; a suppressed edge is
+                // consumed now, never announced late on an ordinary later reading.
+                clearRuntimeAlert(AlertType.SIGNAL_RESTORED, "signal-restored-new-episode")
+                // Notify arbitrates on its delivery looper, after every alert family
+                // evaluated above, before changing notification/audio/retry ownership.
+                triggerMessageAlert(
+                    AlertType.SIGNAL_RESTORED,
+                    Applic.app.getString(R.string.alert_signal_restored)
+                )
+            }
+            return evaluation
         }
     }
 
     private fun ensureTaskLocked() {
         if (monitorTask == null || monitorTask?.isCancelled == true) {
-            monitorTask = scheduler.scheduleAtFixedRate(
+            val executor = scheduler ?: Executors.newSingleThreadScheduledExecutor().also { scheduler = it }
+            val generation = monitorGeneration
+            monitorTask = executor.scheduleAtFixedRate(
                 {
                     synchronized(lock) {
-                        evaluateLocked(System.currentTimeMillis())
+                        if (generation == monitorGeneration) evaluateLocked(System.currentTimeMillis())
                     }
                 },
                 CHECK_INTERVAL_MS,
@@ -163,6 +199,43 @@ object AlertRuntimeManager {
                 TimeUnit.MILLISECONDS
             )
         }
+    }
+
+    /** Stop the worker as well as its timer; the next observation creates a fresh executor. */
+    @androidx.annotation.VisibleForTesting
+    internal fun resetForTests(): Boolean {
+        val retired = synchronized(lock) {
+            monitorGeneration++
+            monitorTask?.cancel(false)
+            monitorTask = null
+            val old = scheduler
+            scheduler = null
+            lastReadingTimeMs = 0L
+            lastDeliveredReadingTimeMs = 0L
+            lastGlucoseValue = Float.NaN
+            lastRate = Float.NaN
+            lastDisplaySnapshot = null
+            persistentHighStartedAtMs = 0L
+            lastLoggedExpiryEndMs = Long.MIN_VALUE
+            warnedForecastRateUntrusted = false
+            preLowSuppressionReason = null
+            preLowConfidence = ForecastLowConfidencePolicy()
+            preLowReturnToBaseline = ForecastLowReturnToBaselineState()
+            preLowConfidenceDecision = null
+            preHighIobSuppressed = false
+            preHighCoverageSkipLogged = null
+            signalRestoredStateHolder = null
+            standardEpisodes.clearAll()
+            sensorExpiryState.reset()
+            fallingDeltaState.reset()
+            risingDeltaState.reset()
+            calibrationReadingBarrier = ReadingTimestampBarrier()
+            sameDirectionSuppression.clear()
+            old
+        }
+        // Do not wait while holding the runtime lock: an old tick may be waiting for it.
+        retired?.shutdownNow()
+        return retired?.awaitTermination(5, TimeUnit.SECONDS) ?: true
     }
 
     private fun evaluateLocked(nowMs: Long): AlertRuntimeEvaluation {
@@ -233,15 +306,29 @@ object AlertRuntimeManager {
     }
 
     private fun evaluateStandardGlucoseAlertsLocked(): AlertRuntimeEvaluation {
-        val glucoseValue = currentGlucoseValueLocked() ?: return AlertRuntimeEvaluation()
+        val glucoseValue = currentGlucoseValueLocked() ?: run {
+            preLowConfidence.reset()
+            preLowReturnToBaseline.clear()
+            return AlertRuntimeEvaluation()
+        }
         val rate = currentRateLocked()
         val configs = standardGlucoseAlertTypes.associateWith { AlertRepository.loadConfig(it) }
+        if (configs[AlertType.PRE_LOW]?.preLowEvidenceEnabled == true) {
+            preLowReturnToBaseline.observe(
+                lastDisplaySnapshot?.timeMillis ?: lastReadingTimeMs, glucoseValue,
+                lastDisplaySnapshot?.sensorId, lastDisplaySnapshot?.sensorGen ?: 0,
+                lastDisplaySnapshot?.viewMode ?: 0, Applic.unit == 1
+            )
+        } else {
+            preLowReturnToBaseline.clear()
+        }
         val activeConditions = suppressPreLow(
             suppressIobCoveredPreHigh(
                 resolveActiveStandardGlucoseAlerts(glucoseValue, rate, configs),
                 configs
             ),
-            rate
+            rate,
+            configs[AlertType.PRE_LOW]
         )
         val activeTypes = activeConditions.keys
         val transition = standardEpisodes.update(activeTypes)
@@ -335,21 +422,38 @@ object AlertRuntimeManager {
 
     private fun suppressPreLow(
         conditions: Map<AlertType, StandardGlucoseAlertCondition>,
-        rate: Float
+        rate: Float,
+        config: AlertConfig?
     ): Map<AlertType, StandardGlucoseAlertCondition> {
         preLowSuppressionReason = null
-        val condition = conditions[AlertType.PRE_LOW] ?: return conditions
+        val condition = conditions[AlertType.PRE_LOW] ?: run {
+            preLowConfidence.reset()
+            preLowConfidenceDecision = null
+            return conditions
+        }
         if (!ForecastLowSuppression.hasDownwardArrow(rate)) {
+            preLowConfidence.reset()
+            preLowConfidenceDecision = null
             preLowSuppressionReason = "forecast-low-not-falling"
             return conditions - AlertType.PRE_LOW
         }
+        val nowMs = System.currentTimeMillis()
+        var iobNext30 = Float.NaN
+        var classicIob = Float.NaN
+        var configuredSensitivity = Float.NaN
         val covered = try {
-            val nowMs = System.currentTimeMillis()
-            val cobGrams = tk.glucodata.JournalIobAccess.snapshot(nowMs)?.getOrNull(2) ?: Float.NaN
+            val journal = tk.glucodata.JournalIobAccess.snapshot(nowMs)
+            iobNext30 = journal?.getOrNull(3) ?: Float.NaN
+            classicIob = journal?.getOrNull(0) ?: Float.NaN
+            val cobGrams = journal?.getOrNull(2) ?: Float.NaN
             val prefs = Applic.app.getSharedPreferences(
                 "tk.glucodata_preferences", android.content.Context.MODE_PRIVATE
             )
             val profile = tk.glucodata.data.prediction.PredictionModelProfileStore.parametersAt(prefs, nowMs)
+            val store = tk.glucodata.data.prediction.PredictionModelProfileStore
+            if (prefs.contains(store.PROFILE_KEY) || prefs.contains(store.INSULIN_SENSITIVITY_KEY)) {
+                configuredSensitivity = profile.insulinSensitivityMgDlPerUnit
+            }
             ForecastLowSuppression.cobCoversLow(
                 condition.evaluatedValue, condition.threshold, Applic.unit == 1,
                 cobGrams, profile.carbRatioGramsPerUnit, profile.insulinSensitivityMgDlPerUnit
@@ -359,7 +463,39 @@ object AlertRuntimeManager {
             false
         }
         if (covered) {
+            preLowConfidence.reset()
+            preLowConfidenceDecision = null
             preLowSuppressionReason = "forecast-cob-covered"
+            return conditions - AlertType.PRE_LOW
+        }
+        if (config?.preLowEvidenceEnabled != true) {
+            preLowConfidence.reset()
+            preLowConfidenceDecision = null
+            return conditions
+        }
+        val decision = preLowConfidence.evaluate(
+            condition = condition,
+            rate = rate,
+            readingTimeMs = lastDisplaySnapshot?.timeMillis ?: lastReadingTimeMs,
+            nowMs = nowMs,
+            sensorId = lastDisplaySnapshot?.sensorId,
+            sensorGen = lastDisplaySnapshot?.sensorGen ?: 0,
+            forecastMinutes = config?.forecastMinutes,
+            isMmol = Applic.unit == 1,
+            episodeActive = standardEpisodes.isActive(AlertType.PRE_LOW),
+            iobNext30 = iobNext30,
+            insulinSensitivity = configuredSensitivity,
+            classicIob = classicIob,
+            recentRiseBaselineMgdl = preLowReturnToBaseline.recentRiseBaselineMgdl(nowMs),
+            viewMode = lastDisplaySnapshot?.viewMode ?: 0
+        )
+        if (decision != preLowConfidenceDecision) {
+            Log.i(LOG_ID, "PRE_LOW evidence=$decision glucose=${condition.glucoseValue} " +
+                "projected=${condition.evaluatedValue} iobNext30=$iobNext30")
+            preLowConfidenceDecision = decision
+        }
+        if (!decision.eligible) {
+            preLowSuppressionReason = "forecast-low-confirming"
             return conditions - AlertType.PRE_LOW
         }
         return conditions
@@ -853,6 +989,7 @@ object AlertRuntimeManager {
             null
         } ?: return
 
+        signalRestoredState.seed(latest.sensorId, latest.timeMillis)
         if (lastReadingTimeMs <= 0L) {
             lastReadingTimeMs = latest.timeMillis
         }
